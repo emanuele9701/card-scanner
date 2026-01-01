@@ -24,10 +24,10 @@ const isActive = (path) => {
 
           <!-- Nav Links -->
           <div class="nav-links">
-            <a href="/ocr/upload" :class="['nav-link', { active: isActive('/ocr/upload') }]">
+            <a href="/cards/upload" :class="['nav-link', { active: isActive('/cards/upload') }]">
               <i class="bi bi-camera-fill"></i> Scansiona
             </a>
-            <a href="/ocr/cards" :class="['nav-link', { active: isActive('/ocr/cards') }]">
+            <a href="/cards" :class="['nav-link', { active: isActive('/cards') }]">
               <i class="bi bi-collection-fill"></i> Collezione
             </a>
             <Link href="/collection/value" :class="['nav-link', { active: isActive('/collection') }]">

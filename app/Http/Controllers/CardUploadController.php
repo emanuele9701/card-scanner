@@ -3,25 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\PokemonCard;
+use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use thiagoalessio\TesseractOCR\TesseractOCR;
 
-class OcrController extends Controller
+class CardUploadController extends Controller
 {
     /**
-     * Show the upload form with Cropper.js
+     * Show the upload form interface
      */
     public function showUploadForm()
     {
         $cards = PokemonCard::latest()->take(10)->get();
-        return view('ocr.upload', compact('cards'));
+        return view('cards.upload', compact('cards'));
     }
 
     /**
-     * Step 1: Process the cropped image and perform initial Tesseract OCR
+     * Step 1: Upload and save the cropped card image
      */
-    public function process(Request $request)
+    public function uploadImage(Request $request)
     {
         $request->validate([
             'cropped_image' => 'required|image|mimes:jpeg,png,jpg|max:30720',
@@ -36,47 +36,24 @@ class OcrController extends Controller
         $card = PokemonCard::create([
             'original_filename' => $originalFilename,
             'storage_path' => $path,
-            'status' => PokemonCard::STATUS_REVIEW, // Waiting for user review
+            'status' => PokemonCard::STATUS_PENDING,
         ]);
 
-        // Get full path for Tesseract
-        $fullPath = Storage::disk('public')->path($path);
-
-        try {
-            // Run OCR with Italian and English support
-            $text = (new TesseractOCR($fullPath))
-                ->lang('ita', 'eng')
-                ->run();
-
-            // Update record with initial extracted text
-            $card->update([
-                'extracted_text' => $text,
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'OCR base completato. Revisiona il risultato.',
-                'data' => [
-                    'id' => $card->id,
-                    'extracted_text' => $text,
-                    'image_url' => Storage::url($path),
-                    'status' => 'review'
-                ]
-            ]);
-        } catch (\Exception $e) {
-            $card->update(['status' => PokemonCard::STATUS_FAILED]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Errore durante l\'elaborazione OCR: ' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Immagine caricata con successo.',
+            'data' => [
+                'id' => $card->id,
+                'image_url' => Storage::url($path),
+                'status' => 'pending'
+            ]
+        ]);
     }
 
     /**
-     * Step 2 (Optional): Enhance data with Gemini AI
+     * Step 2: Enhance card data with Gemini AI
      */
-    public function enhance(Request $request, \App\Services\GeminiService $geminiService)
+    public function enhanceWithAI(Request $request, GeminiService $geminiService)
     {
         $request->validate([
             'card_id' => 'required|exists:pokemon_cards,id',
@@ -92,12 +69,16 @@ class OcrController extends Controller
 
         $base64Image = base64_encode(file_get_contents($imagePath));
 
-        $aiResult = $geminiService->enhanceCardData($base64Image, $card->extracted_text ?? '');
+        // Call Gemini AI for card recognition
+        $aiResult = $geminiService->enhanceCardData($base64Image, '');
 
         if ($aiResult) {
+            // Update card status
+            $card->update(['status' => PokemonCard::STATUS_REVIEW]);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Analisi AI completata!',
+                'message' => 'Riconoscimento AI completato!',
                 'data' => $aiResult
             ]);
         }
@@ -109,18 +90,17 @@ class OcrController extends Controller
     }
 
     /**
-     * Step 3: Confirm and Save Final Data
+     * Step 3: Save final card data (from AI or manual entry)
      */
-    public function confirm(Request $request)
+    public function saveCard(Request $request)
     {
         $request->validate([
             'card_id' => 'required|exists:pokemon_cards,id',
-            // fields are optional as per user request
             'card_name' => 'nullable|string',
             'hp' => 'nullable|string',
             'type' => 'nullable|string',
             'evolution_stage' => 'nullable|string',
-            'attacks_json' => 'nullable|string', // We'll receive this as a JSON string from the textarea or hidden field
+            'attacks_json' => 'nullable|string',
             'weakness' => 'nullable|string',
             'resistance' => 'nullable|string',
             'retreat_cost' => 'nullable|string',
@@ -132,14 +112,13 @@ class OcrController extends Controller
 
         $card = PokemonCard::findOrFail($request->card_id);
 
-        // Decode attacks JSON string to valid array/object if present
+        // Decode attacks JSON string if present
         $attacks = null;
         if ($request->attacks_json) {
             $attacks = json_decode($request->attacks_json, true);
         }
 
         $card->update([
-            'extracted_text' => $request->final_text, // Keep the full text for reference if needed
             'card_name' => $request->card_name,
             'hp' => $request->hp,
             'type' => $request->type,
@@ -162,7 +141,7 @@ class OcrController extends Controller
     }
 
     /**
-     * Discard the current scan
+     * Discard a card
      */
     public function discard(Request $request)
     {
@@ -180,7 +159,7 @@ class OcrController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Scansione annullata.'
+            'message' => 'Carta eliminata.'
         ]);
     }
 
@@ -190,7 +169,7 @@ class OcrController extends Controller
     public function index()
     {
         $cards = PokemonCard::latest()->paginate(20);
-        return view('ocr.index', compact('cards'));
+        return view('cards.index', compact('cards'));
     }
 
     /**

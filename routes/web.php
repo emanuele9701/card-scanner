@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\OcrController;
+use App\Http\Controllers\CardUploadController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MarketDataController;
@@ -18,7 +18,7 @@ use App\Http\Controllers\PokemonCardController;
 // Redirect root to login if guest, or upload if authenticated
 Route::get('/', function () {
     return auth()->check()
-        ? redirect()->route('ocr.upload')
+        ? redirect()->route('cards.upload')
         : redirect()->route('login');
 });
 
@@ -42,15 +42,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
-    // OCR routes
-    Route::prefix('ocr')->group(function () {
-        Route::get('/upload', [OcrController::class, 'showUploadForm'])->name('ocr.upload');
-        Route::post('/process', [OcrController::class, 'process'])->name('ocr.process');
-        Route::post('/enhance', [OcrController::class, 'enhance'])->name('ocr.enhance');
-        Route::post('/confirm', [OcrController::class, 'confirm'])->name('ocr.confirm');
-        Route::post('/discard', [OcrController::class, 'discard'])->name('ocr.discard');
-        Route::get('/cards', [OcrController::class, 'index'])->name('ocr.index');
-        Route::delete('/cards/{card}', [OcrController::class, 'destroy'])->name('ocr.destroy');
+    // Card Upload & Management routes
+    Route::prefix('cards')->group(function () {
+        Route::get('/upload', [CardUploadController::class, 'showUploadForm'])->name('cards.upload');
+        Route::post('/upload-image', [CardUploadController::class, 'uploadImage'])->name('cards.upload-image');
+        Route::post('/enhance', [CardUploadController::class, 'enhanceWithAI'])->name('cards.enhance');
+        Route::post('/save', [CardUploadController::class, 'saveCard'])->name('cards.save');
+        Route::post('/discard', [CardUploadController::class, 'discard'])->name('cards.discard');
+        Route::get('/', [CardUploadController::class, 'index'])->name('cards.index');
+        Route::delete('/{card}', [CardUploadController::class, 'destroy'])->name('cards.destroy');
     });
 
     // Pokemon Cards management
