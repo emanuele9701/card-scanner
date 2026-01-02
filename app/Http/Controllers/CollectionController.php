@@ -58,7 +58,7 @@ class CollectionController extends Controller
                 'profit_loss_percentage' => $card->getProfitLossPercentage(),
                 'has_market_data' => $card->hasMarketData(),
                 'available_conditions' => $availableConditions,
-                'image' => $card->storage_path,
+                'image' => $card->storage_path ? \Illuminate\Support\Facades\Storage::url($card->storage_path) : null,
             ];
         });
 

@@ -230,6 +230,9 @@ const updateCondition = (cardId, condition) => {
               <tr v-for="card in filteredCards" :key="card.id" class="hover:bg-gray-750 transition-colors">
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
+                    <div v-if="card.image" class="flex-shrink-0 h-16 w-12 mr-4">
+                        <img :src="card.image" class="h-16 w-12 rounded object-cover border border-gray-600" :alt="card.name">
+                    </div>
                     <div class="text-sm font-medium text-white">{{ card.name || 'Unknown' }}</div>
                   </div>
                 </td>

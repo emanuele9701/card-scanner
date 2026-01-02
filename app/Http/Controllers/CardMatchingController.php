@@ -31,7 +31,7 @@ class CardMatchingController extends Controller
                     'set' => $card->cardSet?->name,
                     'set_abbreviation' => $card->cardSet?->abbreviation,
                     'rarity' => $card->rarity,
-                    'image' => $card->storage_path,
+                    'image' => $card->storage_path ? \Illuminate\Support\Facades\Storage::url($card->storage_path) : null,
                 ];
             });
 
@@ -73,7 +73,7 @@ class CardMatchingController extends Controller
                 'name' => $card->card_name,
                 'number' => $card->set_number,
                 'set' => $card->cardSet?->name,
-                'image' => $card->storage_path,
+                'image' => $card->storage_path ? \Illuminate\Support\Facades\Storage::url($card->storage_path) : null,
             ],
             'suggestions' => $suggestions->map(function ($marketCard) {
                 $latestPrice = $marketCard->latestPrice;

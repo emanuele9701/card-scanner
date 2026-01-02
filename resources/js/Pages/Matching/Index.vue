@@ -159,7 +159,7 @@ const formatPrice = (price) => {
             <div class="aspect-[2/3] bg-gray-900 flex items-center justify-center">
               <img
                 v-if="card.image"
-                :src="`/storage/${card.image}`"
+                :src="card.image"
                 :alt="card.name"
                 class="w-full h-full object-cover"
               />
