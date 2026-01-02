@@ -8,9 +8,10 @@ use Illuminate\Support\Facades\Log;
 
 class PokemonCard extends Model
 {
-    public const STATUS_PENDING = 'pending';
-    public const STATUS_REVIEW = 'review';
-    public const STATUS_COMPLETED = 'completed';
+    public const STATUS_PENDING = 'pending'; // Caricata, da ritagliare
+    public const STATUS_READY_FOR_AI = 'ready_for_ai'; // Ritagliata (o skippata), pronta per AI
+    public const STATUS_REVIEW = 'review'; // Analizzata da AI, da confermare
+    public const STATUS_COMPLETED = 'completed'; // Salvata definitivamente
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
@@ -161,5 +162,27 @@ class PokemonCard extends Model
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Get the URL for streaming this card's image
+     * This uses the ImageController instead of direct storage URL
+     * to allow for authorization checks and avoid symlink issues
+     */
+    public function getImageUrl(): ?string
+    {
+        if (!$this->storage_path) {
+            return null;
+        }
+
+        return route('image.card', ['card' => $this->id]);
+    }
+
+    /**
+     * Get the image URL attribute (for easy access in Blade templates)
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->getImageUrl();
     }
 }

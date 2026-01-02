@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PokemonCard;
+use App\Models\CardSet;
 use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -21,18 +22,19 @@ class CardUploadController extends Controller
     /**
      * Step 1: Upload and save the cropped card image
      */
-    public function uploadImage(Request $request)
+    /**
+     * Step 1: Upload raw image (initial state: pending)
+     */
+    public function uploadRawImage(Request $request)
     {
         $request->validate([
-            'cropped_image' => 'required|image|mimes:jpeg,png,jpg|max:30720',
+            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:30720',
         ]);
 
-        // Save the file
-        $file = $request->file('cropped_image');
+        $file = $request->file('image');
         $originalFilename = $file->getClientOriginalName();
         $path = $file->store('pokemon_cards', 'public');
 
-        // Create initial record
         $card = PokemonCard::create([
             'original_filename' => $originalFilename,
             'storage_path' => $path,
@@ -41,13 +43,97 @@ class CardUploadController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Immagine caricata con successo.',
+            'message' => 'Immagine caricata.',
             'data' => [
                 'id' => $card->id,
-                'image_url' => Storage::url($path),
-                'status' => 'pending'
+                'image_url' => $card->getImageUrl(),
+                'status' => PokemonCard::STATUS_PENDING
             ]
         ]);
+    }
+
+    /**
+     * Step 1b: Save cropped image (transitions to: ready_for_ai)
+     */
+    public function saveCroppedImage(Request $request)
+    {
+        $request->validate([
+            'card_id' => 'required|exists:pokemon_cards,id',
+            'cropped_image' => 'required|image|mimes:jpeg,png,jpg,webp|max:30720',
+        ]);
+
+        $card = PokemonCard::findOrFail($request->card_id);
+
+        // Delete old image if it exists and is different (optional optimization)
+        // For simplicity, we just overwrite/store new one and update path
+
+        $file = $request->file('cropped_image');
+        $path = $file->store('pokemon_cards', 'public');
+
+        // Delete old file to save space
+        if ($card->storage_path && Storage::disk('public')->exists($card->storage_path)) {
+            Storage::disk('public')->delete($card->storage_path);
+        }
+
+        $card->update([
+            'storage_path' => $path,
+            'status' => PokemonCard::STATUS_READY_FOR_AI
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ritaglio salvato.',
+            'data' => [
+                'id' => $card->id,
+                'image_url' => $card->getImageUrl(),
+                'status' => PokemonCard::STATUS_READY_FOR_AI
+            ]
+        ]);
+    }
+
+    /**
+     * Step 1c: Skip cropping (transitions to: ready_for_ai)
+     */
+    public function skipCrop(Request $request)
+    {
+        $request->validate([
+            'card_id' => 'required|exists:pokemon_cards,id',
+        ]);
+
+        $card = PokemonCard::findOrFail($request->card_id);
+
+        $card->update([
+            'status' => PokemonCard::STATUS_READY_FOR_AI
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ritaglio saltato.',
+            'data' => [
+                'id' => $card->id,
+                'status' => PokemonCard::STATUS_READY_FOR_AI
+            ]
+        ]);
+    }
+
+    /**
+     * Legacy method acting as aliases for compatibility if needed, 
+     * but we will update routes.
+     */
+    public function uploadImage(Request $request)
+    {
+        // Redirect to new logic based on input
+        if ($request->has('cropped_image') && !$request->has('image')) {
+            // If it has cropped_image but no card_id, it's the old flow. 
+            // We can support it by creating a new card directly in ready state or adapting.
+            // But for now let's just use uploadRawImage logic adapted.
+
+            // ... adaptation logic omitted, assuming we update frontend routes ...
+            // Behaving as uploadRawImage for now but mapping input
+            $request->merge(['image' => $request->file('cropped_image')]);
+            return $this->uploadRawImage($request);
+        }
+        return $this->uploadRawImage($request);
     }
 
     /**
@@ -108,6 +194,7 @@ class CardUploadController extends Controller
             'set_number' => 'nullable|string',
             'illustrator' => 'nullable|string',
             'flavor_text' => 'nullable|string',
+            'card_set_id' => 'nullable|exists:card_sets,id',
         ]);
 
         $card = PokemonCard::findOrFail($request->card_id);
@@ -131,6 +218,7 @@ class CardUploadController extends Controller
             'set_number' => $request->set_number,
             'illustrator' => $request->illustrator,
             'flavor_text' => $request->flavor_text,
+            'card_set_id' => $request->card_set_id,
             'status' => PokemonCard::STATUS_COMPLETED,
         ]);
 
@@ -164,12 +252,130 @@ class CardUploadController extends Controller
     }
 
     /**
-     * Get all scanned cards
+     * Get all scanned cards grouped by set
      */
     public function index()
     {
-        $cards = PokemonCard::latest()->paginate(20);
-        return view('cards.index', compact('cards'));
+        $allCards = PokemonCard::with('cardSet')
+            ->where('status', PokemonCard::STATUS_COMPLETED)
+            ->orderBy('card_name')
+            ->get();
+
+        // Separate cards with and without sets first
+        $cardsWithoutSet = $allCards->filter(fn($card) => $card->card_set_id === null);
+        $cardsWithSet = $allCards->filter(fn($card) => $card->card_set_id !== null);
+
+        // Group cards with set by set name
+        $cardsBySet = $cardsWithSet->groupBy(fn($card) => $card->cardSet->name);
+
+        return view('cards.index', compact('cardsBySet', 'cardsWithoutSet'));
+    }
+
+    /**
+     * Update a card from the index page
+     */
+    public function updateCard(Request $request, PokemonCard $card)
+    {
+        $request->validate([
+            'card_name' => 'nullable|string',
+            'hp' => 'nullable|string',
+            'type' => 'nullable|string',
+            'evolution_stage' => 'nullable|string',
+            'weakness' => 'nullable|string',
+            'resistance' => 'nullable|string',
+            'retreat_cost' => 'nullable|string',
+            'rarity' => 'nullable|string',
+            'set_number' => 'nullable|string',
+            'illustrator' => 'nullable|string',
+            'flavor_text' => 'nullable|string',
+            'card_set_id' => 'nullable|exists:card_sets,id',
+        ]);
+
+        $card->update($request->only([
+            'card_name',
+            'hp',
+            'type',
+            'evolution_stage',
+            'weakness',
+            'resistance',
+            'retreat_cost',
+            'rarity',
+            'set_number',
+            'illustrator',
+            'flavor_text',
+            'card_set_id'
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Carta aggiornata con successo!',
+            'data' => $card->load('cardSet')
+        ]);
+    }
+
+    /**
+     * Assign set to one or more cards
+     */
+    public function assignSet(Request $request)
+    {
+        $request->validate([
+            'card_ids' => 'required|array',
+            'card_ids.*' => 'exists:pokemon_cards,id',
+            'card_set_id' => 'required|exists:card_sets,id',
+        ]);
+
+        PokemonCard::whereIn('id', $request->card_ids)
+            ->update(['card_set_id' => $request->card_set_id]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Set assegnato con successo!'
+        ]);
+    }
+
+    /**
+     * Get all card sets for dropdown
+     */
+    public function getCardSets()
+    {
+        $sets = CardSet::orderBy('name')->get(['id', 'name', 'abbreviation']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $sets
+        ]);
+    }
+
+    /**
+     * Get single card data for modal display
+     */
+    public function getCardData(PokemonCard $card)
+    {
+        $card->load('cardSet');
+
+        return response()->json([
+            'success' => true,
+            'card' => [
+                'id' => $card->id,
+                'card_name' => $card->card_name,
+                'hp' => $card->hp,
+                'type' => $card->type,
+                'evolution_stage' => $card->evolution_stage,
+                'weakness' => $card->weakness,
+                'resistance' => $card->resistance,
+                'retreat_cost' => $card->retreat_cost,
+                'set_number' => $card->set_number,
+                'rarity' => $card->rarity,
+                'illustrator' => $card->illustrator,
+                'flavor_text' => $card->flavor_text,
+                'condition' => $card->condition,
+                'acquisition_price' => $card->acquisition_price,
+                'image_url' => $card->image_url,
+                'card_set_id' => $card->card_set_id,
+                'card_set' => $card->cardSet ? ['name' => $card->cardSet->name] : null,
+                'estimated_value' => $card->formatted_estimated_value,
+            ]
+        ]);
     }
 
     /**

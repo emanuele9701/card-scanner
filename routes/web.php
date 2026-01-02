@@ -8,6 +8,7 @@ use App\Http\Controllers\MarketDataController;
 use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\CardMatchingController;
 use App\Http\Controllers\PokemonCardController;
+use App\Http\Controllers\ImageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,14 +43,24 @@ Route::middleware('auth')->group(function () {
     Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
+    // Image streaming routes (for secure image access without symlinks)
+    Route::get('/image/card/{card}', [ImageController::class, 'showCardImage'])->name('image.card');
+    Route::get('/image', [ImageController::class, 'showImage'])->name('image.show');
+
     // Card Upload & Management routes
     Route::prefix('cards')->group(function () {
         Route::get('/upload', [CardUploadController::class, 'showUploadForm'])->name('cards.upload');
-        Route::post('/upload-image', [CardUploadController::class, 'uploadImage'])->name('cards.upload-image');
+        Route::post('/upload-image', [CardUploadController::class, 'uploadRawImage'])->name('cards.upload-image'); // Updated to use raw upload
+        Route::post('/save-crop', [CardUploadController::class, 'saveCroppedImage'])->name('cards.save-crop');
+        Route::post('/skip-crop', [CardUploadController::class, 'skipCrop'])->name('cards.skip-crop');
         Route::post('/enhance', [CardUploadController::class, 'enhanceWithAI'])->name('cards.enhance');
         Route::post('/save', [CardUploadController::class, 'saveCard'])->name('cards.save');
         Route::post('/discard', [CardUploadController::class, 'discard'])->name('cards.discard');
         Route::get('/', [CardUploadController::class, 'index'])->name('cards.index');
+        Route::put('/{card}/update', [CardUploadController::class, 'updateCard'])->name('cards.update');
+        Route::post('/assign-set', [CardUploadController::class, 'assignSet'])->name('cards.assign-set');
+        Route::get('/api/card-sets', [CardUploadController::class, 'getCardSets'])->name('api.card-sets');
+        Route::get('/{card}/data', [CardUploadController::class, 'getCardData'])->name('cards.data');
         Route::delete('/{card}', [CardUploadController::class, 'destroy'])->name('cards.destroy');
     });
 

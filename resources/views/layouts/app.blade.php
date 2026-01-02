@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Pokemon Card Scanner') - AI Powered</title>
+    <title>@yield('title', 'Card Scanner') - AI Powered</title>
 
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -76,48 +76,62 @@
             transform: scale(1.02);
         }
 
-        .pokeball-logo {
-            width: 36px;
-            height: 36px;
+        .scanner-logo {
+            width: 32px;
+            height: 40px;
             position: relative;
             display: inline-block;
-            animation: pokeball-float 3s ease-in-out infinite;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            border: 2px solid var(--pokemon-yellow);
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(255, 203, 5, 0.2);
         }
 
-        .pokeball-logo::before {
+        .scanner-logo::before {
             content: '';
             position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: linear-gradient(to bottom, var(--pokemon-red) 45%, #222 45%, #222 55%, #fff 55%);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            top: 4px;
+            left: 4px;
+            right: 4px;
+            bottom: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 2px;
         }
 
-        .pokeball-logo::after {
+        .scanner-logo::after {
             content: '';
             position: absolute;
-            width: 12px;
-            height: 12px;
-            background: #fff;
-            border: 3px solid #222;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            width: 120%;
+            height: 2px;
+            background: var(--pokemon-red);
+            box-shadow: 0 0 8px var(--pokemon-red);
+            top: 0;
+            left: -10%;
+            animation: scan-vertical 2s linear infinite;
         }
 
-        @keyframes pokeball-float {
+        @keyframes scan-vertical {
+            0% {
+                top: 0;
+                opacity: 0;
+            }
 
-            0%,
+            10% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
             100% {
-                transform: translateY(0);
-            }
-
-            50% {
-                transform: translateY(-3px);
+                top: 100%;
+                opacity: 0;
             }
         }
+
+
 
         .nav-link {
             color: rgba(255, 255, 255, 0.8) !important;
@@ -475,8 +489,8 @@
     <nav class="navbar navbar-expand-lg fixed-top">
         <div class="container">
             <a class="navbar-brand" href="{{ route('cards.upload') }}">
-                <span class="pokeball-logo"></span>
-                Pokemon Card Scanner
+                <span class="scanner-logo"></span>
+                Card Scanner
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -484,86 +498,86 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     @auth
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('cards.upload') ? 'active' : '' }}"
-                                href="{{ route('cards.upload') }}">
-                                <i class="bi bi-camera-fill me-1"></i> Scansiona
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('cards.index') ? 'active' : '' }}"
-                                href="{{ route('cards.index') }}">
-                                <i class="bi bi-collection-fill me-1"></i> Collezione
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('collection.*') ? 'active' : '' }}"
-                                href="{{ route('collection.value') }}">
-                                <i class="bi bi-currency-dollar me-1"></i> Valore
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('matching.*') ? 'active' : '' }}"
-                                href="{{ route('matching.index') }}">
-                                <i class="bi bi-link-45deg me-1"></i> Matching
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('market-data.*') ? 'active' : '' }}"
-                                href="{{ route('market-data.index') }}">
-                                <i class="bi bi-cloud-upload me-1"></i> Market Data
-                            </a>
-                        </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('cards.upload') ? 'active' : '' }}"
+                            href="{{ route('cards.upload') }}">
+                            <i class="bi bi-camera-fill me-1"></i> Scansiona
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('cards.index') ? 'active' : '' }}"
+                            href="{{ route('cards.index') }}">
+                            <i class="bi bi-collection-fill me-1"></i> Collezione
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('collection.*') ? 'active' : '' }}"
+                            href="{{ route('collection.value') }}">
+                            <i class="bi bi-currency-dollar me-1"></i> Valore
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('matching.*') ? 'active' : '' }}"
+                            href="{{ route('matching.index') }}">
+                            <i class="bi bi-link-45deg me-1"></i> Matching
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('market-data.*') ? 'active' : '' }}"
+                            href="{{ route('market-data.index') }}">
+                            <i class="bi bi-cloud-upload me-1"></i> Market Data
+                        </a>
+                    </li>
                     @endauth
                 </ul>
 
                 <ul class="navbar-nav">
                     @guest
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('login') ? 'active' : '' }}"
-                                href="{{ route('login') }}">
-                                <i class="bi bi-box-arrow-in-right me-1"></i> Accedi
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="btn btn-pokemon btn-sm ms-2" href="{{ route('register') }}">
-                                <i class="bi bi-person-plus me-1"></i> Registrati
-                            </a>
-                        </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('login') ? 'active' : '' }}"
+                            href="{{ route('login') }}">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Accedi
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-pokemon btn-sm ms-2" href="{{ route('register') }}">
+                            <i class="bi bi-person-plus me-1"></i> Registrati
+                        </a>
+                    </li>
                     @else
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown"
-                                role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                @if(Auth::user()->avatar)
-                                    <img src="{{ Auth::user()->avatar_url }}" alt="Avatar" class="rounded-circle me-2"
-                                        style="width: 28px; height: 28px; object-fit: cover;">
-                                @else
-                                    <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center me-2"
-                                        style="width: 28px; height: 28px;">
-                                        <i class="bi bi-person-fill text-dark small"></i>
-                                    </div>
-                                @endif
-                                {{ Auth::user()->display_name }}
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="userDropdown">
-                                <li>
-                                    <a class="dropdown-item" href="{{ route('profile.show') }}">
-                                        <i class="bi bi-person me-2"></i>Il Mio Profilo
-                                    </a>
-                                </li>
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <li>
-                                    <form action="{{ route('logout') }}" method="POST" class="d-inline">
-                                        @csrf
-                                        <button type="submit" class="dropdown-item text-danger">
-                                            <i class="bi bi-box-arrow-right me-2"></i>Esci
-                                        </button>
-                                    </form>
-                                </li>
-                            </ul>
-                        </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown"
+                            role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            @if(Auth::user()->avatar)
+                            <img src="{{ Auth::user()->avatar_url }}" alt="Avatar" class="rounded-circle me-2"
+                                style="width: 28px; height: 28px; object-fit: cover;">
+                            @else
+                            <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center me-2"
+                                style="width: 28px; height: 28px;">
+                                <i class="bi bi-person-fill text-dark small"></i>
+                            </div>
+                            @endif
+                            {{ Auth::user()->display_name }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="userDropdown">
+                            <li>
+                                <a class="dropdown-item" href="{{ route('profile.show') }}">
+                                    <i class="bi bi-person me-2"></i>Il Mio Profilo
+                                </a>
+                            </li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li>
+                                <form action="{{ route('logout') }}" method="POST" class="d-inline">
+                                    @csrf
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-box-arrow-right me-2"></i>Esci
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
                     @endguest
                 </ul>
             </div>
@@ -594,7 +608,7 @@
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
                 <p>
                     <i class="bi bi-stars me-1"></i>
-                    <strong>Pokemon Card Scanner</strong> - AI powered by Google Gemini
+                    <strong>Card Scanner</strong> - AI powered by Google Gemini
                 </p>
                 <p class="footer-version mt-2 mt-md-0">
                     v1.0.0 &bull; Made with <i class="bi bi-heart-fill text-danger"></i> for collectors
@@ -622,11 +636,11 @@
 
             const iconClass = type === 'success' ? 'bi-check-circle-fill text-success' :
                 type === 'warning' ? 'bi-exclamation-triangle-fill text-warning' :
-                    type === 'info' ? 'bi-info-circle-fill text-info' :
-                        'bi-exclamation-circle-fill text-danger';
+                type === 'info' ? 'bi-info-circle-fill text-info' :
+                'bi-exclamation-circle-fill text-danger';
             const title = type === 'success' ? 'Successo' :
                 type === 'warning' ? 'Attenzione' :
-                    type === 'info' ? 'Info' : 'Errore';
+                type === 'info' ? 'Info' : 'Errore';
 
             const toastHtml = `
                 <div id="${toastId}" class="toast" role="alert">

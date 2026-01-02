@@ -36,7 +36,7 @@ class AuthController extends Controller
 
         Auth::login($user);
 
-        return redirect()->route('ocr.upload')->with('success', 'Registrazione completata! Benvenuto!');
+        return redirect()->route('cards.upload')->with('success', 'Registrazione completata! Benvenuto!');
     }
 
     /**
@@ -60,7 +60,7 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            return redirect()->intended(route('ocr.upload'))->with('success', 'Bentornato!');
+            return redirect()->intended(route('cards.upload'))->with('success', 'Bentornato!');
         }
 
         return back()->withErrors([
