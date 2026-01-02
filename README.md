@@ -5,7 +5,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Laravel](https://img.shields.io/badge/Laravel-12-red.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+![License](https://img.shields.io/badge/license-Personal_Use-red.svg)
 
 ---
 
@@ -226,7 +226,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under a **Personal Use Only License** - see the [LICENSE](LICENSE) file for details. **Commercial use is strictly prohibited.**
 
 ---
 
