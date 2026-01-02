@@ -56,7 +56,7 @@ const submitImport = () => {
     return
   }
 
-  form.post(route('market-data.import'), {
+  form.post('/market-data/import', {
     preserveScroll: true,
     onSuccess: () => {
       form.reset()

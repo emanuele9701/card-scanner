@@ -985,7 +985,7 @@
 
         galleryCards.forEach(card => {
             if (card.state === 'pending' || card.state === 'uploading') stats.pending++;
-            else if (['cropped', 'processing', 'ready'].includes(card.state)) stats.processing++;
+            else if (['cropped', 'processing', 'ready', 'failed'].includes(card.state)) stats.processing++;
             else if (card.state === 'completed') stats.completed++;
         });
 
@@ -1010,7 +1010,7 @@
             // Filter by Tab
             let show = false;
             if (currentTab === 'pending' && (card.state === 'pending' || card.state === 'uploading')) show = true;
-            if (currentTab === 'processing' && ['cropped', 'processing', 'ready'].includes(card.state)) show = true;
+            if (currentTab === 'processing' && ['cropped', 'processing', 'ready', 'failed'].includes(card.state)) show = true;
             if (currentTab === 'completed' && card.state === 'completed') show = true;
 
             if (!show) return;
@@ -1145,10 +1145,34 @@
                 </button>
             `;
         }
+        if (card.state === 'failed') {
+            return `
+                <div class="alert alert-danger p-1 text-center mb-1">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <small>${card.error || 'Errore AI'}</small>
+                </div>
+                <button class="btn btn-sm btn-success" onclick="recognizeWithAI('${fileId}')">
+                    <i class="bi bi-arrow-clockwise"></i> Riprova
+                </button>
+                <button class="btn btn-sm btn-warning" onclick="manualEntry('${fileId}')">
+                    <i class="bi bi-pencil"></i> Manuale
+                </button>
+                <button class="btn btn-sm btn-secondary" onclick="deleteCard('${fileId}')">
+                    <i class="bi bi-trash"></i> Rimuovi
+                </button>
+            `;
+        }
         return '';
     }
 
     function getCardInfoHtml(card) {
+        if (card.state === 'failed' && card.error) {
+            return `
+                <div class="mt-2 small text-danger">
+                    <strong>Errore:</strong> ${card.error}
+                </div>
+            `;
+        }
         if (!card.data) return '';
         return `
             <div class="mt-2 small text-white-50">
@@ -1364,6 +1388,7 @@
     async function recognizeWithAI(fileId, showNotification = true) {
         const card = galleryCards.get(fileId);
         card.state = 'processing';
+        card.error = null;
         updateStats(); // Force re-render to remove checkbox and show spinner
         renderGallery();
 
@@ -1380,18 +1405,31 @@
             });
 
             const result = await response.json();
+
+            if (response.status === 422 && result.is_not_card) {
+                card.state = 'failed';
+                card.error = result.message;
+                updateStats();
+                renderGallery();
+                if (showNotification) showToast(result.message, 'warning');
+                return;
+            }
+
             if (result.success) {
                 card.data = result.data;
                 card.state = 'ready';
                 updateStats();
                 renderGallery();
                 if (showNotification) showToast('Analisi completata!', 'success');
+            } else {
+                throw new Error(result.message || 'Errore durante l\'analisi');
             }
         } catch (error) {
-            card.state = 'cropped'; // Revert state
+            card.state = 'failed';
+            card.error = error.message || 'Errore connessione AI';
             updateStats();
             renderGallery();
-            if (showNotification) showToast('Errore AI', 'error');
+            if (showNotification) showToast(card.error, 'error');
         }
     }
 

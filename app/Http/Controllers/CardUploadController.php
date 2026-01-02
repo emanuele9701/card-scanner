@@ -159,6 +159,18 @@ class CardUploadController extends Controller
         $aiResult = $geminiService->enhanceCardData($base64Image, '');
 
         if ($aiResult) {
+            // Check if AI detected this is NOT a valid card
+            if (isset($aiResult['is_valid_card']) && $aiResult['is_valid_card'] === false) {
+                // Update card status to failed
+                $card->update(['status' => PokemonCard::STATUS_FAILED]);
+
+                return response()->json([
+                    'success' => false,
+                    'is_not_card' => true,
+                    'message' => $aiResult['error_message'] ?? 'L\'immagine non sembra essere una carta da gioco collezionabile'
+                ], 422);
+            }
+
             // Update card status
             $card->update(['status' => PokemonCard::STATUS_REVIEW]);
 

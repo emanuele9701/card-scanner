@@ -30,13 +30,23 @@ class GeminiService
         // In a real app, I'd rely solely on env.
         $apiKey = $this->apiKey;
 
-        $prompt = "Sei un esperto di carte Pokemon TCG. Analizza l'immagine fornita e il testo OCR grezzo per estrarre le informazioni dettagliate della carta.
+        $prompt = "Sei un esperto di carte Pokemon TCG. Analizza l'immagine fornita.
+
+        IMPORTANTE: Prima di tutto, verifica se l'immagine mostra una carta da gioco collezionabile (Pokemon, Magic, Yu-Gi-Oh, o simili).
+        Se l'immagine NON è una carta da gioco, restituisci SOLO questo JSON:
+        {
+            \"is_valid_card\": false,
+            \"error_message\": \"L'immagine non sembra essere una carta da gioco collezionabile\"
+        }
+
+        Se l'immagine È una carta da gioco Pokemon, analizza il testo OCR grezzo per estrarre le informazioni dettagliate.
         
         Testo OCR grezzo:
         {$ocrText}
         
         Rispondi ESCLUSIVAMENTE con un oggetto JSON valido (senza markdown o altro testo) con questa struttura esatta:
         {
+            \"is_valid_card\": true,
             \"card_name\": \"Nome della carta\",
             \"hp\": \"HP (es. 120)\",
             \"type\": \"Tipo (es. Fuoco, Acqua)\",
@@ -51,7 +61,7 @@ class GeminiService
             \"set_number\": \"Numero serie (es. 001/151)\",
             \"illustrator\": \"Illustratore\",
             \"flavor_text\": \"Testo descrittivo\",
-             \"analysis_notes\": \"Breve nota su cosa hai corretto dall'OCR\"
+            \"analysis_notes\": \"Breve nota su cosa hai corretto dall'OCR\"
         }";
 
         $payload = [
@@ -74,7 +84,6 @@ class GeminiService
                 "temperature" => 0.1,
                 "topP" => 0.8,
                 "topK" => 10,
-                // "responseMimeType" => "application/json" // Adding this to enforce JSON mode if supported by the model version
             ]
         ];
 
@@ -92,8 +101,20 @@ class GeminiService
 
                 // Clean up potential markdown code blocks
                 $jsonString = str_replace(['```json', '```'], '', $generatedText);
+                $jsonString = trim($jsonString);
 
-                return json_decode($jsonString, true);
+                $result = json_decode($jsonString, true);
+
+                // Check if it's a valid card
+                if ($result && isset($result['is_valid_card']) && $result['is_valid_card'] === false) {
+                    Log::info('Image rejected: not a valid trading card');
+                    return [
+                        'is_valid_card' => false,
+                        'error_message' => $result['error_message'] ?? 'L\'immagine non è una carta da gioco valida'
+                    ];
+                }
+
+                return $result;
             } else {
                 Log::error('Gemini API Error: ' . $response->body());
                 return null;
