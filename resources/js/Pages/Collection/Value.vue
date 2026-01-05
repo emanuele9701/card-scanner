@@ -83,6 +83,22 @@ const filteredCards = computed(() => {
   return result
 })
 
+// Dynamic stats based on filters
+const filteredStats = computed(() => {
+  const cards = filteredCards.value
+  const totalCards = cards.length
+  const cardsWithMarketData = cards.filter(c => c.has_market_data).length
+  const totalValue = cards.reduce((sum, c) => sum + (parseFloat(c.estimated_value) || 0), 0)
+  
+  return {
+    total_cards: totalCards,
+    cards_with_market_data: cardsWithMarketData,
+    cards_without_market_data: totalCards - cardsWithMarketData,
+    total_value: totalValue,
+    match_rate: totalCards > 0 ? ((cardsWithMarketData / totalCards) * 100).toFixed(2) : 0
+  }
+})
+
 // Sorting handler
 const sort = (field) => {
   if (sortField.value === field) {
@@ -151,19 +167,19 @@ const updateCondition = (cardId, condition) => {
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <StatsCard
           title="Total Cards"
-          :value="stats.total_cards"
-          :subtitle="`${stats.cards_with_market_data} matched`"
+          :value="filteredStats.total_cards"
+          :subtitle="`${filteredStats.cards_with_market_data} matched`"
         />
         <StatsCard
           title="Total Value"
-          :value="formatCurrency(stats.total_value)"
-          :color="stats.total_value > 0 ? 'text-green-400' : 'text-white'"
+          :value="formatCurrency(filteredStats.total_value)"
+          :color="filteredStats.total_value > 0 ? 'text-green-400' : 'text-white'"
         />
         <StatsCard
           title="Match Rate"
-          :value="`${stats.match_rate}%`"
-          :subtitle="`${stats.cards_without_market_data} unmatched`"
-          :color="stats.match_rate >= 80 ? 'text-green-400' : stats.match_rate >= 50 ? 'text-yellow-400' : 'text-red-400'"
+          :value="`${filteredStats.match_rate}%`"
+          :subtitle="`${filteredStats.cards_without_market_data} unmatched`"
+          :color="filteredStats.match_rate >= 80 ? 'text-green-400' : filteredStats.match_rate >= 50 ? 'text-yellow-400' : 'text-red-400'"
         />
       </div>
 

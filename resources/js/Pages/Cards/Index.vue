@@ -8,7 +8,9 @@ import axios from 'axios';
 
 const props = defineProps({
     cardsBySet: Object,
-    cardsWithoutSet: Array
+    cardsWithoutSet: Array,
+    availableGames: Array,
+    availableSets: Array
 });
 
 const { showConfirm, showAlert } = useModal();
@@ -44,6 +46,38 @@ const bulkSetId = ref('');
 
 const selectedCount = computed(() => selectedCards.value.size);
 const hasSelectedCards = computed(() => selectedCards.value.size > 0);
+
+// Filters
+const searchQuery = ref('');
+const selectedGame = ref('');
+const selectedSet = ref('');
+
+const filteredResults = computed(() => {
+    let allCards = [];
+
+    // Flatten cards from sets
+    for (const [setName, cards] of Object.entries(props.cardsBySet)) {
+        allCards = allCards.concat(cards);
+    }
+    
+    // Add cards without sets
+    if (props.cardsWithoutSet) {
+        allCards = allCards.concat(props.cardsWithoutSet);
+    }
+
+    // Filter
+    return allCards.filter(card => {
+        const matchesSearch = !searchQuery.value || 
+            card.card_name?.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
+            card.set_number?.toLowerCase().includes(searchQuery.value.toLowerCase());
+        
+        const matchesGame = !selectedGame.value || card.game === selectedGame.value;
+        const matchesSet = !selectedSet.value || 
+            (card.card_set?.name === selectedSet.value);
+
+        return matchesSearch && matchesGame && matchesSet;
+    });
+});
 
 onMounted(async () => {
     await loadCardSets();
@@ -228,105 +262,121 @@ const saveBulkSet = async () => {
                 <p class="page-subtitle">Tutte le tue carte da gioco organizzate per set</p>
             </div>
 
-            <div v-if="Object.keys(cardsBySet).length > 0 || cardsWithoutSet.length > 0">
-                <!-- Cards organized by set -->
-                <div v-for="(cards, setName) in cardsBySet" :key="setName" class="set-section">
-                    <div class="set-header" @click="toggleSet">
-                        <h3>
-                            <i class="bi bi-collection"></i> {{ setName }}
-                        </h3>
-                        <div class="d-flex align-items-center gap-3">
-                            <span class="set-badge">{{ cards.length }} {{ cards.length == 1 ? 'carta' : 'carte' }}</span>
-                            <i class="bi bi-chevron-down collapse-icon"></i>
-                        </div>
+            <!-- Filters -->
+            <div class="bg-gray-800 rounded-lg p-4 mb-5 border border-gray-700" style="background: rgba(30, 35, 60, 0.8); backdrop-filter: blur(10px); border-radius: 12px;">
+                <div class="row g-3">
+                    <!-- Search -->
+                    <div class="col-md-4">
+                        <label class="form-label text-warning text-sm">Cerca</label>
+                        <input
+                            v-model="searchQuery"
+                            type="search"
+                            placeholder="Cerca per nome o numero..."
+                            class="form-control bg-dark text-white border-secondary"
+                        />
                     </div>
-                    <div class="set-cards">
-                        <div class="row g-3">
-                            <div v-for="card in cards" :key="card.id" class="col-6 col-sm-4 col-md-3 col-lg-2 card-small">
-                                <div class="glass-card" :data-card-id="card.id" :class="{ selected: selectedCards.has(card.id) }">
-                                    <div class="card-selector">
-                                        <input type="checkbox" @change="e => toggleCardSelection(card.id, e.target.checked)">
-                                    </div>
-                                    <img :src="card.image_url" :alt="card.card_name || 'Pokemon Card'" class="card-image" @click="openFullscreenCard(card.image_url)">
-                                    <div class="card-name" :title="card.card_name || 'Sconosciuta'">
-                                        {{ card.card_name || 'Sconosciuta' }}
-                                    </div>
-                                    <div v-if="card.hp || card.type" class="card-meta">
-                                        {{ card.hp ? 'HP ' + card.hp : '' }}
-                                        {{ card.hp && card.type ? ' • ' : '' }}
-                                        {{ card.type || '' }}
-                                    </div>
-                                    <div class="card-actions">
-                                        <button class="btn btn-sm btn-info" @click="viewEditCard(card.id, false)" title="Visualizza">
-                                            <i class="bi bi-eye"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-warning" @click="viewEditCard(card.id, true)" title="Modifica">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-danger" @click="deleteCard(card.id)" title="Elimina">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    
+                    <!-- Game Filter -->
+                    <div class="col-md-4">
+                        <label class="form-label text-warning text-sm">Gioco</label>
+                        <select
+                            v-model="selectedGame"
+                            class="form-select bg-dark text-white border-secondary"
+                        >
+                            <option value="">Tutti i Giochi</option>
+                            <option v-for="game in availableGames" :key="game" :value="game">{{ game }}</option>
+                        </select>
                     </div>
-                </div>
 
-                <!-- Cards without set -->
-                <div v-if="cardsWithoutSet.length > 0" class="noset-section">
-                    <div class="set-header" @click="toggleSet" style="background: transparent; border: none;">
-                        <h3>
-                            <i class="bi bi-question-circle"></i> Senza Set
-                        </h3>
-                        <div class="d-flex align-items-center gap-3">
-                            <span class="set-badge" style="background: #dc3545;">{{ cardsWithoutSet.length }}</span>
-                            <i class="bi bi-chevron-down collapse-icon"></i>
-                        </div>
-                    </div>
-                    <div class="set-cards">
-                        <div class="row g-3">
-                            <div v-for="card in cardsWithoutSet" :key="card.id" class="col-6 col-sm-4 col-md-3 col-lg-2 card-small">
-                                <div class="glass-card" :data-card-id="card.id" :class="{ selected: selectedCards.has(card.id) }">
-                                    <div class="card-selector">
-                                        <input type="checkbox" @change="e => toggleCardSelection(card.id, e.target.checked)">
-                                    </div>
-                                    <img :src="card.image_url" :alt="card.card_name || 'Pokemon Card'" class="card-image" @click="openFullscreenCard(card.image_url)">
-                                    <div class="card-name" :title="card.card_name || 'Sconosciuta'">
-                                        {{ card.card_name || 'Sconosciuta' }}
-                                    </div>
-                                    <div v-if="card.hp || card.type" class="card-meta">
-                                        {{ card.hp ? 'HP ' + card.hp : '' }}
-                                        {{ card.hp && card.type ? ' • ' : '' }}
-                                        {{ card.type || '' }}
-                                    </div>
-                                    <div class="card-actions">
-                                        <button class="btn btn-sm btn-info" @click="viewEditCard(card.id, false)" title="Visualizza">
-                                            <i class="bi bi-eye"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-warning" @click="viewEditCard(card.id, true)" title="Modifica">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-danger" @click="deleteCard(card.id)" title="Elimina">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Set Filter -->
+                    <div class="col-md-4">
+                        <label class="form-label text-warning text-sm">Set</label>
+                        <select
+                            v-model="selectedSet"
+                            class="form-select bg-dark text-white border-secondary"
+                        >
+                            <option value="">Tutti i Set</option>
+                            <option v-for="set in availableSets" :key="set" :value="set">{{ set }}</option>
+                        </select>
                     </div>
                 </div>
             </div>
 
-            <!-- Empty state -->
-            <div v-else class="glass-card p-5 text-center">
-                <i class="bi bi-inbox" style="font-size: 64px; color: rgba(255, 255, 255, 0.3);"></i>
-                <h3 class="mt-3">Nessuna Carta Trovata</h3>
-                <p class="text-white-50">Inizia a scansionare le tue carte!</p>
-                <a href="/cards/upload" class="btn btn-pokemon mt-3">
-                    <i class="bi bi-camera-fill"></i> Carica Carte
-                </a>
+            <div class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700" style="background: rgba(30, 35, 60, 0.5); backdrop-filter: blur(10px); border-radius: 12px;">
+                <div v-if="filteredResults.length > 0" class="overflow-x-auto">
+                    <table class="table table-dark table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">
+                                    <div class="card-selector position-relative">
+                                        <input type="checkbox" @change="e => { if(e.target.checked) filteredResults.forEach(c => selectedCards.add(c.id)); else clearSelection(); }" :checked="filteredResults.length > 0 && selectedCards.size === filteredResults.length">
+                                    </div>
+                                </th>
+                                <th>Carta</th>
+                                <th>Numero</th>
+                                <th>Set</th>
+                                <th>Gioco</th>
+                                <th>Rarità</th>
+                                <th class="text-end">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="card in filteredResults" :key="card.id">
+                                <td>
+                                    <div class="card-selector position-relative">
+                                        <input type="checkbox" @change="e => toggleCardSelection(card.id, e.target.checked)" :checked="selectedCards.has(card.id)">
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <img :src="card.image_url" class="rounded" style="width: 40px; height: 56px; object-fit: cover; cursor: zoom-in;" @click="openFullscreenCard(card.image_url)">
+                                        <div>
+                                            <div class="fw-bold text-warning">{{ card.card_name || 'Sconosciuta' }}</div>
+                                            <div class="small text-white-50" v-if="card.hp || card.type">
+                                                {{ card.hp ? 'HP ' + card.hp : '' }}
+                                                {{ card.hp && card.type ? ' • ' : '' }}
+                                                {{ card.type || '' }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ card.set_number || 'N/A' }}</td>
+                                <td>
+                                    <div v-if="card.card_set">
+                                        <div>{{ card.card_set.name }}</div>
+                                        <div class="small text-white-50">{{ card.card_set.abbreviation }}</div>
+                                    </div>
+                                    <span v-else class="text-white-50 fst-italic">Nessun Set</span>
+                                </td>
+                                <td>{{ card.game || 'N/A' }}</td>
+                                <td>{{ card.rarity || 'N/A' }}</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-dark border-secondary" @click="viewEditCard(card.id, false)" title="Visualizza">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <button class="btn btn-dark border-secondary" @click="viewEditCard(card.id, true)" title="Modifica">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-danger" @click="deleteCard(card.id)" title="Elimina">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty state -->
+                <div v-else class="p-5 text-center">
+                    <i class="bi bi-inbox" style="font-size: 64px; color: rgba(255, 255, 255, 0.3);"></i>
+                    <h3 class="mt-3">Nessuna Carta Trovata</h3>
+                    <p class="text-white-50">Prova a modificare i filtri di ricerca.</p>
+                </div>
             </div>
+
+
         </div>
 
         <!-- Floating Action Bar -->

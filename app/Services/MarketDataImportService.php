@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CardSet;
+use App\Models\Game;
 use App\Models\MarketCard;
 use App\Models\MarketPrice;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,14 @@ class MarketDataImportService
                     $stats['sets_created']++;
                 }
 
+                // Ensure game exists
+                $game = Game::firstOrCreate(
+                    [
+                        'name' => $firstVariant['game'],
+                        'user_id' => auth()->id()
+                    ]
+                );
+
                 // Create or update market card
                 $marketCard = MarketCard::updateOrCreate(
                     [
@@ -58,6 +67,7 @@ class MarketDataImportService
                         'rarity' => $firstVariant['rarity'],
                         'type' => $firstVariant['type'],
                         'game' => $firstVariant['game'],
+                        'game_id' => $game->id,
                         'is_supplemental' => $firstVariant['isSupplemental'],
                     ]
                 );

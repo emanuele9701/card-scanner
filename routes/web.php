@@ -9,6 +9,7 @@ use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\CardMatchingController;
 use App\Http\Controllers\PokemonCardController;
 use App\Http\Controllers\ImageController;
+use App\Http\Controllers\AdminController;
 
 /*
 |--------------------------------------------------------------------------
@@ -90,3 +91,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/cards/{card}/unmatch', [CardMatchingController::class, 'unmatch'])->name('matching.unmatch');
     });
 });
+
+// Admin / Utility Routes
+Route::get('/admin/reset-database', [AdminController::class, 'resetDatabase'])->name('admin.reset-database');

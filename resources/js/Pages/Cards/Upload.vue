@@ -380,7 +380,7 @@ const openEditModal = async (card) => {
     
     // If AI detected a game that's NOT in the available list, clear it
     // This forces the user to manually select a valid game
-    if (card.data && card.data.game && !availableGames.value.includes(card.data.game)) {
+    if (card.data && card.data.game && !availableGames.value.some(g => g.name === card.data.game)) {
         console.warn(`AI detected game "${card.data.game}" is not in available games list. User must select manually.`);
         editForm.game = '';
         validationErrors.value.game = `Il game "${card.data.game}" rilevato dall'AI non è valido. Seleziona manualmente.`;
@@ -919,8 +919,8 @@ onBeforeUnmount(() => {
                                         :class="{ 'border-error': validationErrors.game }"
                                     >
                                         <option value="">Seleziona Game...</option>
-                                        <option v-for="game in availableGames" :key="game" :value="game">
-                                            {{ game }}
+                                        <option v-for="game in availableGames" :key="game.id" :value="game.name">
+                                            {{ game.name }}
                                         </option>
                                     </select>
                                     <span v-if="validationErrors.game" class="error-message">

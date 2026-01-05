@@ -19,6 +19,7 @@ class CollectionController extends Controller
             'cardSet',
             'marketCard.latestPrice'
         ])
+            ->where('user_id', auth()->id())
             ->where('status', PokemonCard::STATUS_COMPLETED)
             ->get();
 
@@ -66,13 +67,15 @@ class CollectionController extends Controller
         });
 
         // Get unique games and sets for filters
-        $availableGames = PokemonCard::where('status', PokemonCard::STATUS_COMPLETED)
+        $availableGames = PokemonCard::where('user_id', auth()->id())
+            ->where('status', PokemonCard::STATUS_COMPLETED)
             ->distinct()
             ->whereNotNull('game')
             ->orderBy('game')
             ->pluck('game');
 
         $availableSets = PokemonCard::with('cardSet')
+            ->where('user_id', auth()->id())
             ->where('status', PokemonCard::STATUS_COMPLETED)
             ->whereNotNull('card_set_id')
             ->get()

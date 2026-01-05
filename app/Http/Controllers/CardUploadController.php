@@ -330,6 +330,18 @@ class CardUploadController extends Controller
             $attacks = json_decode($request->attacks_json, true);
         }
 
+        // Ensure game exists and get ID
+        $gameId = null;
+        if ($request->game) {
+            $gameModel = \App\Models\Game::firstOrCreate(
+                [
+                    'name' => $request->game,
+                    'user_id' => auth()->id()
+                ]
+            );
+            $gameId = $gameModel->id;
+        }
+
         $card->update([
             'card_name' => $request->card_name,
             'hp' => $request->hp,
@@ -345,6 +357,7 @@ class CardUploadController extends Controller
             'flavor_text' => $request->flavor_text,
             'card_set_id' => $request->card_set_id,
             'game' => $request->game,
+            'game_id' => $gameId,
             'status' => PokemonCard::STATUS_COMPLETED,
         ]);
 
@@ -388,16 +401,28 @@ class CardUploadController extends Controller
             ->orderBy('card_name')
             ->get();
 
+
         // Separate cards with and without sets first
-        $cardsWithoutSet = $allCards->filter(fn($card) => $card->card_set_id === null);
+        $cardsWithoutSet = $allCards->filter(fn($card) => $card->card_set_id === null)->values();
         $cardsWithSet = $allCards->filter(fn($card) => $card->card_set_id !== null);
 
         // Group cards with set by set name
         $cardsBySet = $cardsWithSet->groupBy(fn($card) => $card->cardSet->name);
 
+
         return Inertia::render('Cards/Index', [
             'cardsBySet' => $cardsBySet,
-            'cardsWithoutSet' => $cardsWithoutSet
+            'cardsWithoutSet' => $cardsWithoutSet,
+            'availableGames' => PokemonCard::where('user_id', auth()->id())
+                ->whereNotNull('game')
+                ->distinct()
+                ->pluck('game')
+                ->sort()
+                ->values(),
+            'availableSets' => $cardsWithSet->pluck('cardSet.name')
+                ->unique()
+                ->sort()
+                ->values()
         ]);
     }
 
@@ -425,7 +450,7 @@ class CardUploadController extends Controller
             'game' => 'nullable|string',
         ]);
 
-        $card->update($request->only([
+        $data = $request->only([
             'card_name',
             'hp',
             'type',
@@ -439,7 +464,19 @@ class CardUploadController extends Controller
             'flavor_text',
             'card_set_id',
             'game'
-        ]));
+        ]);
+
+        if ($request->has('game')) {
+            $gameModel = \App\Models\Game::firstOrCreate(
+                [
+                    'name' => $request->game,
+                    'user_id' => auth()->id()
+                ]
+            );
+            $data['game_id'] = $gameModel->id;
+        }
+
+        $card->update($data);
 
         return response()->json([
             'success' => true,
@@ -483,14 +520,13 @@ class CardUploadController extends Controller
     }
 
     /**
-     * Get all available games for dropdown (DISTINCT from MarketCard)
+     * Get all available games for dropdown (from Games table)
      */
     public function getAvailableGames()
     {
-        $games = \App\Models\MarketCard::distinct()
-            ->whereNotNull('game')
-            ->orderBy('game')
-            ->pluck('game');
+        $games = \App\Models\Game::where('user_id', auth()->id())
+            ->orderBy('name')
+            ->get();
 
         return response()->json([
             'success' => true,

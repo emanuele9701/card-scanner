@@ -20,6 +20,7 @@ class MarketCard extends Model
         'rarity',
         'type',
         'game',
+        'game_id',
         'is_supplemental',
     ];
 
@@ -46,6 +47,14 @@ class MarketCard extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the game this card belongs to
+     */
+    public function game(): BelongsTo
+    {
+        return $this->belongsTo(Game::class);
     }
 
     /**
