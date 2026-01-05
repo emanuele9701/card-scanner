@@ -54,6 +54,15 @@ class PokemonCard extends Model
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = [
+        'image_url',
+    ];
+
+    /**
      * Get the card set this card belongs to
      */
     public function cardSet(): BelongsTo

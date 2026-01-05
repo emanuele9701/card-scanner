@@ -18,11 +18,28 @@ class ImageController extends Controller
      */
     public function showCardImage(PokemonCard $card)
     {
+        \Log::info('ImageController: showCardImage called', [
+            'card_id' => $card->id,
+            'card_user_id' => $card->user_id,
+            'auth_user_id' => auth()->id(),
+            'storage_path' => $card->storage_path
+        ]);
+
         if ($card->user_id !== auth()->id()) {
-            abort(403);
+            \Log::warning('ImageController: Unauthorized access attempt', [
+                'card_id' => $card->id,
+                'card_user_id' => $card->user_id,
+                'auth_user_id' => auth()->id()
+            ]);
+            abort(403, 'Non autorizzato');
         }
+
         // Check if the file exists
         if (!$card->storage_path || !Storage::disk('public')->exists($card->storage_path)) {
+            \Log::error('ImageController: Image not found', [
+                'card_id' => $card->id,
+                'storage_path' => $card->storage_path
+            ]);
             abort(404, 'Immagine non trovata');
         }
 
@@ -34,6 +51,13 @@ class ImageController extends Controller
 
         // Get file size
         $fileSize = Storage::disk('public')->size($card->storage_path);
+
+        \Log::info('ImageController: Serving image', [
+            'card_id' => $card->id,
+            'file_path' => $filePath,
+            'mime_type' => $mimeType,
+            'file_size' => $fileSize
+        ]);
 
         // Stream the file
         return response()->stream(
