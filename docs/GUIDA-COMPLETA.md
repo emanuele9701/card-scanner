@@ -69,6 +69,17 @@
 - Routing client-side con Inertia.js Router
 - Import Bootstrap CSS/JS in `app.js` per styling consistente
 
+**📦 Market Data Ownership:**
+- Esteso il sistema multi-utente anche ai dati di mercato (`market_cards`)
+- Aggiunta colonna `user_id` e relazione `belongsTo`
+- Implementato Global Scope automatico per isolare i dati di importazione per ogni utente
+- Aggiornato `MarketDataImportService` per associare i dati importati all'utente corrente
+
+**🗑️ Gestione Avanzata Cancellazione:**
+- Nuova funzionalità "Svuota Tutto" con pulizia fisica (DB + Storage)
+- Possibilità di eliminare singolarmente le carte in bozza in qualsiasi stato (Pending, Cropped, Ready)
+- Sistema di feedback visivo con modali di conferma personalizzati (`ConfirmModal`)
+
 ---
 
 ## 🎯 Introduzione e Scopo della Piattaforma

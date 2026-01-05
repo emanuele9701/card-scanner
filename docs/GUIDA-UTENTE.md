@@ -145,6 +145,14 @@ Prima di aggiungere le tue carte, devi importare i **prezzi di mercato** delle c
 
 > **Quando farlo?** Importa i dati **una volta per ogni set** che acquisti
 
+### 🔒 I Tuoi Dati Sono Privati
+La piattaforma è multi-utente, il che significa che ogni utente ha la propria collezione privata.
+- **Tu vedi solo le tue carte**
+- **Tu gestisci solo i tuoi dati di mercato**
+- Nessun altro utente può vedere o modificare la tua collezione
+
+---
+
 ### 2️⃣ Scansiona le Tue Carte
 
 1. Clicca su **"Scansiona"** nel menu (icona fotocamera)
@@ -154,14 +162,18 @@ Prima di aggiungere le tue carte, devi importare i **prezzi di mercato** delle c
 3. **Ritaglia** ogni carta (opzionale):
    - Clicca "Ritaglia" per inquadrare meglio la carta
    - Oppure "Salta Ritaglio" per usare l'immagine originale
+   - 🗑️ **Elimina**: Se la foto non va bene, puoi eliminarla subito cliccando l'icona cestino
 4. **Riconosci con AI**:
    - Clicca l'icona "bacchetta magica" 🪄
    - L'AI estrarrà automaticamente tutti i dati della carta
+   - Anche in questa fase puoi eliminare la carta se necessario
 5. **Verifica e Salva**:
    - Controlla che i dati siano corretti
    - Seleziona il **Set** di appartenenza
    - Indica la **Condizione** (Near Mint, Lightly Played, etc.)
    - Clicca **"Salva"**
+
+> 🧹 **Reset Galleria**: Il pulsante "Svuota Tutto" elimina **definitivamente** tutte le carte visualizzate, rimuovendole sia dal database che dallo spazio di archiviazione fisico. Usalo con cautela!
 
 ### 3️⃣ Collega le Carte ai Prezzi
 
