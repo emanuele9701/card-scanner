@@ -6,13 +6,33 @@ use App\Models\PokemonCard;
 use App\Models\CardSet;
 use App\Services\GeminiService;
 use App\Services\ImageResizeService;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 use Inertia\Inertia;
 
 class CardUploadController extends Controller
 {
+    /**
+     * Helper function to log memory usage
+     */
+    private function logMemoryUsage(string $step, array $extraData = []): void
+    {
+        $memoryUsage = memory_get_usage(true);
+        $memoryPeak = memory_get_peak_usage(true);
+        $memoryLimit = ini_get('memory_limit');
+
+        Log::info("MEMORY TRACKING - {$step}", array_merge([
+            'memory_current_mb' => round($memoryUsage / 1024 / 1024, 2),
+            'memory_peak_mb' => round($memoryPeak / 1024 / 1024, 2),
+            'memory_limit' => $memoryLimit,
+            'memory_current_bytes' => $memoryUsage,
+            'memory_peak_bytes' => $memoryPeak,
+        ], $extraData));
+    }
+
     /**
      * Show the upload form interface
      */
@@ -44,34 +64,100 @@ class CardUploadController extends Controller
      */
     public function uploadRawImage(Request $request)
     {
-        $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:30720',
-        ]);
+        try {
+            $this->logMemoryUsage('START - Upload raw image');
 
-        $file = $request->file('image');
-        $originalFilename = $file->getClientOriginalName();
-        $path = $file->store('pokemon_cards', 'public');
+            Log::info('Starting raw image upload', [
+                'user_id' => auth()->id(),
+                'has_image' => $request->hasFile('image')
+            ]);
 
-        // Resize image if needed
-        $imageResizeService = app(ImageResizeService::class);
-        $imageResizeService->resizeIfNeeded($path, 'public');
+            $request->validate([
+                'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:30720',
+            ]);
 
-        $card = PokemonCard::create([
-            'user_id' => auth()->id(),
-            'original_filename' => $originalFilename,
-            'storage_path' => $path,
-            'status' => PokemonCard::STATUS_PENDING,
-        ]);
+            $this->logMemoryUsage('AFTER - Validation');
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Immagine caricata.',
-            'data' => [
-                'id' => $card->id,
-                'image_url' => $card->getImageUrl(),
-                'status' => PokemonCard::STATUS_PENDING
-            ]
-        ]);
+            $file = $request->file('image');
+            $originalFilename = $file->getClientOriginalName();
+            $fileSize = $file->getSize();
+
+            Log::info('Image file received', [
+                'filename' => $originalFilename,
+                'size' => $fileSize,
+                'size_mb' => round($fileSize / 1024 / 1024, 2),
+                'mime_type' => $file->getMimeType(),
+                'extension' => $file->getClientOriginalExtension()
+            ]);
+
+            $this->logMemoryUsage('AFTER - File info extracted', [
+                'file_size_mb' => round($fileSize / 1024 / 1024, 2)
+            ]);
+
+            $path = $file->store('pokemon_cards', 'public');
+
+            Log::info('Image stored', ['path' => $path]);
+
+            $this->logMemoryUsage('AFTER - File stored to disk');
+
+            // Force garbage collection before resize
+            gc_collect_cycles();
+            $this->logMemoryUsage('AFTER - Garbage collection');
+
+            // Resize image if needed
+            $imageResizeService = app(ImageResizeService::class);
+            $wasResized = $imageResizeService->resizeIfNeeded($path, 'public');
+
+            $this->logMemoryUsage('AFTER - Resize service completed', [
+                'was_resized' => $wasResized
+            ]);
+
+            // Force garbage collection after resize
+            gc_collect_cycles();
+            $this->logMemoryUsage('AFTER - Garbage collection post-resize');
+
+            Log::info('Image resize check completed', [
+                'was_resized' => $wasResized,
+                'path' => $path
+            ]);
+
+            $card = PokemonCard::create([
+                'user_id' => auth()->id(),
+                'original_filename' => $originalFilename,
+                'storage_path' => $path,
+                'status' => PokemonCard::STATUS_PENDING,
+            ]);
+
+            $this->logMemoryUsage('AFTER - Database record created');
+
+            Log::info('PokemonCard record created', [
+                'card_id' => $card->id,
+                'status' => $card->status
+            ]);
+
+            $this->logMemoryUsage('END - Upload raw image completed');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Immagine caricata.',
+                'data' => [
+                    'id' => $card->id,
+                    'image_url' => $card->getImageUrl(),
+                    'status' => PokemonCard::STATUS_PENDING
+                ]
+            ]);
+        } catch (Exception $e) {
+            $this->logMemoryUsage('ERROR - Exception caught');
+
+            Log::error('Error uploading raw image', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore durante il caricamento dell\'immagine.'
+            ], 500);
+        }
     }
 
     /**

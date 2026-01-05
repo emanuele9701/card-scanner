@@ -97,32 +97,122 @@ const handleFileSelect = (e) => {
     handleFiles(e.target.files);
 };
 
+/**
+ * Resize image client-side if it exceeds 1920x1080 (1080p)
+ * @param {File} file - The image file to resize
+ * @returns {Promise<File>} - The resized file or original if within limits
+ */
+const resizeImageIfNeeded = (file) => {
+    return new Promise((resolve, reject) => {
+        const MAX_WIDTH = 1920;
+        const MAX_HEIGHT = 1080;
+        const QUALITY = 0.85; // 85% quality for JPEG
+
+        // Create image object
+        const img = new Image();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        img.onload = () => {
+            const width = img.width;
+            const height = img.height;
+
+            console.log(`[CLIENT RESIZE] Original: ${width}x${height}, File size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+
+            // Check if resize is needed
+            if (width <= MAX_WIDTH && height <= MAX_HEIGHT) {
+                console.log('[CLIENT RESIZE] No resize needed - within limits');
+                resolve(file);
+                return;
+            }
+
+            // Calculate new dimensions maintaining aspect ratio
+            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+            const newWidth = Math.floor(width * ratio);
+            const newHeight = Math.floor(height * ratio);
+
+            console.log(`[CLIENT RESIZE] Resizing to: ${newWidth}x${newHeight}, Ratio: ${ratio.toFixed(4)}`);
+
+            // Set canvas dimensions
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+
+            // Draw resized image
+            ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+            // Convert canvas to blob
+            canvas.toBlob(
+                (blob) => {
+                    if (!blob) {
+                        reject(new Error('Failed to create blob'));
+                        return;
+                    }
+
+                    console.log(`[CLIENT RESIZE] New file size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+
+                    // Create new File object from blob
+                    const resizedFile = new File(
+                        [blob],
+                        file.name,
+                        {
+                            type: file.type || 'image/jpeg',
+                            lastModified: Date.now()
+                        }
+                    );
+
+                    resolve(resizedFile);
+                },
+                file.type || 'image/jpeg',
+                QUALITY
+            );
+        };
+
+        img.onerror = () => {
+            reject(new Error('Failed to load image'));
+        };
+
+        // Load image
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            img.src = e.target.result;
+        };
+        reader.onerror = () => {
+            reject(new Error('Failed to read file'));
+        };
+        reader.readAsDataURL(file);
+    });
+};
+
 const handleFiles = async (files) => {
     currentTab.value = 'pending';
     const fileArray = Array.from(files).filter(file => file.type.startsWith('image/'));
 
-    for (const file of fileArray) {
+    for (const originalFile of fileArray) {
         const tempId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         
-        // Add to local state immediately
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            cards.value.push({
-                tempId: tempId,
-                id: null, // Server ID
-                thumbnail: e.target.result,
-                state: 'uploading',
-                data: null,
-                error: null
-            });
-        };
-        reader.readAsDataURL(file);
-
-        // Upload
-        const formData = new FormData();
-        formData.append('image', file);
-
         try {
+            // Resize image if needed BEFORE upload
+            console.log(`[UPLOAD] Processing file: ${originalFile.name}`);
+            const file = await resizeImageIfNeeded(originalFile);
+            
+            // Add to local state immediately
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                cards.value.push({
+                    tempId: tempId,
+                    id: null, // Server ID
+                    thumbnail: e.target.result,
+                    state: 'uploading',
+                    data: null,
+                    error: null
+                });
+            };
+            reader.readAsDataURL(file);
+
+            // Upload resized file
+            const formData = new FormData();
+            formData.append('image', file);
+
             const response = await axios.post('/cards/upload-image', formData);
             const cardIndex = cards.value.findIndex(c => c.tempId === tempId);
             if (cardIndex !== -1) {
@@ -131,14 +221,14 @@ const handleFiles = async (files) => {
                 cards.value[cardIndex].thumbnail = response.data.data.image_url;
             }
         } catch (error) {
-            console.error(error);
+            console.error('[UPLOAD ERROR]', error);
             const cardIndex = cards.value.findIndex(c => c.tempId === tempId);
             if (cardIndex !== -1) {
                  // Remove failed uploads for now or show error state?
                  // Let's remove to match blade logic roughly or show error
                  cards.value.splice(cardIndex, 1);
             }
-            showToast('Errore upload: ' + file.name, 'error');
+            showToast('Errore upload: ' + originalFile.name, 'error');
         }
     }
 };
