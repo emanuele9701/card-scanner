@@ -1,79 +1,91 @@
-# 🎴 Pokemon Card Scanner
+# 🎴 Card Scanner
 
-> **AI-powered Pokemon Card Collection Manager**  
-> Scan, organize, and track the value of your Pokemon TCG collection with the power of Google Gemini AI.
+> **AI-Powered Trading Card Collection Manager**  
+> Scan, organize, and track the value of your trading card collection with the power of Google Gemini AI.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![Laravel](https://img.shields.io/badge/Laravel-12-red.svg)
-![License](https://img.shields.io/badge/license-Personal_Use-red.svg)
+![License](https://img.shields.io/badge/license-Personal_Use_Only-red.svg)
 
 ---
 
-## ✨ Features
+## ⚠️ Important Notice
 
-### 🤖 **AI-Powered Card Recognition**
-- Automatic card identification using **Google Gemini 2.5 Flash**
-- Extracts card name, HP, type, attacks, rarity, and more
-- Smart image analysis for accurate data extraction
+**This application is intended for PERSONAL USE ONLY.**
 
-### 📸 **Intuitive Upload Interface**
+This software is released exclusively for private, non-commercial use. **Commercial use, resale, or any profit-generating activity is strictly prohibited** and violates the license terms.
+
+If you wish to use this application, please install it on your own server or use the demo instance available at:
+
+**🔗 [https://gmapsextractor.altervista.org/](https://gmapsextractor.altervista.org/)**
+
+> **Note:** The demo instance automatically resets all data (cards, collections, market data) daily at midnight (00:00) to prevent resource saturation. Do not use it for long-term data storage.
+
+---
+
+## 📖 What is Card Scanner?
+
+Card Scanner is a **free, open-source web application** designed to help trading card collectors:
+
+- 📊 **Catalog** your collection of trading cards (Pokemon, Magic: The Gathering, Yu-Gi-Oh!, Force of Will, and more)
+- 🤖 **Automatically recognize** card information printed on the card using AI
+- 💰 **Track the market value** of your cards using imported market data
+- 📈 **Calculate profit and loss** for your collection over time
+- 🎮 **Manage multiple games** in a single application with automatic game detection
+
+---
+
+## ✨ Key Features
+
+### 🤖 AI-Powered Card Recognition
+- Automatic card data extraction using **Google Gemini 2.5 Flash**
+- Extracts visible information: name, HP, type, attacks, rarity, card number
+- **Automatic game detection** (Pokemon, Magic, Yu-Gi-Oh!, etc.)
+- Creates new games automatically if not already in your collection
+
+### 📸 Intuitive Upload Workflow
 - **Multi-image upload** with drag & drop support
-- **Built-in image cropper** for perfect card framing
-- **Gallery view** to manage multiple cards simultaneously
+- **Built-in image cropper** for precise card framing
+- **Gallery view** to manage multiple cards at once
+- Individual card deletion before saving
 
-### 💎 **Collection Management**
-- Browse your complete card collection
-- Track card conditions (Near Mint, Lightly Played, etc.)
-- Link cards to market pricing data
-- Calculate collection value and profit/loss
+### 💎 Collection Management
+- Browse your complete card collection organized by set
+- Track card **conditions** (Near Mint, Lightly Played, Moderately Played, etc.)
+- **Manual set assignment** via collection interface
+- Multi-game support in a single application
+- User authentication with private collections
 
-### 📊 **Market Data Integration**
-- Import market prices from CSV files
+### 📊 Market Data Integration
+- Import market prices from **TCGPlayer** (JSON format)
+- **Auto-matching system** to link cards with market data
 - Track real-time collection value
-- Monitor price variations over time
-- Auto-matching system for cards and market data
+- Calculate **P&L (Profit & Loss)** in EUR and percentage
 
-### 🎨 **Beautiful Modern UI**
-- **Dark themed** Pokemon-inspired design
-- **Glassmorphism** effects and smooth animations
+### 🎨 Modern, Responsive UI
+- **Dark-themed** modern design
+- Built with **Vue.js 3 + Inertia.js** for a seamless SPA experience
+- **TailwindCSS v4** for styling
 - Fully **responsive** (mobile, tablet, desktop)
-- Custom Pokemon type badges and colors
-
----
-
-## 🚀 How It Works
-
-### 1. **Upload Your Cards**
-Take photos of your Pokemon cards or select existing images from your device.
-
-### 2. **Crop & Process**
-Use the built-in cropper to isolate each card for better AI recognition.
-
-### 3. **AI Recognition or Manual Entry**
-- **Option A**: Let Gemini AI automatically extract all card details
-- **Option B**: Manually enter card information
-
-### 4. **Save & Organize**
-Review the extracted data, make any necessary edits, and save to your collection.
-
-### 5. **Track Value**
-Link cards to market data and monitor your collection's value over time.
+- Custom modals and confirmation dialogs
 
 ---
 
 ## 🛠️ Technology Stack
 
 ### Backend
-- **Laravel 12** - PHP framework
-- **PHP 8.2+** - Modern PHP features
-- **MySQL** - Database
-- **Google Gemini API** - AI card recognition
+- **Laravel 12** - Modern PHP framework
+- **PHP 8.2+** - Latest PHP features
+- **MySQL/MariaDB** - Database
+- **Google Gemini 2.5 Flash API** - AI card recognition
+- **Intervention Image** - Image processing
 
 ### Frontend
-- **Blade Templates** - Server-side rendering
-- **Vue.js 3 + Inertia.js** - Interactive components
-- **Bootstrap 5** - UI framework
-- **Cropper.js** - Image cropping functionality
+- **Vue.js 3** - Progressive JavaScript framework
+- **Inertia.js** - Modern monolith (no separate API needed)
+- **TailwindCSS v4** - Utility-first CSS framework
+- **Bootstrap 5** - UI components
+- **Cropper.js** - Advanced image cropping
 
 ---
 
@@ -81,116 +93,124 @@ Link cards to market data and monitor your collection's value over time.
 
 ### Prerequisites
 
-- PHP >= 8.2
-- Composer
-- Node.js >= 18
-- MySQL or PostgreSQL
-- Google Gemini API Key ([Get one here](https://ai.google.dev/))
+- **PHP** >= 8.2
+- **Composer** - PHP dependency manager
+- **Node.js** >= 18 + npm
+- **MySQL** or **MariaDB**
+- **Google Gemini API Key** ([Get one here](https://aistudio.google.com/apikey))
 
-### Setup Instructions
+### Quick Setup
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/lib-pokemon.git
-   cd lib-pokemon
+   git clone https://github.com/yourusername/card-scanner.git
+   cd card-scanner
    ```
 
-2. **Install PHP dependencies**
+2. **Install dependencies**
    ```bash
    composer install
-   ```
-
-3. **Install JavaScript dependencies**
-   ```bash
    npm install
    ```
 
-4. **Configure environment**
+3. **Configure environment**
    ```bash
    cp .env.example .env
    php artisan key:generate
    ```
 
-5. **Set up your database**
+4. **Set up database**
    
-   Edit `.env` and configure your database connection:
+   Edit `.env` and configure your database:
    ```env
    DB_CONNECTION=mysql
    DB_HOST=127.0.0.1
    DB_PORT=3306
-   DB_DATABASE=pokemon_cards
+   DB_DATABASE=card_scanner
    DB_USERNAME=your_username
    DB_PASSWORD=your_password
    ```
 
-6. **Add your Gemini API Key**
+5. **Add your Gemini API Key**
    
    Edit `.env` and add:
    ```env
    GEMINI_API_KEY=your_gemini_api_key_here
    ```
 
-7. **Run database migrations**
+6. **Run migrations**
    ```bash
    php artisan migrate
    ```
 
-8. **Build frontend assets**
+7. **Build frontend assets**
    ```bash
    npm run build
    ```
 
-9. **Start the development server**
+8. **Start the server**
    ```bash
    php artisan serve
    ```
 
-10. **Access the application**
-    
-    Open your browser and navigate to:  
-    **http://localhost:8000**
+9. **Access the application**
+   
+   Open your browser at: **http://localhost:8000**
 
 ---
 
-## 🎯 Usage Guide
+## 📚 User Guide
 
-### Uploading Cards
+For a **complete, step-by-step guide** on how to use the application, please refer to:
 
-1. Navigate to **Scansiona** (Scan) from the navigation menu
-2. Click or drag images into the upload zone
-3. For each image:
-   - Click **Ritaglia** (Crop) to frame the card
-   - Confirm the crop to upload the image
-4. Choose your processing method:
-   - **Riconosci con AI** (AI Recognition) - Automated
-   - **Inserimento Manuale** (Manual Entry) - Manual input
-5. Review the extracted data and click **Salva** (Save)
+**📖 [Complete User Guide (Italian)](docs/GUIDA-COMPLETA.md)**
 
-### Managing Your Collection
-
-- View all cards in **Collezione** (Collection)
-- Delete unwanted cards with the trash icon
-- Track collection value in **Valore** (Value)
-
-### Market Data
-
-1. Navigate to **Market Data**
-2. Upload a CSV file with pricing information
-3. Use **Matching** to link your cards to market prices
-4. View updated values in the **Collection Value** section
+The guide covers:
+- ✅ How to retrieve and import Market Data from TCGPlayer
+- ✅ How to scan and upload cards
+- ✅ How to assign sets and card conditions
+- ✅ How to link cards to market prices
+- ✅ How to monitor your collection's value
+- ✅ Troubleshooting and FAQs
 
 ---
 
-## 🖼️ Screenshots
+## 🚀 Quick Start
 
-### Upload Interface
-AI-powered card upload with cropping and gallery view
+### 1. Import Market Data (Required First Step)
 
-### Collection View
-Browse and manage your complete Pokemon card collection
+Before adding cards, you need market pricing data:
 
-### Market Value
-Track your collection's value with real-time price data
+1. Navigate to **Market Data** in the app
+2. Follow the [detailed instructions in the user guide](docs/GUIDA-COMPLETA.md#1%EF%B8%8F⃣-market-data-importare-i-prezzi-delle-carte) to extract JSON data from TCGPlayer
+3. Upload the JSON file to import prices
+
+### 2. Scan Your Cards
+
+1. Go to **Scansiona** (Scan)
+2. Upload card images (drag & drop or click to select)
+3. Optionally crop each image
+4. Click **AI Recognition** (magic wand icon) to extract card data
+5. Review and click **Save**
+
+### 3. Organize Your Collection
+
+1. Go to **Collezione** (Collection)
+2. For each card, assign:
+   - **Set** (which expansion/set it belongs to)
+   - **Condition** (Near Mint, Lightly Played, etc.)
+3. Save your changes
+
+### 4. Link to Market Prices
+
+1. Go to **Matching**
+2. Click **Auto-Match** to automatically link cards to market data
+3. Manually match any unmatched cards
+
+### 5. Track Value
+
+1. Go to **Valore** (Value)
+2. View your collection's current value, cost basis, and P&L
 
 ---
 
@@ -198,56 +218,77 @@ Track your collection's value with real-time price data
 
 ### Gemini AI Settings
 
-The app uses Google Gemini 2.5 Flash for card recognition. Configure the API  in `app/Services/GeminiService.php`:
+The app uses Google Gemini 2.5 Flash for card recognition. You can customize the AI behavior in `app/Services/GeminiService.php`.
 
-```php
-protected string $baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-```
+### Multi-User Support
+
+The application supports multiple users with private collections. Each user can only see and manage their own:
+- Cards
+- Market Data
+- Collection statistics
 
 ### Customization
 
-- **Pokemon Type Colors**: Edit CSS variables in `resources/views/layouts/app.blade.php`
-- **Card Fields**: Modify `pokemon_cards` table migration
-- **AI Prompt**: Customize recognition prompt in `GeminiService.php`
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+You can customize various aspects:
+- **Card fields**: Modify the `pokemon_cards` table migration
+- **AI prompt**: Edit the prompt in `GeminiService.php`
+- **UI styling**: Modify TailwindCSS classes or add custom CSS
 
 ---
 
 ## 📝 License
 
-This project is licensed under a **Personal Use Only License** - see the [LICENSE](LICENSE) file for details. **Commercial use is strictly prohibited.**
+This project is licensed under a **Personal Use Only License** - see the [LICENSE](LICENSE) file for details.
+
+**⚠️ Commercial use is strictly prohibited.**
+
+You are free to:
+- ✅ Use the application for personal card collection management
+- ✅ Install it on your own server
+- ✅ Modify it for your own needs
+- ✅ Share it with friends (non-commercially)
+
+You may NOT:
+- ❌ Sell the application or access to it
+- ❌ Offer it as a commercial service
+- ❌ Use it for any profit-generating activity
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! If you'd like to improve the application:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
 ## 🙏 Acknowledgments
 
-- **Google Gemini AI** for powerful card recognition
-- **Pokemon Company** for the amazing TCG
-- **Laravel Community** for the excellent framework
-- **Bootstrap** for beautiful UI components
+- **Google Gemini AI** - For powerful and affordable card recognition
+- **TCGPlayer** - For market price data
+- **Laravel Community** - For the excellent framework and ecosystem
+- **Trading card game publishers** - Pokemon Company, Wizards of the Coast (Magic: The Gathering), Konami (Yu-Gi-Oh!), and others
 
 ---
 
-## 📧 Contact
+## 📧 Support
 
-For questions or support, please open an issue on GitHub.
+For questions, issues, or feature requests:
+
+- 📖 Check the [User Guide](docs/GUIDA-COMPLETA.md)
+- 🐛 Open an issue on GitHub
+- 💬 Join discussions in the Issues section
 
 ---
 
 <div align="center">
 
-**Made with ❤️ for Pokemon TCG collectors**
+**Made with ❤️ for trading card collectors worldwide**
 
 ⭐ Star this repo if you find it useful!
 
