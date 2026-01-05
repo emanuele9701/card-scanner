@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import GuestLayout from '@/Layouts/GuestLayout.vue';
 import { ref } from 'vue';
 
 const form = useForm({
@@ -28,7 +28,7 @@ const submit = () => {
 </script>
 
 <template>
-    <AppLayout>
+    <GuestLayout>
         <Head title="Card Scanner - Registrazione" />
 
         <div class="auth-container">
@@ -108,7 +108,7 @@ const submit = () => {
                 </p>
             </div>
         </div>
-    </AppLayout>
+    </GuestLayout>
 </template>
 
 <style scoped>

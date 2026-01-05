@@ -95,6 +95,13 @@ const logout = () => {
                 <i class="bi bi-person"></i> Il Mio Profilo
               </a>
               <hr class="dropdown-divider">
+              <a href="https://github.com/emanuele9701/card-scanner/blob/main/docs/GUIDA-COMPLETA.md" target="_blank" class="dropdown-item">
+                <i class="bi bi-book"></i> Guida Completa
+              </a>
+              <a href="https://github.com/emanuele9701/card-scanner/blob/main/README.md" target="_blank" class="dropdown-item">
+                <i class="bi bi-gear"></i> Guida Installazione
+              </a>
+              <hr class="dropdown-divider">
               <button class="dropdown-item text-danger" @click="logout">
                 <i class="bi bi-box-arrow-right"></i> Esci
               </button>
@@ -125,6 +132,12 @@ const logout = () => {
           <template v-if="user">
             <a href="/profile" class="nav-link" @click="closeMobileMenu">
               <i class="bi bi-person"></i> Il Mio Profilo
+            </a>
+            <a href="https://github.com/emanuele9701/card-scanner/blob/main/docs/GUIDA-COMPLETA.md" target="_blank" class="nav-link" @click="closeMobileMenu">
+              <i class="bi bi-book"></i> Guida Completa
+            </a>
+            <a href="https://github.com/emanuele9701/card-scanner/blob/main/README.md" target="_blank" class="nav-link" @click="closeMobileMenu">
+              <i class="bi bi-gear"></i> Guida Installazione
             </a>
             <Link href="/logout" method="post" as="button" class="nav-link text-danger" @click="closeMobileMenu">
               <i class="bi bi-box-arrow-right"></i> Esci
