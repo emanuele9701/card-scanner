@@ -1,5 +1,5 @@
 <script setup>
-import { useForm} from '@inertiajs/vue3';
+import { useForm, Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
 const props = defineProps({
@@ -20,6 +20,7 @@ const submit = () => {
 
 <template>
     <AppLayout>
+        <Head title="Card Scanner - Il Mio Profilo" />
         <div class="container">
             <div class="text-center mb-5">
                 <h1 class="page-title">Modifica Profilo</h1>
@@ -50,9 +51,9 @@ const submit = () => {
                             <div v-if="form.errors.phone" class="text-danger mt-1">{{ form.errors.phone }}</div>
                         </div>
                         <div class="col-12 text-center mt-4">
-                            <a :href="route('profile.show')" class="btn btn-secondary me-2">
+                            <Link href="/profile" class="btn btn-secondary me-2">
                                 <i class="bi bi-arrow-left"></i> Annulla
-                            </a>
+                            </Link>
                             <button type="submit" class="btn btn-pokemon" :disabled="form.processing">
                                 <i class="bi bi-check-lg"></i> Salva Modifiche
                             </button>

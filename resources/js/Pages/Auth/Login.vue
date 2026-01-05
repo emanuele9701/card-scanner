@@ -24,8 +24,8 @@ const submit = () => {
 
 <template>
     <AppLayout>
-        <Head title="Accedi" />
-
+        <Head title="Card Scanner - Accedi" />
+        
         <div class="auth-container">
             <div class="auth-card">
                 <div class="auth-header">
@@ -33,7 +33,7 @@ const submit = () => {
                         <div class="scanner-logo"></div>
                     </div>
                     <h1 class="auth-title">Bentornato!</h1>
-                    <p class="auth-subtitle">Accedi alla tua collezione Pokemon</p>
+                    <p class="auth-subtitle">Accedi alla tua collezione di carte da gioco.</p>
                 </div>
 
                 <div v-if="$page.props.flash?.success" class="alert-auth">

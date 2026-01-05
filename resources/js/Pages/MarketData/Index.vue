@@ -78,14 +78,14 @@ const formatDate = (dateString) => {
 </script>
 
 <template>
-  <Head title="Market Data Import" />
+  <Head title="Card Scanner - Market Data" />
 
   <AppLayout>
     <div class="container mx-auto px-4 py-8">
       <!-- Header -->
       <div class="mb-8">
         <h1 class="text-4xl font-bold mb-2">Market Data Management</h1>
-        <p class="text-gray-400">Import and manage Pokemon card market price data</p>
+        <p class="text-gray-400">Import and manage card market price data</p>
       </div>
 
       <!-- Stats Cards -->

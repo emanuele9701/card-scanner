@@ -145,7 +145,7 @@ const logout = () => {
         <div class="footer-content">
           <p>
             <i class="bi bi-stars"></i>
-            <strong>Card Scanner</strong> - AI powered by Google Gemini
+            <strong>Card Scanner</strong>
           </p>
           <p class="footer-version">
             v1.0.0 • Made with <i class="bi bi-heart-fill text-danger"></i> for collectors

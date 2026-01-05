@@ -2,6 +2,8 @@
 import { ref, reactive, computed, onMounted, nextTick } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import ConfirmModal from '@/Components/ConfirmModal.vue';
+import { useModal } from '@/composables/useModal';
 import Cropper from 'cropperjs';
 import 'cropperjs/dist/cropper.css';
 import axios from 'axios';
@@ -19,6 +21,15 @@ const selectedCardIds = ref(new Set());
 const isDragging = ref(false);
 const fileInput = ref(null);
 const toasts = ref([]); // Toast state
+
+// Loading states
+const isSkipping = ref(false);
+const isCropping = ref(false);
+const isUploading = ref(false);
+const isEnhancing = ref(new Set()); // Set of card IDs being enhanced
+const isSaving = ref(new Set()); // Set of card IDs being saved
+const isBulkEnhancing = ref(false);
+const isBulkSaving = ref(false);
 
 // Edit Modal State
 const showEditModal = ref(false);
@@ -217,6 +228,10 @@ const skipCrop = async (card, notify = true) => {
 
 // AI Enhance
 const recognizeWithAI = async (card, notify = true) => {
+    if (isEnhancing.value.has(card.id || card.tempId)) return;
+    
+    const cardKey = card.id || card.tempId;
+    isEnhancing.value.add(cardKey);
     card.state = 'processing';
     card.error = null;
 
@@ -229,6 +244,8 @@ const recognizeWithAI = async (card, notify = true) => {
         card.state = 'failed';
         card.error = error.response?.data?.message || error.message || 'Errore AI';
         if (notify) showToast(card.error, 'error');
+    } finally {
+        isEnhancing.value.delete(cardKey);
     }
 };
 
@@ -276,6 +293,11 @@ const saveEdit = async () => {
 };
 
 const saveCard = async (card, notify = true) => {
+    const cardKey = card.id || card.tempId;
+    if (isSaving.value.has(cardKey)) return;
+    
+    isSaving.value.add(cardKey);
+    
     try {
         await axios.post('/cards/save', {
             card_id: card.id,
@@ -285,6 +307,8 @@ const saveCard = async (card, notify = true) => {
         if (notify) showToast('Carta salvata!', 'success');
     } catch (error) {
         if (notify) showToast('Errore salvataggio', 'error');
+    } finally {
+        isSaving.value.delete(cardKey);
     }
 };
 
@@ -386,12 +410,12 @@ const openFullscreen = (src) => {
 
 <template>
     <AppLayout>
-        <Head title="Upload Card" />
+        <Head title="Card Scanner - Carica Carta" />
         
         <div class="container h-custom-padding">
             <div class="text-center mb-5">
                 <h1 class="page-title">Carica le Tue Carte</h1>
-                <p class="page-subtitle">Scansiona le carte Pokemon con intelligenza artificiale o inserisci i dati manualmente</p>
+                <p class="page-subtitle">Scansiona le tue Carte con intelligenza artificiale o inserisci i dati manualmente</p>
             </div>
 
             <!-- Upload Area -->
@@ -719,6 +743,9 @@ const openFullscreen = (src) => {
             </div>
 
         </div>
+
+        <!-- Confirm Modal -->
+        <ConfirmModal />
     </AppLayout>
 </template>
 

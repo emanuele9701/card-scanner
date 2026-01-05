@@ -92,7 +92,7 @@ const formatPrice = (price) => {
 </script>
 
 <template>
-  <Head title="Card Matching" />
+  <Head title="Card Scanner - Matching" />
 
   <AppLayout>
     <div class="container mx-auto px-4 py-8">

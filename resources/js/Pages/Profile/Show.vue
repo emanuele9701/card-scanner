@@ -1,4 +1,5 @@
 <script setup>
+import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
 defineProps({
@@ -8,6 +9,7 @@ defineProps({
 
 <template>
     <AppLayout>
+        <Head title="Card Scanner - Il Mio Profilo" />
         <div class="container">
             <div class="text-center mb-5">
                 <h1 class="page-title">Il Mio Profilo</h1>
@@ -40,9 +42,9 @@ defineProps({
                         <p class="text-white">{{ user.phone || 'Non impostato' }}</p>
                     </div>
                     <div class="col-12 text-center mt-4">
-                        <a :href="route('profile.edit')" class="btn btn-pokemon">
+                        <Link href="/profile/edit" class="btn btn-pokemon">
                             <i class="bi bi-pencil"></i> Modifica Profilo
-                        </a>
+                        </Link>
                     </div>
                 </div>
             </div>

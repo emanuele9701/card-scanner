@@ -125,14 +125,14 @@ const updateCondition = (cardId, condition) => {
 </script>
 
 <template>
-  <Head title="Collection Value" />
+  <Head title="Card Scanner - Valore Collezione" />
 
   <AppLayout>
     <div class="container mx-auto px-4 py-8">
       <!-- Header -->
       <div class="mb-8">
         <h1 class="text-4xl font-bold mb-2">Collection Value</h1>
-        <p class="text-gray-400">Track the estimated value of your Pokemon card collection</p>
+        <p class="text-gray-400">Track the estimated value of your card collection</p>
       </div>
 
       <!-- Stats Cards -->

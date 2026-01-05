@@ -29,7 +29,7 @@ const submit = () => {
 
 <template>
     <AppLayout>
-        <Head title="Registrazione" />
+        <Head title="Card Scanner - Registrazione" />
 
         <div class="auth-container">
             <div class="auth-card">
@@ -38,7 +38,7 @@ const submit = () => {
                         <div class="scanner-logo"></div>
                     </div>
                     <h1 class="auth-title">Crea Account</h1>
-                    <p class="auth-subtitle">Unisciti ai collezionisti Pokemon!</p>
+                    <p class="auth-subtitle">Unisciti ai collezionisti!</p>
                 </div>
 
                 <form @submit.prevent="submit">

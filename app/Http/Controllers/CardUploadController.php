@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PokemonCard;
 use App\Models\CardSet;
 use App\Services\GeminiService;
+use App\Services\ImageResizeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -51,6 +52,10 @@ class CardUploadController extends Controller
         $originalFilename = $file->getClientOriginalName();
         $path = $file->store('pokemon_cards', 'public');
 
+        // Resize image if needed
+        $imageResizeService = app(ImageResizeService::class);
+        $imageResizeService->resizeIfNeeded($path, 'public');
+
         $card = PokemonCard::create([
             'user_id' => auth()->id(),
             'original_filename' => $originalFilename,
@@ -86,6 +91,10 @@ class CardUploadController extends Controller
 
         $file = $request->file('cropped_image');
         $path = $file->store('pokemon_cards', 'public');
+
+        // Resize image if needed
+        $imageResizeService = app(ImageResizeService::class);
+        $imageResizeService->resizeIfNeeded($path, 'public');
 
         // Delete old file to save space
         if ($card->storage_path && Storage::disk('public')->exists($card->storage_path)) {

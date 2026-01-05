@@ -1,7 +1,73 @@
 # 📚 Guida Completa - Pokemon Card Scanner
 
 **Data di creazione:** 2 Gennaio 2026  
-**Versione:** 1.0
+**Versione:** 1.1  
+**Ultimo aggiornamento:** 5 Gennaio 2026
+
+---
+
+## 📝 Changelog e Aggiornamenti
+
+### Versione 1.1 (5 Gennaio 2026)
+
+#### 🔐 Sistema Multi-Utente e Ownership
+
+**Implementato user ownership su tutte le carte:**
+- Ogni carta è ora associata all'utente che l'ha creata tramite il campo `user_id`
+- Tutti i controller sono stati aggiornati per filtrare le carte in base all'utente autenticato:
+  - `CardUploadController`: Upload, modifiche ed eliminazioni limitate alle proprie carte
+  - `CollectionController`: Visualizzazione collezione e calcolo valore solo per carte proprie
+  - `CardMatchingController`: Matching e suggerimenti filtrati per utente
+  - `PokemonCardController`: Aggiornamento condizioni riservato al proprietario
+  - `ImageController`: Streaming immagini protetto da ownership check
+- Protezione completa contro accessi non autorizzati (HTTP 403 per tentativi di accesso a carte altrui)
+
+**Vantaggi:**
+- Ogni utente vede e gestisce solo le proprie carte
+- Privacy e sicurezza dei dati garantite
+- Supporto multi-utente senza conflitti tra collezioni
+
+#### 🎨 Migrazione Completa a Vue 3 + Inertia.js
+
+**Tutte le views Blade sono state convertite a componenti Vue:**
+- ✅ `Auth/Login.vue` - Pagina login con animazioni
+- ✅ `Auth/Register.vue` - Pagina registrazione
+- ✅ `Cards/Upload.vue` - Sistema upload carte con pipeline visiva
+- ✅ `Cards/Index.vue` - Collezione carte organizzata per set
+- ✅ `Collection/Index.vue` - Dashboard statistiche collezione
+- ✅ `Collection/Value.vue` - Calcolo valore totale collezione
+- ✅ `Matching/Index.vue` - Sistema matching carte/prezzi
+- ✅ `Profile/Show.vue` - Visualizzazione profilo utente
+- ✅ `Profile/Edit.vue` - Modifica profilo utente
+
+**Navbar Unificata:**
+- Nuovo layout `AppLayout.vue` condiviso da tutte le pagine
+- Menu utente con dropdown nell'angolo in alto a destra:
+  - Avatar con iniziale del nome
+  - Link al profilo (`/profile`)
+  - Pulsante logout funzionante
+- Navigazione responsive con menu hamburger su mobile
+- Banner "DEMO MODE" sempre visibile per ambienti dimostrativi
+
+**Miglioramenti UX:**
+- Notifiche toast al posto degli `alert()` JavaScript
+- Animazioni fluide e transizioni moderne
+- Componenti riutilizzabili e manutenibili
+- Gestione errori di validazione integrata con Inertia
+
+#### 🔧 Miglioramenti Tecnici
+
+**Backend:**
+- Middleware Inertia configurato per condividere dati utente autenticato (`auth.user`)
+- Migration per aggiungere `user_id` alla tabella `pokemon_cards`
+- Relazione `belongsTo` tra `PokemonCard` e `User`
+- Query scoping automatico per ownership in tutti i controller
+
+**Frontend:**
+- Setup Vue 3 con Composition API (`<script setup>`)
+- Gestione stato reattiva con `ref` e `computed`
+- Routing client-side con Inertia.js Router
+- Import Bootstrap CSS/JS in `app.js` per styling consistente
 
 ---
 

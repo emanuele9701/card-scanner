@@ -1,13 +1,17 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, Head } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import ConfirmModal from '@/Components/ConfirmModal.vue';
+import { useModal } from '@/composables/useModal';
 import axios from 'axios';
 
 const props = defineProps({
     cardsBySet: Object,
     cardsWithoutSet: Array
 });
+
+const { showConfirm, showAlert } = useModal();
 
 const selectedCards = ref(new Set());
 const cardSets = ref([]);
@@ -18,6 +22,9 @@ const showFullscreen = ref(false);
 const fullscreenImageSrc = ref('');
 const isEditMode = ref(false);
 const isLoadingCard = ref(false);
+const isSaving = ref(false);
+const isDeleting = ref(false);
+const isAssigningSet = ref(false);
 
 const editForm = ref({
     card_name: '',
@@ -129,31 +136,46 @@ const toggleEditMode = () => {
 };
 
 const saveCardChanges = async () => {
+    if (isSaving.value) return;
+    isSaving.value = true;
+
     try {
         const response = await axios.put(`/cards/${currentCardData.value.id}/update`, editForm.value);
         if (response.data.success) {
-            alert('Carta aggiornata con successo!');
+            await showAlert('Carta aggiornata con successo!', 'success');
             closeCardModal();
             router.reload();
         }
     } catch (error) {
         console.error('Error saving card:', error);
-        alert('Errore durante il salvataggio');
+        await showAlert('Errore durante il salvataggio', 'error');
+    } finally {
+        isSaving.value = false;
     }
 };
 
 const deleteCard = async (cardId) => {
-    if (!confirm('Sei sicuro di voler eliminare questa carta?')) return;
+    const confirmed = await showConfirm(
+        'Sei sicuro di voler eliminare questa carta?',
+        'Conferma Eliminazione',
+        { confirmText: 'Elimina', cancelText: 'Annulla' }
+    );
+    
+    if (!confirmed) return;
+    if (isDeleting.value) return;
+    isDeleting.value = true;
 
     try {
         const response = await axios.delete(`/cards/${cardId}`);
         if (response.data.success) {
-            alert('Carta eliminata con successo!');
+            await showAlert('Carta eliminata con successo!', 'success');
             router.reload();
         }
     } catch (error) {
         console.error('Error deleting card:', error);
-        alert('Errore durante l\'eliminazione');
+        await showAlert('Errore durante l\'eliminazione', 'error');
+    } finally {
+        isDeleting.value = false;
     }
 };
 
@@ -169,9 +191,12 @@ const closeBulkSetModal = () => {
 const saveBulkSet = async () => {
     const cardIds = Array.from(selectedCards.value);
     if (cardIds.length === 0) {
-        alert('Nessuna carta selezionata');
+        await showAlert('Nessuna carta selezionata', 'warning');
         return;
     }
+
+    if (isAssigningSet.value) return;
+    isAssigningSet.value = true;
 
     try {
         const response = await axios.post('/cards/assign-set', {
@@ -180,24 +205,27 @@ const saveBulkSet = async () => {
         });
 
         if (response.data.success) {
-            alert(`Set assegnato a ${cardIds.length} carte!`);
+            await showAlert(`Set assegnato a ${cardIds.length} carte!`, 'success');
             closeBulkSetModal();
             clearSelection();
             router.reload();
         }
     } catch (error) {
         console.error('Error assigning set:', error);
-        alert('Errore durante l\'assegnazione');
+        await showAlert('Errore durante l\'assegnazione', 'error');
+    } finally {
+        isAssigningSet.value = false;
     }
 };
 </script>
 
 <template>
     <AppLayout>
+        <Head title="Card Scanner - Collezione" />
         <div class="container">
             <div class="text-center mb-5">
                 <h1 class="page-title">La Mia Collezione</h1>
-                <p class="page-subtitle">Tutte le tue carte Pokemon organizzate per set</p>
+                <p class="page-subtitle">Tutte le tue carte da gioco organizzate per set</p>
             </div>
 
             <div v-if="Object.keys(cardsBySet).length > 0 || cardsWithoutSet.length > 0">
@@ -469,12 +497,22 @@ const saveBulkSet = async () => {
                     <button v-if="!isEditMode" type="button" class="btn btn-warning" @click="toggleEditMode">
                         <i class="bi bi-pencil"></i> Modifica
                     </button>
-                    <button v-if="isEditMode" type="button" class="btn btn-success" @click="saveCardChanges">
-                        <i class="bi bi-check-lg"></i> Salva
+                    <button 
+                        v-if="isEditMode" 
+                        type="button" 
+                        class="btn btn-success" 
+                        @click="saveCardChanges"
+                        :disabled="isSaving"
+                    >
+                        <span v-if="isSaving" class="spinner-border spinner-border-sm me-1"></span>
+                        <i v-else class="bi bi-check-lg"></i> Salva
                     </button>
                 </div>
             </div>
         </div>
+
+        <!-- Confirm Modal -->
+        <ConfirmModal />
     </AppLayout>
 </template>
 
