@@ -136,6 +136,7 @@ Card Scanner is a **free, open-source web application** designed to help trading
    Edit `.env` and add:
    ```env
    GEMINI_API_KEY=your_gemini_api_key_here
+   FORCE_HTTPS=false #Per forzare o meno https default false
    ```
 
 6. **Run migrations**
