@@ -36,6 +36,7 @@ class PokemonCard extends Model
         // Market data fields
         'card_set_id',
         'market_card_id',
+        'game',
         'condition',
         'printing',
         'acquisition_price',

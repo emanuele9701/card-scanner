@@ -30,39 +30,39 @@ class GeminiService
         // In a real app, I'd rely solely on env.
         $apiKey = $this->apiKey;
 
-        $prompt = "Sei un esperto di carte Pokemon TCG. Analizza l'immagine fornita.
+        $prompt = "Sei un esperto di carte collezionabili (TCG/CCG). Analizza l'immagine fornita.
 
-        IMPORTANTE: Prima di tutto, verifica se l'immagine mostra una carta da gioco collezionabile (Pokemon, Magic, Yu-Gi-Oh, o simili).
+        IMPORTANTE: Prima di tutto, verifica se l'immagine mostra una carta da gioco collezionabile (Pokemon, Magic: The Gathering, Yu-Gi-Oh!, Digimon, One Piece, Dragon Ball, o simili).
         Se l'immagine NON è una carta da gioco, restituisci SOLO questo JSON:
         {
             \"is_valid_card\": false,
             \"error_message\": \"L'immagine non sembra essere una carta da gioco collezionabile\"
         }
 
-        Se l'immagine È una carta da gioco Pokemon, analizza il testo OCR grezzo per estrarre le informazioni dettagliate.
-        
-        Testo OCR grezzo:
-        {$ocrText}
+        Se l'immagine È una carta da gioco, identifica PRIMA il tipo di gioco (Pokemon, Yu-Gi-Oh!, Magic: The Gathering, etc.) e poi analizza i dettagli.
         
         Rispondi ESCLUSIVAMENTE con un oggetto JSON valido (senza markdown o altro testo) con questa struttura esatta:
         {
             \"is_valid_card\": true,
+            \"game\": \"Nome del gioco (es. Pokemon, Yu-Gi-Oh!, Magic: The Gathering, Digimon, One Piece, etc.)\",
             \"card_name\": \"Nome della carta\",
-            \"hp\": \"HP (es. 120)\",
-            \"type\": \"Tipo (es. Fuoco, Acqua)\",
-            \"evolution_stage\": \"Stadio (es. Base, Fase 1)\",
+            \"hp\": \"HP/ATK/DEF (a seconda del gioco)\",
+            \"type\": \"Tipo/Colore (es. Fuoco, Acqua per Pokemon; Creatura, Stregoneria per Magic; Mostro, Magia per Yu-Gi-Oh!)\",
+            \"evolution_stage\": \"Stadio evolutivo (se applicabile, es. Base, Fase 1 per Pokemon)\",
             \"attacks\": [
-                { \"name\": \"Nome Attacco\", \"damage\": \"Danno\", \"cost\": \"Costo (es. 2 Fuoco)\", \"effect\": \"Descrizione effetto\" }
+                { \"name\": \"Nome Attacco/Abilità\", \"damage\": \"Danno\", \"cost\": \"Costo\", \"effect\": \"Descrizione effetto\" }
             ],
             \"weakness\": \"Debolezza\",
             \"resistance\": \"Resistenza\",
-            \"retreat_cost\": \"Costo ritirata\",
+            \"retreat_cost\": \"Costo ritirata (o equivalente)\",
             \"rarity\": \"Rarità\",
             \"set_number\": \"Numero serie (es. 001/151)\",
-            \"illustrator\": \"Illustratore\",
+            \"illustrator\": \"Illustratore/Artista\",
             \"flavor_text\": \"Testo descrittivo\",
-            \"analysis_notes\": \"Breve nota su cosa hai corretto dall'OCR\"
-        }";
+            \"analysis_notes\": \"Breve nota su cosa hai identificato\"
+        }
+        
+        NOTA: Il campo 'game' è OBBLIGATORIO e deve essere il nome preciso del gioco di carte.";
 
         $payload = [
             "contents" => [

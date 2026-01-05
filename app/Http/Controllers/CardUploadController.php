@@ -319,6 +319,7 @@ class CardUploadController extends Controller
             'illustrator' => 'nullable|string',
             'flavor_text' => 'nullable|string',
             'card_set_id' => 'nullable|exists:card_sets,id',
+            'game' => 'required|string',
         ]);
 
         $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
@@ -343,6 +344,7 @@ class CardUploadController extends Controller
             'illustrator' => $request->illustrator,
             'flavor_text' => $request->flavor_text,
             'card_set_id' => $request->card_set_id,
+            'game' => $request->game,
             'status' => PokemonCard::STATUS_COMPLETED,
         ]);
 
@@ -420,6 +422,7 @@ class CardUploadController extends Controller
             'illustrator' => 'nullable|string',
             'flavor_text' => 'nullable|string',
             'card_set_id' => 'nullable|exists:card_sets,id',
+            'game' => 'nullable|string',
         ]);
 
         $card->update($request->only([
@@ -434,7 +437,8 @@ class CardUploadController extends Controller
             'set_number',
             'illustrator',
             'flavor_text',
-            'card_set_id'
+            'card_set_id',
+            'game'
         ]));
 
         return response()->json([
@@ -475,6 +479,22 @@ class CardUploadController extends Controller
         return response()->json([
             'success' => true,
             'data' => $sets
+        ]);
+    }
+
+    /**
+     * Get all available games for dropdown (DISTINCT from MarketCard)
+     */
+    public function getAvailableGames()
+    {
+        $games = \App\Models\MarketCard::distinct()
+            ->whereNotNull('game')
+            ->orderBy('game')
+            ->pluck('game');
+
+        return response()->json([
+            'success' => true,
+            'data' => $games
         ]);
     }
 

@@ -8,6 +8,8 @@ import Cropper from 'cropperjs';
 import 'cropperjs/dist/cropper.css';
 import axios from 'axios';
 
+const { showConfirm, showAlert } = useModal();
+
 const props = defineProps({
     initialCards: Array,
     cardsBySet: Object,
@@ -47,8 +49,11 @@ const editForm = reactive({
     illustrator: '',
     flavor_text: '',
     card_set_id: '',
+    game: '',
 });
 const cardSets = ref([]);
+const availableGames = ref([]);
+const validationErrors = ref({});
 
 // Cropper State
 const showCropperModal = ref(false);
@@ -95,6 +100,7 @@ const handleDrop = (e) => {
 
 const handleFileSelect = (e) => {
     handleFiles(e.target.files);
+    e.target.value = ''; // Allow re-selecting the same file
 };
 
 /**
@@ -343,8 +349,9 @@ const recognizeWithAI = async (card, notify = true) => {
 const openEditModal = async (card) => {
     editingCardId.value = card.tempId;
     
-    // Reset form
+    // Reset form and validation errors
     Object.keys(editForm).forEach(key => editForm[key] = '');
+    validationErrors.value = {};
 
     if (card.data) {
         Object.keys(editForm).forEach(key => {
@@ -361,12 +368,43 @@ const openEditModal = async (card) => {
         }
     }
     
+    // Load available games if not already loaded
+    if (availableGames.value.length === 0) {
+        try {
+            const res = await axios.get('/cards/api/available-games');
+            availableGames.value = res.data.data;
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    
+    // If AI detected a game that's NOT in the available list, clear it
+    // This forces the user to manually select a valid game
+    if (card.data && card.data.game && !availableGames.value.includes(card.data.game)) {
+        console.warn(`AI detected game "${card.data.game}" is not in available games list. User must select manually.`);
+        editForm.game = '';
+        validationErrors.value.game = `Il game "${card.data.game}" rilevato dall'AI non è valido. Seleziona manualmente.`;
+    }
+    
     showEditModal.value = true;
 };
 
 const saveEdit = async () => {
-    if (!editForm.card_name) {
-        showToast('Nome obbligatorio', 'error');
+    // Clear previous errors
+    validationErrors.value = {};
+    
+    // Validate required fields
+    if (!editForm.card_name || editForm.card_name.trim() === '') {
+        validationErrors.value.card_name = 'Il nome della carta è obbligatorio';
+    }
+    
+    if (!editForm.game || editForm.game.trim() === '') {
+        validationErrors.value.game = 'Il game è obbligatorio';
+    }
+    
+    // If there are errors, show toast and return
+    if (Object.keys(validationErrors.value).length > 0) {
+        showToast('Compila tutti i campi obbligatori', 'error');
         return;
     }
 
@@ -377,6 +415,7 @@ const saveEdit = async () => {
     // Local update
     card.data = { ...editForm };
     card.state = 'ready';
+    
     
     showEditModal.value = false;
     showToast('Dati salvati localmente', 'success');
@@ -402,10 +441,19 @@ const saveCard = async (card, notify = true) => {
     }
 };
 
-const deleteCard = async (card) => {
-    if (!confirm('Eliminare?')) return;
+const deleteCard = async (card, skipConfirm = false) => {
+    if (!skipConfirm) {
+        const confirmed = await showConfirm(
+            'Sei sicuro di voler eliminare questa carta?',
+            'Conferma Eliminazione',
+            { confirmText: 'Elimina', cancelText: 'Annulla' }
+        );
+        if (!confirmed) return;
+    }
     try {
-        await axios.delete(`/cards/${card.id}`); // This route wasn't in Blade JS explicitly but in controller
+        if (card.id) {
+            await axios.delete(`/cards/${card.id}`); 
+        }
         // Blade used /cards/discard POST. Let's use discard to be safe with existing logic
         // await axios.post('/cards/discard', { card_id: card.id });
          // Checking web.php: Route::delete('/{card}', [CardUploadController::class, 'destroy']) exists.
@@ -427,7 +475,12 @@ const deleteCard = async (card) => {
 
 // Bulk Actions
 const bulkSkipCrop = async () => {
-    if (!confirm(`Saltare il ritaglio per ${selectedCardIds.value.size} carte?`)) return;
+    const confirmed = await showConfirm(
+        `Saltare il ritaglio per ${selectedCardIds.value.size} carte?`,
+        'Conferma Azione',
+        { confirmText: 'Salta', cancelText: 'Annulla' }
+    );
+    if (!confirmed) return;
     const ids = Array.from(selectedCardIds.value);
     selectedCardIds.value.clear();
     
@@ -461,19 +514,55 @@ const bulkSave = async () => {
 };
 
 const bulkDelete = async () => {
-    if (!confirm(`Eliminare ${selectedCardIds.value.size} carte?`)) return;
+    const confirmed = await showConfirm(
+        `Eliminare ${selectedCardIds.value.size} carte?`,
+        'Conferma Eliminazione Multipla',
+        { confirmText: 'Elimina', cancelText: 'Annulla' }
+    );
+    if (!confirmed) return;
     const ids = Array.from(selectedCardIds.value);
     selectedCardIds.value.clear();
     for (const id of ids) {
          const card = cards.value.find(c => c.id === id || c.tempId === id);
-         if (card) await deleteCard(card);
+         if (card) await deleteCard(card, true);
     }
 };
 
 const resetGallery = async () => {
-    if (!confirm('Eliminare tutto?')) return;
+    const confirmed = await showConfirm(
+        'Sei sicuro di voler eliminare tutto?\nLe carte salvate o caricate verranno eliminate DEFINITIVAMENTE dal database e dallo storage.',
+        'Reset Galleria',
+        { confirmText: 'Elimina Tutto', cancelText: 'Annulla' }
+    );
+    if (!confirmed) return;
+    
+    // Create a copy of cards to delete to avoid iteration issues while modifying
+    const cardsToDelete = [...cards.value];
+    let deletedCount = 0;
+    
+    showToast('Eliminazione in corso...', 'info');
+
+    for (const card of cardsToDelete) {
+        if (card.id) {
+            try {
+                // Delete from server (using logic similar to deleteCard but without reloading UI/confirm)
+                await axios.delete(`/cards/${card.id}`);
+                deletedCount++;
+            } catch (e) {
+                console.error(`Errore eliminazione carta ${card.id}:`, e);
+            }
+        }
+    }
+    
     cards.value = [];
     selectedCardIds.value.clear();
+    if (fileInput.value) fileInput.value.value = '';
+    
+    if (deletedCount > 0) {
+        showToast(`${deletedCount} carte eliminate definitivamente`, 'success');
+    } else {
+        showToast('Galleria svuotata', 'success');
+    }
 };
 
 
@@ -588,6 +677,9 @@ const openFullscreen = (src) => {
                                 <button class="btn btn-sm btn-secondary" @click="skipCrop(card)">
                                     <i class="bi bi-skip-forward"></i> Salta
                                 </button>
+                                <button class="btn btn-sm btn-danger" @click="deleteCard(card)">
+                                    <i class="bi bi-trash"></i> Elimina
+                                </button>
                              </template>
 
                              <template v-else-if="card.state === 'cropped'">
@@ -596,6 +688,9 @@ const openFullscreen = (src) => {
                                 </button>
                                 <button class="btn btn-sm btn-warning" @click="openEditModal(card)">
                                     <i class="bi bi-pencil"></i> Manuale
+                                </button>
+                                <button class="btn btn-sm btn-danger" @click="deleteCard(card)">
+                                    <i class="bi bi-trash"></i> Elimina
                                 </button>
                              </template>
 
@@ -612,6 +707,9 @@ const openFullscreen = (src) => {
                                 </button>
                                 <button class="btn btn-sm btn-info" @click="openEditModal(card)">
                                     <i class="bi bi-pencil"></i> Modifica
+                                </button>
+                                <button class="btn btn-sm btn-danger" @click="deleteCard(card)">
+                                    <i class="bi bi-trash"></i> Elimina
                                 </button>
                              </template>
 
@@ -710,7 +808,14 @@ const openFullscreen = (src) => {
                              <div class="form-grid">
                                 <div class="form-group-custom">
                                     <label>Nome Carta *</label>
-                                    <input v-model="editForm.card_name" type="text">
+                                    <input 
+                                        v-model="editForm.card_name" 
+                                        type="text"
+                                        :class="{ 'border-error': validationErrors.card_name }"
+                                    >
+                                    <span v-if="validationErrors.card_name" class="error-message">
+                                        {{ validationErrors.card_name }}
+                                    </span>
                                 </div>
                                 <div class="form-group-custom">
                                     <label>HP</label>
@@ -763,6 +868,23 @@ const openFullscreen = (src) => {
                                             {{ set.name }} ({{ set.abbreviation || set.series }})
                                         </option>
                                     </select>
+                                </div>
+                                
+                                <div class="form-group-custom">
+                                    <label>Game *</label>
+                                    <select 
+                                        v-model="editForm.game" 
+                                        required
+                                        :class="{ 'border-error': validationErrors.game }"
+                                    >
+                                        <option value="">Seleziona Game...</option>
+                                        <option v-for="game in availableGames" :key="game" :value="game">
+                                            {{ game }}
+                                        </option>
+                                    </select>
+                                    <span v-if="validationErrors.game" class="error-message">
+                                        {{ validationErrors.game }}
+                                    </span>
                                 </div>
 
                                 <div class="d-flex gap-2">
@@ -1024,5 +1146,18 @@ const openFullscreen = (src) => {
 @keyframes slideIn {
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
+}
+
+/* Validation Error Styles */
+.border-error {
+    border-color: #ef4444 !important;
+    border-width: 2px !important;
+}
+
+.error-message {
+    display: block;
+    color: #ef4444;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
 }
 </style>

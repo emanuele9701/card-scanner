@@ -30,7 +30,7 @@ const closeMobileMenu = () => {
 }
 
 const logout = () => {
-    router.post(route('logout'));
+    router.post('/logout');
 };
 </script>
 

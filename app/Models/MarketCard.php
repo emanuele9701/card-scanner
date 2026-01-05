@@ -5,10 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
 
 class MarketCard extends Model
 {
     protected $fillable = [
+        'user_id',
         'product_id',
         'product_name',
         'card_number',
@@ -23,6 +26,27 @@ class MarketCard extends Model
     protected $casts = [
         'is_supplemental' => 'boolean',
     ];
+
+    /**
+     * Boot the model and add global scope
+     */
+    protected static function booted(): void
+    {
+        // Automatically filter by authenticated user
+        static::addGlobalScope('user', function (Builder $builder) {
+            if (auth()->check()) {
+                $builder->where('user_id', auth()->id());
+            }
+        });
+    }
+
+    /**
+     * Get the user that owns this market card
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     /**
      * Get all price records for this card

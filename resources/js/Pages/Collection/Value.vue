@@ -6,20 +6,27 @@ import StatsCard from '@/Components/StatsCard.vue'
 
 const props = defineProps({
   stats: Object,
-  cards: Array
+  cards: Array,
+  availableGames: Array,
+  availableSets: Array,
 })
 
 // State
 const searchQuery = ref('')
+const selectedGame = ref('')
 const selectedSet = ref('')
 const selectedRarity = ref('')
 const sortField = ref('name')
 const sortDirection = ref('asc')
 
-// Get unique sets and rarities for filters
+// Get unique sets and rarities for filters (these are now from backend)
+// But we keep these computed for backward compatibility if needed
 const uniqueSets = computed(() => {
-  const sets = new Set(props.cards.map(card => card.set_abbr).filter(Boolean))
-  return [...sets].sort()
+  return props.availableSets || []
+})
+
+const uniqueGames = computed(() => {
+  return props.availableGames || []
 })
 
 const uniqueRarities = computed(() => {
@@ -39,6 +46,11 @@ const filteredCards = computed(() => {
       card.number?.toLowerCase().includes(query) ||
       card.set?.toLowerCase().includes(query)
     )
+  }
+  
+  // Game filter
+  if (selectedGame.value) {
+    result = result.filter(card => card.game === selectedGame.value)
   }
 
   // Set filter
@@ -157,7 +169,7 @@ const updateCondition = (cardId, condition) => {
 
       <!-- Filters -->
       <div class="bg-gray-800 rounded-lg p-6 mb-6 border border-gray-700">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <!-- Search -->
           <div>
             <label class="block text-sm text-gray-400 mb-2">Search</label>
@@ -168,6 +180,18 @@ const updateCondition = (cardId, condition) => {
               class="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
             />
           </div>
+          
+          <!-- Game Filter -->
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Game</label>
+            <select
+              v-model="selectedGame"
+              class="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
+            >
+              <option value="">Tutti</option>
+              <option v-for="game in uniqueGames" :key="game" :value="game">{{ game }}</option>
+            </select>
+          </div>
 
           <!-- Set Filter -->
           <div>
@@ -176,7 +200,7 @@ const updateCondition = (cardId, condition) => {
               v-model="selectedSet"
               class="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
             >
-              <option value="">All Sets</option>
+              <option value="">Tutti</option>
               <option v-for="set in uniqueSets" :key="set" :value="set">{{ set }}</option>
             </select>
           </div>
@@ -218,6 +242,9 @@ const updateCondition = (cardId, condition) => {
                 <th @click="sort('rarity')" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600">
                   Rarity {{ getSortIcon('rarity') }}
                 </th>
+                <th @click="sort('game')" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600">
+                  Game {{ getSortIcon('game') }}
+                </th>
                 <th @click="sort('condition')" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600">
                   Condition {{ getSortIcon('condition') }}
                 </th>
@@ -245,6 +272,9 @@ const updateCondition = (cardId, condition) => {
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                   {{ card.rarity || 'N/A' }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                  {{ card.game || 'N/A' }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                   <span v-if="card.condition">{{ card.condition }}</span>

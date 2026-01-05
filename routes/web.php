@@ -60,6 +60,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/{card}/update', [CardUploadController::class, 'updateCard'])->name('cards.update');
         Route::post('/assign-set', [CardUploadController::class, 'assignSet'])->name('cards.assign-set');
         Route::get('/api/card-sets', [CardUploadController::class, 'getCardSets'])->name('api.card-sets');
+        Route::get('/api/available-games', [CardUploadController::class, 'getAvailableGames'])->name('api.available-games');
         Route::get('/{card}/data', [CardUploadController::class, 'getCardData'])->name('cards.data');
         Route::delete('/{card}', [CardUploadController::class, 'destroy'])->name('cards.destroy');
     });

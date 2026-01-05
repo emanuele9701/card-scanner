@@ -61,12 +61,32 @@ class CollectionController extends Controller
                 'has_market_data' => $card->hasMarketData(),
                 'available_conditions' => $availableConditions,
                 'image' => $card->getImageUrl(),
+                'game' => $card->game,
             ];
         });
+
+        // Get unique games and sets for filters
+        $availableGames = PokemonCard::where('status', PokemonCard::STATUS_COMPLETED)
+            ->distinct()
+            ->whereNotNull('game')
+            ->orderBy('game')
+            ->pluck('game');
+
+        $availableSets = PokemonCard::with('cardSet')
+            ->where('status', PokemonCard::STATUS_COMPLETED)
+            ->whereNotNull('card_set_id')
+            ->get()
+            ->pluck('cardSet.abbreviation')
+            ->unique()
+            ->filter()
+            ->sort()
+            ->values();
 
         return Inertia::render('Collection/Value', [
             'stats' => $stats,
             'cards' => $cardsWithValue,
+            'availableGames' => $availableGames,
+            'availableSets' => $availableSets,
         ]);
     }
 
