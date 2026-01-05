@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, nextTick, onBeforeUnmount } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ConfirmModal from '@/Components/ConfirmModal.vue';
@@ -585,6 +585,47 @@ const openFullscreen = (src) => {
     fullscreenImageSrc.value = src;
     showFullscreen.value = true;
 };
+
+// Browser/Tab Close Interception
+const handleBeforeUnload = (e) => {
+    const unsavedCards = cards.value.filter(c => c.id && c.state !== 'completed');
+    if (unsavedCards.length === 0) return;
+
+    // Standard way to trigger a confirmation dialog
+    e.preventDefault();
+    e.returnValue = '';
+};
+
+const handleUnload = () => {
+    const unsavedCards = cards.value.filter(c => c.id && c.state !== 'completed');
+    if (unsavedCards.length === 0) return;
+
+    const csrfToken = document.head.querySelector('meta[name="csrf-token"]')?.content;
+    
+    // We must use fetch with keepalive because axios is cancelled on unload
+    // We iterate because we don't have a batch delete endpoint yet
+    unsavedCards.forEach(card => {
+        fetch(`/cards/${card.id}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            keepalive: true
+        }).catch(err => console.error('Cleanup failed for card', card.id, err));
+    });
+};
+
+onMounted(() => {
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleUnload);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.removeEventListener('pagehide', handleUnload);
+});
 </script>
 
 <template>

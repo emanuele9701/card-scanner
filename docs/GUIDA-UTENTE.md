@@ -243,6 +243,14 @@ Per gestire più carte insieme:
 1. ✅ Spunta le checkbox sulle carte
 2. Apparirà una **barra in basso**
 3. Clicca **"Assegna Set"** per assegnare tutte le carte a un set
+4. Oppure **"Conferma Selezionati"** per salvare multiple carte
+5. Oppure **"Analizza Selezionati"** per lanciare l'AI su multiple carte
+
+#### 🛡️ Protezione Chiusura Accidentale
+Se provi a chiudere la scheda o il browser mentre ci sono carte caricate ma non ancora salvate (stato "Pending" o "Ready"):
+- Il browser ti mostrerà un **avviso di conferma** per evitare la perdita accidentale.
+- Se confermi l'uscita, il sistema tenterà automaticamente di **eliminare le carte temporanee** dal server per non lasciare file "orfani" (immagini caricate ma non salvate).
+- **Nota:** Si consiglia comunque di usare il pulsante "Svuota Tutto" o eliminare manualmente le carte prima di uscire per garantire la pulizia completa.
 
 ### Profilo Utente
 

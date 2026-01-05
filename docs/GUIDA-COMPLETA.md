@@ -79,6 +79,8 @@
 - Nuova funzionalità "Svuota Tutto" con pulizia fisica (DB + Storage)
 - Possibilità di eliminare singolarmente le carte in bozza in qualsiasi stato (Pending, Cropped, Ready)
 - Sistema di feedback visivo con modali di conferma personalizzati (`ConfirmModal`)
+- **Protezione Chiusura:** Intercettazione chiusura browser con conferma e pulizia automatica carte orfane
+
 
 ---
 
@@ -288,6 +290,13 @@ Per velocizzare il processo con molte carte:
 2. Usa la **barra azioni flottante** che appare
 3. Clicca **"Analizza Selezionati"** per lanciare l'AI su tutte
 4. Oppure **"Conferma Selezionati"** per salvare multiple carte
+5. Oppure **"Analizza Selezionati"** per lanciare l'AI su multiple carte
+
+#### 🛡️ Sicurezza Dati e Pulizia
+Il sistema monitora lo stato della sessione di lavoro:
+- **Chiusura Accidentale:** Se chiudi il browser con carte non salvate, verrai avvisato.
+- **Auto-Cleanup:** Se confermi l'uscita, il sistema tenta di eliminare automaticamente i file temporanei caricati per mantenere pulito il server.
+
 
 ---
 
