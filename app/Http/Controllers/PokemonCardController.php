@@ -12,6 +12,9 @@ class PokemonCardController extends Controller
      */
     public function updateCondition(Request $request, PokemonCard $card)
     {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
         $request->validate([
             'condition' => 'required|in:Damaged,Heavily Played,Moderately Played,Lightly Played,Near Mint',
         ]);

@@ -13,7 +13,8 @@ class CardMatchingController extends Controller
 {
     public function __construct(
         private CardMatchingService $matchingService
-    ) {}
+    ) {
+    }
 
     /**
      * Show cards matching interface
@@ -21,6 +22,7 @@ class CardMatchingController extends Controller
     public function index(): Response
     {
         $unmatchedCards = PokemonCard::with('cardSet')
+            ->where('user_id', auth()->id())
             ->whereNull('market_card_id')
             ->get()
             ->map(function ($card) {
@@ -36,9 +38,9 @@ class CardMatchingController extends Controller
             });
 
         $stats = [
-            'total_cards' => PokemonCard::count(),
-            'matched_cards' => PokemonCard::whereNotNull('market_card_id')->count(),
-            'unmatched_cards' => PokemonCard::whereNull('market_card_id')->count(),
+            'total_cards' => PokemonCard::where('user_id', auth()->id())->count(),
+            'matched_cards' => PokemonCard::where('user_id', auth()->id())->whereNotNull('market_card_id')->count(),
+            'unmatched_cards' => PokemonCard::where('user_id', auth()->id())->whereNull('market_card_id')->count(),
         ];
 
         return Inertia::render('Matching/Index', [
@@ -65,6 +67,9 @@ class CardMatchingController extends Controller
      */
     public function suggestions(PokemonCard $card)
     {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
         $suggestions = $this->matchingService->suggestMatches($card, 10);
 
         return response()->json([
@@ -98,6 +103,9 @@ class CardMatchingController extends Controller
      */
     public function match(Request $request, PokemonCard $card)
     {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
         $request->validate([
             'market_card_id' => 'required|exists:market_cards,id',
         ]);
@@ -113,6 +121,9 @@ class CardMatchingController extends Controller
      */
     public function unmatch(PokemonCard $card)
     {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
         $this->matchingService->unmatch($card);
 
         return back()->with('success', 'Match rimosso!');

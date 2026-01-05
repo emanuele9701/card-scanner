@@ -42,6 +42,33 @@
             --type-colorless: #A8A8A8;
         }
 
+        /* Demo Banner */
+        .demo-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(90deg, #ff9966, #ff5e62);
+            color: white;
+            z-index: 1001;
+            font-size: 0.85rem;
+            font-weight: 600;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .banner-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-align: center;
+            line-height: 1.2;
+        }
+
         * {
             font-family: 'Inter', sans-serif;
         }
@@ -60,6 +87,8 @@
             backdrop-filter: blur(20px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding: 0.75rem 0;
+            top: 40px;
+            /* Offset for banner */
         }
 
         .navbar-brand {
@@ -203,7 +232,7 @@
 
         /* Main Container */
         .main-container {
-            padding-top: 100px;
+            padding-top: 130px;
             padding-bottom: 80px;
             flex: 1;
         }
@@ -485,6 +514,14 @@
 </head>
 
 <body>
+    <!-- Demo Warning Banner -->
+    <div class="demo-banner">
+        <div class="container banner-content">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span>ATTENZIONE: Ogni giorno a mezzanotte viene eseguita la pulizia del DB e dello storage (Ambiente
+                Demo).</span>
+        </div>
+    </div>
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg fixed-top">
         <div class="container">
@@ -498,86 +535,86 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     @auth
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('cards.upload') ? 'active' : '' }}"
-                            href="{{ route('cards.upload') }}">
-                            <i class="bi bi-camera-fill me-1"></i> Scansiona
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('cards.index') ? 'active' : '' }}"
-                            href="{{ route('cards.index') }}">
-                            <i class="bi bi-collection-fill me-1"></i> Collezione
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('collection.*') ? 'active' : '' }}"
-                            href="{{ route('collection.value') }}">
-                            <i class="bi bi-currency-dollar me-1"></i> Valore
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('matching.*') ? 'active' : '' }}"
-                            href="{{ route('matching.index') }}">
-                            <i class="bi bi-link-45deg me-1"></i> Matching
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('market-data.*') ? 'active' : '' }}"
-                            href="{{ route('market-data.index') }}">
-                            <i class="bi bi-cloud-upload me-1"></i> Market Data
-                        </a>
-                    </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('cards.upload') ? 'active' : '' }}"
+                                href="{{ route('cards.upload') }}">
+                                <i class="bi bi-camera-fill me-1"></i> Scansiona
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('cards.index') ? 'active' : '' }}"
+                                href="{{ route('cards.index') }}">
+                                <i class="bi bi-collection-fill me-1"></i> Collezione
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('collection.*') ? 'active' : '' }}"
+                                href="{{ route('collection.value') }}">
+                                <i class="bi bi-currency-dollar me-1"></i> Valore
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('matching.*') ? 'active' : '' }}"
+                                href="{{ route('matching.index') }}">
+                                <i class="bi bi-link-45deg me-1"></i> Matching
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('market-data.*') ? 'active' : '' }}"
+                                href="{{ route('market-data.index') }}">
+                                <i class="bi bi-cloud-upload me-1"></i> Market Data
+                            </a>
+                        </li>
                     @endauth
                 </ul>
 
                 <ul class="navbar-nav">
                     @guest
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('login') ? 'active' : '' }}"
-                            href="{{ route('login') }}">
-                            <i class="bi bi-box-arrow-in-right me-1"></i> Accedi
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="btn btn-pokemon btn-sm ms-2" href="{{ route('register') }}">
-                            <i class="bi bi-person-plus me-1"></i> Registrati
-                        </a>
-                    </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('login') ? 'active' : '' }}"
+                                href="{{ route('login') }}">
+                                <i class="bi bi-box-arrow-in-right me-1"></i> Accedi
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="btn btn-pokemon btn-sm ms-2" href="{{ route('register') }}">
+                                <i class="bi bi-person-plus me-1"></i> Registrati
+                            </a>
+                        </li>
                     @else
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown"
-                            role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            @if(Auth::user()->avatar)
-                            <img src="{{ Auth::user()->avatar_url }}" alt="Avatar" class="rounded-circle me-2"
-                                style="width: 28px; height: 28px; object-fit: cover;">
-                            @else
-                            <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center me-2"
-                                style="width: 28px; height: 28px;">
-                                <i class="bi bi-person-fill text-dark small"></i>
-                            </div>
-                            @endif
-                            {{ Auth::user()->display_name }}
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="userDropdown">
-                            <li>
-                                <a class="dropdown-item" href="{{ route('profile.show') }}">
-                                    <i class="bi bi-person me-2"></i>Il Mio Profilo
-                                </a>
-                            </li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li>
-                                <form action="{{ route('logout') }}" method="POST" class="d-inline">
-                                    @csrf
-                                    <button type="submit" class="dropdown-item text-danger">
-                                        <i class="bi bi-box-arrow-right me-2"></i>Esci
-                                    </button>
-                                </form>
-                            </li>
-                        </ul>
-                    </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown"
+                                role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                @if(Auth::user()->avatar)
+                                    <img src="{{ Auth::user()->avatar_url }}" alt="Avatar" class="rounded-circle me-2"
+                                        style="width: 28px; height: 28px; object-fit: cover;">
+                                @else
+                                    <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center me-2"
+                                        style="width: 28px; height: 28px;">
+                                        <i class="bi bi-person-fill text-dark small"></i>
+                                    </div>
+                                @endif
+                                {{ Auth::user()->display_name }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="userDropdown">
+                                <li>
+                                    <a class="dropdown-item" href="{{ route('profile.show') }}">
+                                        <i class="bi bi-person me-2"></i>Il Mio Profilo
+                                    </a>
+                                </li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li>
+                                    <form action="{{ route('logout') }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <i class="bi bi-box-arrow-right me-2"></i>Esci
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
                     @endguest
                 </ul>
             </div>
@@ -636,11 +673,11 @@
 
             const iconClass = type === 'success' ? 'bi-check-circle-fill text-success' :
                 type === 'warning' ? 'bi-exclamation-triangle-fill text-warning' :
-                type === 'info' ? 'bi-info-circle-fill text-info' :
-                'bi-exclamation-circle-fill text-danger';
+                    type === 'info' ? 'bi-info-circle-fill text-info' :
+                        'bi-exclamation-circle-fill text-danger';
             const title = type === 'success' ? 'Successo' :
                 type === 'warning' ? 'Attenzione' :
-                type === 'info' ? 'Info' : 'Errore';
+                    type === 'info' ? 'Info' : 'Errore';
 
             const toastHtml = `
                 <div id="${toastId}" class="toast" role="alert">

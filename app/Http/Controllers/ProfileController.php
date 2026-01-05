@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 
 class ProfileController extends Controller
 {
@@ -14,7 +15,9 @@ class ProfileController extends Controller
      */
     public function show()
     {
-        return view('profile.show', ['user' => Auth::user()]);
+        return Inertia::render('Profile/Show', [
+            'user' => Auth::user()
+        ]);
     }
 
     /**
@@ -22,7 +25,9 @@ class ProfileController extends Controller
      */
     public function edit()
     {
-        return view('profile.edit', ['user' => Auth::user()]);
+        return Inertia::render('Profile/Edit', [
+            'user' => Auth::user()
+        ]);
     }
 
     /**

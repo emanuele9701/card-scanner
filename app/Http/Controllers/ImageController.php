@@ -18,6 +18,9 @@ class ImageController extends Controller
      */
     public function showCardImage(PokemonCard $card)
     {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
         // Check if the file exists
         if (!$card->storage_path || !Storage::disk('public')->exists($card->storage_path)) {
             abort(404, 'Immagine non trovata');

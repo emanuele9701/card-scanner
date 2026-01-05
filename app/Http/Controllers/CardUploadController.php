@@ -8,6 +8,8 @@ use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
+use Inertia\Inertia;
+
 class CardUploadController extends Controller
 {
     /**
@@ -15,8 +17,22 @@ class CardUploadController extends Controller
      */
     public function showUploadForm()
     {
-        $cards = PokemonCard::latest()->take(10)->get();
-        return view('cards.upload', compact('cards'));
+        $cards = PokemonCard::where('user_id', auth()->id())
+            ->latest()
+            ->take(10)
+            ->get();
+        // Separate cards with and without sets first
+        $cardsWithoutSet = $cards->filter(fn($card) => $card->card_set_id === null)->values();
+        $cardsWithSet = $cards->filter(fn($card) => $card->card_set_id !== null)->values();
+
+        // Group cards with set by set name - converting to array for Inertia
+        $cardsBySet = $cardsWithSet->groupBy(fn($card) => $card->cardSet->name);
+
+        return Inertia::render('Cards/Upload', [
+            'initialCards' => $cards,
+            'cardsBySet' => $cardsBySet,
+            'cardsWithoutSet' => $cardsWithoutSet
+        ]);
     }
 
     /**
@@ -36,6 +52,7 @@ class CardUploadController extends Controller
         $path = $file->store('pokemon_cards', 'public');
 
         $card = PokemonCard::create([
+            'user_id' => auth()->id(),
             'original_filename' => $originalFilename,
             'storage_path' => $path,
             'status' => PokemonCard::STATUS_PENDING,
@@ -62,7 +79,7 @@ class CardUploadController extends Controller
             'cropped_image' => 'required|image|mimes:jpeg,png,jpg,webp|max:30720',
         ]);
 
-        $card = PokemonCard::findOrFail($request->card_id);
+        $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
 
         // Delete old image if it exists and is different (optional optimization)
         // For simplicity, we just overwrite/store new one and update path
@@ -100,7 +117,7 @@ class CardUploadController extends Controller
             'card_id' => 'required|exists:pokemon_cards,id',
         ]);
 
-        $card = PokemonCard::findOrFail($request->card_id);
+        $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
 
         $card->update([
             'status' => PokemonCard::STATUS_READY_FOR_AI
@@ -145,7 +162,7 @@ class CardUploadController extends Controller
             'card_id' => 'required|exists:pokemon_cards,id',
         ]);
 
-        $card = PokemonCard::findOrFail($request->card_id);
+        $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
 
         // Get image content for AI
         $imagePath = Storage::disk('public')->path($card->storage_path);
@@ -209,7 +226,7 @@ class CardUploadController extends Controller
             'card_set_id' => 'nullable|exists:card_sets,id',
         ]);
 
-        $card = PokemonCard::findOrFail($request->card_id);
+        $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
 
         // Decode attacks JSON string if present
         $attacks = null;
@@ -249,7 +266,7 @@ class CardUploadController extends Controller
             'card_id' => 'required|exists:pokemon_cards,id',
         ]);
 
-        $card = PokemonCard::findOrFail($request->card_id);
+        $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
 
         if (Storage::disk('public')->exists($card->storage_path)) {
             Storage::disk('public')->delete($card->storage_path);
@@ -269,6 +286,7 @@ class CardUploadController extends Controller
     public function index()
     {
         $allCards = PokemonCard::with('cardSet')
+            ->where('user_id', auth()->id())
             ->where('status', PokemonCard::STATUS_COMPLETED)
             ->orderBy('card_name')
             ->get();
@@ -280,7 +298,10 @@ class CardUploadController extends Controller
         // Group cards with set by set name
         $cardsBySet = $cardsWithSet->groupBy(fn($card) => $card->cardSet->name);
 
-        return view('cards.index', compact('cardsBySet', 'cardsWithoutSet'));
+        return Inertia::render('Cards/Index', [
+            'cardsBySet' => $cardsBySet,
+            'cardsWithoutSet' => $cardsWithoutSet
+        ]);
     }
 
     /**
@@ -288,6 +309,9 @@ class CardUploadController extends Controller
      */
     public function updateCard(Request $request, PokemonCard $card)
     {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
         $request->validate([
             'card_name' => 'nullable|string',
             'hp' => 'nullable|string',
@@ -336,7 +360,8 @@ class CardUploadController extends Controller
             'card_set_id' => 'required|exists:card_sets,id',
         ]);
 
-        PokemonCard::whereIn('id', $request->card_ids)
+        PokemonCard::where('user_id', auth()->id())
+            ->whereIn('id', $request->card_ids)
             ->update(['card_set_id' => $request->card_set_id]);
 
         return response()->json([
@@ -363,6 +388,9 @@ class CardUploadController extends Controller
      */
     public function getCardData(PokemonCard $card)
     {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
         $card->load('cardSet');
 
         return response()->json([
@@ -395,6 +423,9 @@ class CardUploadController extends Controller
      */
     public function destroy(PokemonCard $card)
     {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
         if (Storage::disk('public')->exists($card->storage_path)) {
             Storage::disk('public')->delete($card->storage_path);
         }

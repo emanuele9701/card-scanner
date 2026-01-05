@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsTo as UserBelongsTo;
 use Illuminate\Support\Facades\Log;
 
 class PokemonCard extends Model
@@ -15,6 +16,7 @@ class PokemonCard extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
+        'user_id',
         'original_filename',
         'storage_path',
         'extracted_text',
@@ -57,6 +59,14 @@ class PokemonCard extends Model
     public function cardSet(): BelongsTo
     {
         return $this->belongsTo(CardSet::class);
+    }
+
+    /**
+     * Get the user that owns the card
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

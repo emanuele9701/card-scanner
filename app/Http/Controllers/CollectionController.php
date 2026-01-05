@@ -18,7 +18,9 @@ class CollectionController extends Controller
         $cards = PokemonCard::with([
             'cardSet',
             'marketCard.latestPrice'
-        ])->get();
+        ])
+            ->where('status', PokemonCard::STATUS_COMPLETED)
+            ->get();
 
         $stats = $this->calculateCollectionStats($cards);
 
@@ -76,6 +78,7 @@ class CollectionController extends Controller
         $sets = CardSet::withCount('pokemonCards')->get();
 
         $cards = PokemonCard::with(['cardSet', 'marketCard'])
+            ->where('user_id', auth()->id())
             ->get()
             ->groupBy('card_set_id');
 

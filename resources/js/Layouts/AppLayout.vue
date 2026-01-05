@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Link, usePage } from '@inertiajs/vue3'
+import { Link, usePage, router } from '@inertiajs/vue3'
 
 const page = usePage()
 const currentUrl = computed(() => page.url)
@@ -20,16 +20,30 @@ const toggleMobileMenu = () => {
 }
 
 const toggleUserDropdown = () => {
+  console.log('Toggle clicked! Current state:', userDropdownOpen.value)
   userDropdownOpen.value = !userDropdownOpen.value
+  console.log('New state:', userDropdownOpen.value)
 }
 
 const closeMobileMenu = () => {
   mobileMenuOpen.value = false
 }
+
+const logout = () => {
+    router.post(route('logout'));
+};
 </script>
 
 <template>
   <div class="min-h-screen app-wrapper">
+    <!-- Demo Warning Banner -->
+    <div class="demo-banner">
+      <div class="container banner-content">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span>ATTENZIONE: Ogni giorno a mezzanotte viene eseguita la pulizia del DB e dello storage (Ambiente Demo).</span>
+      </div>
+    </div>
+
     <!-- Navbar Pokemon Style -->
     <nav class="navbar-pokemon">
       <div class="container">
@@ -69,21 +83,21 @@ const closeMobileMenu = () => {
             <div class="user-avatar">
               <img v-if="user.avatar" :src="user.avatar_url" :alt="user.name" class="avatar-img">
               <div v-else class="avatar-placeholder">
-                <i class="bi bi-person-fill"></i>
+                {{ user.name ? user.name.charAt(0).toUpperCase() : 'U' }}
               </div>
             </div>
             <span class="user-name">{{ user.name }}</span>
             <i class="bi bi-chevron-down"></i>
             
             <!-- Dropdown Menu -->
-            <div v-show="userDropdownOpen" class="dropdown-menu">
+            <div :class="['dropdown-menu', { 'show': userDropdownOpen }]" @click.stop>
               <a href="/profile" class="dropdown-item">
                 <i class="bi bi-person"></i> Il Mio Profilo
               </a>
               <hr class="dropdown-divider">
-              <Link href="/logout" method="post" as="button" class="dropdown-item text-danger">
+              <button class="dropdown-item text-danger" @click="logout">
                 <i class="bi bi-box-arrow-right"></i> Esci
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -150,16 +164,56 @@ const closeMobileMenu = () => {
   min-height: 100vh;
 }
 
+/* Demo Banner */
+.demo-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(90deg, #ff9966, #ff5e62);
+  color: white;
+  z-index: 1001;
+  font-size: 0.85rem;
+  font-weight: 600;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  line-height: 1.2;
+}
+
 .navbar-pokemon {
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding: 0.75rem 0;
   position: fixed;
-  top: 0;
+  top: 40px; /* Offset for banner */
   left: 0;
   right: 0;
   z-index: 1000;
+}
+
+.avatar-circle {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #FFCB05, #f39c12);
+    color: #000;
+    font-weight: bold;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
 }
 
 .container {
@@ -265,7 +319,7 @@ const closeMobileMenu = () => {
 /* User Dropdown */
 .user-dropdown {
   position: relative;
-  display: flex;
+  display: flex !important;
   align-items: center;
   gap: 8px;
   cursor: pointer;
@@ -317,6 +371,12 @@ const closeMobileMenu = () => {
   min-width: 180px;
   padding: 8px 0;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: none;
+}
+
+.dropdown-menu.show {
+  display: block;
 }
 
 .dropdown-item {
@@ -426,7 +486,7 @@ const closeMobileMenu = () => {
 
 /* Main Content */
 .main-container {
-  padding-top: 100px;
+  padding-top: 130px; /* 100px + 30px adjustments approximately */
   padding-bottom: 80px;
   color: #fff;
   flex: 1;
