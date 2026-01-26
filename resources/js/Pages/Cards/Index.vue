@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { router, Head } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ConfirmModal from '@/Components/ConfirmModal.vue';
@@ -7,10 +7,10 @@ import { useModal } from '@/composables/useModal';
 import axios from 'axios';
 
 const props = defineProps({
-    cardsBySet: Object,
-    cardsWithoutSet: Array,
+    cards: Object,
     availableGames: Array,
-    availableSets: Array
+    availableSets: Array,
+    filters: Object
 });
 
 const { showConfirm, showAlert } = useModal();
@@ -27,6 +27,18 @@ const isLoadingCard = ref(false);
 const isSaving = ref(false);
 const isDeleting = ref(false);
 const isAssigningSet = ref(false);
+
+// Inventory management
+const showInventoryForm = ref(false);
+const inventoryOptions = ref({ rarity_variants: [], conditions: [] });
+const isSavingInventory = ref(false);
+const editingInventoryId = ref(null);
+const inventoryForm = ref({
+    quantity: 1,
+    rarity_variant: 'Standard',
+    condition: 'Near Mint',
+    notes: ''
+});
 
 const editForm = ref({
     card_name: '',
@@ -47,82 +59,59 @@ const bulkSetId = ref('');
 const selectedCount = computed(() => selectedCards.value.size);
 const hasSelectedCards = computed(() => selectedCards.value.size > 0);
 
-// Filters
-const searchQuery = ref('');
-const selectedGame = ref('');
-const selectedSet = ref('');
-const showCardsWithoutSet = ref(false);
+// Filters - initialized from server
+const searchQuery = ref(props.filters?.search || '');
+const selectedGame = ref(props.filters?.game || '');
+const selectedSet = ref(props.filters?.set || '');
+const showCardsWithoutSet = ref(props.filters?.without_set || false);
+const perPage = ref(25); // Cards per page
 
-// Sorting
-const sortColumn = ref('');
-const sortDirection = ref('asc');
+// Sorting - initialized from server
+const sortColumn = ref(props.filters?.sort_column || '');
+const sortDirection = ref(props.filters?.sort_direction || 'asc');
 
 // Multi-selection with shift
 const lastClickedIndex = ref(null);
 
-const filteredResults = computed(() => {
-    let allCards = [];
+// Debounce timer for search
+let searchDebounce = null;
 
-    // Flatten cards from sets
-    for (const [setName, cards] of Object.entries(props.cardsBySet)) {
-        allCards = allCards.concat(cards);
-    }
-    
-    // Add cards without sets
-    if (props.cardsWithoutSet) {
-        allCards = allCards.concat(props.cardsWithoutSet);
-    }
-
-    // Filter
-    let filtered = allCards.filter(card => {
-        const matchesSearch = !searchQuery.value || 
-            card.card_name?.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
-            card.set_number?.toLowerCase().includes(searchQuery.value.toLowerCase());
-        
-        const matchesGame = !selectedGame.value || card.game === selectedGame.value;
-        const matchesSet = !selectedSet.value || 
-            (card.card_set?.name === selectedSet.value);
-        
-        // Filter for cards without set
-        const matchesWithoutSet = !showCardsWithoutSet.value || !card.card_set_id;
-
-        return matchesSearch && matchesGame && matchesSet && matchesWithoutSet;
+// Watch filters and reload data
+const reloadCards = () => {
+    router.get('/cards', {
+        search: searchQuery.value,
+        game: selectedGame.value,
+        set: selectedSet.value,
+        without_set: showCardsWithoutSet.value ? 1 : 0,
+        sort_column: sortColumn.value,
+        sort_direction: sortDirection.value,
+        per_page: perPage.value,
+        page: props.cards.current_page
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['cards']
     });
-    
-    // Sort
-    if (sortColumn.value) {
-        filtered.sort((a, b) => {
-            let aVal = a[sortColumn.value];
-            let bVal = b[sortColumn.value];
-            
-            // Handle set_number specially - extract numeric part for proper sorting
-            if (sortColumn.value === 'set_number') {
-                const extractNumber = (str) => {
-                    if (!str) return 0;
-                    const match = str.match(/\d+/);
-                    return match ? parseInt(match[0], 10) : 0;
-                };
-                aVal = extractNumber(aVal);
-                bVal = extractNumber(bVal);
-            }
-            
-            // Handle null/undefined values
-            if (aVal == null && bVal == null) return 0;
-            if (aVal == null) return 1;
-            if (bVal == null) return -1;
-            
-            // Compare values
-            if (aVal < bVal) return sortDirection.value === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sortDirection.value === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }
-    
-    return filtered;
+};
+
+// Watch for filter changes with debounce on search
+watch(searchQuery, () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+        reloadCards();
+    }, 500);
 });
 
-onMounted(async () => {
-    await loadCardSets();
+watch([selectedGame, selectedSet, showCardsWithoutSet], () => {
+    reloadCards();
+});
+
+watch(perPage, () => {
+    reloadCards();
+});
+
+watch([sortColumn, sortDirection], () => {
+    reloadCards();
 });
 
 const loadCardSets = async () => {
@@ -150,8 +139,8 @@ const toggleCardSelection = (cardId, checked, event, index) => {
         const end = Math.max(lastClickedIndex.value, index);
         
         for (let i = start; i <= end; i++) {
-            if (filteredResults.value[i]) {
-                selectedCards.value.add(filteredResults.value[i].id);
+            if (props.cards.data[i]) {
+                selectedCards.value.add(props.cards.data[i].id);
             }
         }
     } else {
@@ -181,6 +170,63 @@ const sortBy = (column) => {
         sortColumn.value = column;
         sortDirection.value = 'asc';
     }
+};
+
+const goToPage = (page) => {
+    router.get('/cards', {
+        search: searchQuery.value,
+        game: selectedGame.value,
+        set: selectedSet.value,
+        without_set: showCardsWithoutSet.value ? 1 : 0,
+        sort_column: sortColumn.value,
+        sort_direction: sortDirection.value,
+        per_page: perPage.value,
+        page: page
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['cards']
+    });
+};
+
+const generatePageNumbers = () => {
+    const pages = [];
+    const current = props.cards.current_page;
+    const last = props.cards.last_page;
+    
+    if (last <= 7) {
+        // Show all pages if there are 7 or fewer
+        for (let i = 1; i <= last; i++) {
+            pages.push(i);
+        }
+    } else {
+        // Always show first page
+        pages.push(1);
+        
+        // Show ellipsis or pages around current
+        if (current > 3) {
+            pages.push('...');
+        }
+        
+        // Show pages around current page
+        for (let i = Math.max(2, current - 1); i <= Math.min(last - 1, current + 1); i++) {
+            if (!pages.includes(i)) {
+                pages.push(i);
+            }
+        }
+        
+        // Show ellipsis or pages before last
+        if (current < last - 2) {
+            pages.push('...');
+        }
+        
+        // Always show last page
+        if (!pages.includes(last)) {
+            pages.push(last);
+        }
+    }
+    
+    return pages;
 };
 
 const openFullscreenCard = (src) => {
@@ -321,6 +367,166 @@ const saveBulkSet = async () => {
         isAssigningSet.value = false;
     }
 };
+
+// Rarity Management
+const showBulkRarityModal = ref(false);
+const bulkRarity = ref('');
+const isAssigningRarity = ref(false);
+
+const updateCardRarity = async (cardId, rarity) => {
+    try {
+        const response = await axios.put(`/cards/${cardId}/update`, { rarity });
+        if (response.data.success) {
+            // Update local data
+            const card = props.cards.data.find(c => c.id === cardId);
+            if (card) card.rarity = rarity;
+        }
+    } catch (error) {
+        console.error('Error updating rarity:', error);
+        await showAlert('Errore durante l\'aggiornamento', 'error');
+    }
+};
+
+const openBulkRarityModal = () => {
+    showBulkRarityModal.value = true;
+};
+
+const closeBulkRarityModal = () => {
+    showBulkRarityModal.value = false;
+    bulkRarity.value = '';
+};
+
+const saveBulkRarity = async () => {
+    const cardIds = Array.from(selectedCards.value);
+    if (cardIds.length === 0) {
+        await showAlert('Nessuna carta selezionata', 'warning');
+        return;
+    }
+
+    if (isAssigningRarity.value) return;
+    isAssigningRarity.value = true;
+
+    try {
+        // Update each card
+        await Promise.all(cardIds.map(id => 
+            axios.put(`/cards/${id}/update`, { rarity: bulkRarity.value || null })
+        ));
+        
+        await showAlert(`Rarità aggiornata per ${cardIds.length} carte!`, 'success');
+        closeBulkRarityModal();
+        clearSelection();
+        router.reload();
+    } catch (error) {
+        console.error('Error assigning rarity:', error);
+        await showAlert('Errore durante l\'aggiornamento', 'error');
+    } finally {
+        isAssigningRarity.value = false;
+    }
+};
+
+// Inventory Management Functions
+const loadInventoryOptions = async () => {
+    try {
+        const response = await axios.get('/cards/api/inventory-options');
+        if (response.data.success) {
+            inventoryOptions.value = response.data.data;
+        }
+    } catch (error) {
+        console.error('Error loading inventory options:', error);
+    }
+};
+
+const openInventoryForm = (inventoryItem = null) => {
+    if (inventoryItem) {
+        // Editing existing
+        editingInventoryId.value = inventoryItem.id;
+        inventoryForm.value = {
+            quantity: inventoryItem.quantity,
+            rarity_variant: inventoryItem.rarity_variant,
+            condition: inventoryItem.condition,
+            notes: inventoryItem.notes || ''
+        };
+    } else {
+        // New item
+        editingInventoryId.value = null;
+        inventoryForm.value = {
+            quantity: 1,
+            rarity_variant: 'Standard',
+            condition: 'Near Mint',
+            notes: ''
+        };
+    }
+    showInventoryForm.value = true;
+};
+
+const closeInventoryForm = () => {
+    showInventoryForm.value = false;
+    editingInventoryId.value = null;
+    inventoryForm.value = {
+        quantity: 1,
+        rarity_variant: 'Standard',
+        condition: 'Near Mint',
+        notes: ''
+    };
+};
+
+const saveInventory = async () => {
+    if (isSavingInventory.value) return;
+    isSavingInventory.value = true;
+
+    try {
+        let response;
+        if (editingInventoryId.value) {
+            // Update existing
+            response = await axios.put(`/cards/inventory/${editingInventoryId.value}`, inventoryForm.value);
+        } else {
+            // Create new
+            response = await axios.post(`/cards/${currentCardData.value.id}/inventory`, inventoryForm.value);
+        }
+
+        if (response.data.success) {
+            await showAlert('Inventario aggiornato!', 'success');
+            closeInventoryForm();
+            // Refresh card data
+            await viewEditCard(currentCardData.value.id, isEditMode.value);
+            router.reload({ only: ['cards'] });
+        }
+    } catch (error) {
+        console.error('Error saving inventory:', error);
+        await showAlert('Errore durante il salvataggio', 'error');
+    } finally {
+        isSavingInventory.value = false;
+    }
+};
+
+const deleteInventory = async (inventoryId) => {
+    const confirmed = await showConfirm(
+        'Sei sicuro di voler eliminare questo elemento?',
+        'Conferma Eliminazione',
+        { confirmText: 'Elimina', cancelText: 'Annulla' }
+    );
+    
+    if (!confirmed) return;
+
+    try {
+        const response = await axios.delete(`/cards/inventory/${inventoryId}`);
+        if (response.data.success) {
+            await showAlert('Elemento eliminato!', 'success');
+            // Refresh card data
+            await viewEditCard(currentCardData.value.id, isEditMode.value);
+            router.reload({ only: ['cards'] });
+        }
+    } catch (error) {
+        console.error('Error deleting inventory:', error);
+        await showAlert('Errore durante l\'eliminazione', 'error');
+    }
+};
+
+// Load inventory options on mount
+onMounted(async () => {
+    await loadCardSets();
+    await loadInventoryOptions();
+});
 </script>
 
 <template>
@@ -347,7 +553,7 @@ const saveBulkSet = async () => {
                     </div>
                     
                     <!-- Game Filter -->
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label text-warning text-sm">Gioco</label>
                         <select
                             v-model="selectedGame"
@@ -359,7 +565,7 @@ const saveBulkSet = async () => {
                     </div>
 
                     <!-- Set Filter -->
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label text-warning text-sm">Set</label>
                         <select
                             v-model="selectedSet"
@@ -367,6 +573,20 @@ const saveBulkSet = async () => {
                         >
                             <option value="">Tutti i Set</option>
                             <option v-for="set in availableSets" :key="set" :value="set">{{ set }}</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Per Page Selector -->
+                    <div class="col-md-2">
+                        <label class="form-label text-warning text-sm">Carte per pagina</label>
+                        <select
+                            v-model.number="perPage"
+                            class="form-select bg-dark text-white border-secondary"
+                        >
+                            <option :value="10">10</option>
+                            <option :value="25">25</option>
+                            <option :value="50">50</option>
+                            <option :value="100">100</option>
                         </select>
                     </div>
                     
@@ -389,14 +609,36 @@ const saveBulkSet = async () => {
                 </div>
             </div>
 
+            <!-- Bulk Actions Bar -->
+            <div v-if="selectedCards.size > 0" class="mb-4 p-3 rounded-lg" style="background: linear-gradient(135deg, rgba(255, 203, 5, 0.2), rgba(30, 35, 60, 0.8)); border: 1px solid rgba(255, 203, 5, 0.5);">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="badge bg-warning text-dark" style="font-size: 1rem;">
+                            {{ selectedCards.size }} carte selezionate
+                        </span>
+                        <button class="btn btn-sm btn-outline-light" @click="clearSelection">
+                            <i class="bi bi-x-lg me-1"></i> Deseleziona
+                        </button>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-warning btn-sm" @click="openBulkSetModal">
+                            <i class="bi bi-folder me-1"></i> Assegna Set
+                        </button>
+                        <button class="btn btn-info btn-sm text-white" @click="openBulkRarityModal">
+                            <i class="bi bi-star me-1"></i> Assegna Rarità
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700" style="background: rgba(30, 35, 60, 0.5); backdrop-filter: blur(10px); border-radius: 12px;">
-                <div v-if="filteredResults.length > 0" class="overflow-x-auto">
+                <div v-if="cards.data && cards.data.length > 0" class="overflow-x-auto">
                     <table class="table table-dark table-hover mb-0">
                         <thead>
                             <tr>
                                 <th style="width: 40px;">
                                     <div class="card-selector position-relative">
-                                        <input type="checkbox" @change="e => { if(e.target.checked) filteredResults.forEach(c => selectedCards.add(c.id)); else clearSelection(); }" :checked="filteredResults.length > 0 && selectedCards.size === filteredResults.length">
+                                        <input type="checkbox" @change="e => { if(e.target.checked) cards.data.forEach(c => selectedCards.add(c.id)); else clearSelection(); }" :checked="cards.data.length > 0 && selectedCards.size === cards.data.length">
                                     </div>
                                 </th>
                                 <th>Carta</th>
@@ -406,12 +648,13 @@ const saveBulkSet = async () => {
                                 </th>
                                 <th>Set</th>
                                 <th>Gioco</th>
+                                <th>Quantità</th>
                                 <th>Rarità</th>
                                 <th class="text-end">Azioni</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(card, index) in filteredResults" :key="card.id">
+                            <tr v-for="(card, index) in cards.data" :key="card.id">
                                 <td>
                                     <div class="card-selector position-relative">
                                         <input type="checkbox" @change="e => toggleCardSelection(card.id, e.target.checked, e, index)" :checked="selectedCards.has(card.id)">
@@ -439,7 +682,29 @@ const saveBulkSet = async () => {
                                     <span v-else class="text-white-50 fst-italic">Nessun Set</span>
                                 </td>
                                 <td>{{ card.game || 'N/A' }}</td>
-                                <td>{{ card.rarity || 'N/A' }}</td>
+                                <td>
+                                    <span v-if="card.inventory_sum_quantity" class="badge bg-warning text-dark" style="font-size: 0.875rem;">
+                                        {{ card.inventory_sum_quantity }}
+                                    </span>
+                                    <span v-else class="text-white-50">0</span>
+                                </td>
+                                <td>
+                                    <select 
+                                        class="form-select form-select-sm bg-dark text-white border-secondary" 
+                                        style="width: auto; min-width: 120px; cursor: pointer;"
+                                        :value="card.rarity || ''"
+                                        @change="updateCardRarity(card.id, $event.target.value)"
+                                    >
+                                        <option value="">Seleziona...</option>
+                                        <option value="Comune">Comune</option>
+                                        <option value="Non Comune">Non Comune</option>
+                                        <option value="Rara">Rara</option>
+                                        <option value="Rara Holo">Rara Holo</option>
+                                        <option value="Ultra Rara">Ultra Rara</option>
+                                        <option value="Segreta">Segreta</option>
+                                        <option value="Promo">Promo</option>
+                                    </select>
+                                </td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
                                         <button class="btn btn-dark border-secondary" @click="viewEditCard(card.id, false)" title="Visualizza">
@@ -458,6 +723,47 @@ const saveBulkSet = async () => {
                     </table>
                 </div>
 
+                <!-- Pagination Controls -->
+                <div v-if="cards.data && cards.data.length > 0" class="p-3" style="background: rgba(30, 35, 60, 0.8); border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <!-- Results Info -->
+                        <div class="text-white-50 small">
+                            Mostrando {{ cards.from }} - {{ cards.to }} di {{ cards.total }} carte
+                        </div>
+                        
+                        <!-- Pagination Buttons -->
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0">
+                                <!-- Previous Button -->
+                                <li class="page-item" :class="{ disabled: cards.current_page === 1 }">
+                                    <button class="page-link bg-dark text-white border-secondary" @click="goToPage(cards.current_page - 1)" :disabled="cards.current_page === 1">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </button>
+                                </li>
+                                
+                                <!-- Page Numbers -->
+                                <template v-for="page in generatePageNumbers()" :key="page">
+                                    <li v-if="page === '...'" class="page-item disabled">
+                                        <span class="page-link bg-dark text-white-50 border-secondary">...</span>
+                                    </li>
+                                    <li v-else class="page-item" :class="{ active: page === cards.current_page }">
+                                        <button class="page-link" :class="page === cards.current_page ? 'bg-warning text-dark border-warning' : 'bg-dark text-white border-secondary'" @click="goToPage(page)">
+                                            {{ page }}
+                                        </button>
+                                    </li>
+                                </template>
+                                
+                                <!-- Next Button -->
+                                <li class="page-item" :class="{ disabled: cards.current_page === cards.last_page }">
+                                    <button class="page-link bg-dark text-white border-secondary" @click="goToPage(cards.current_page + 1)" :disabled="cards.current_page === cards.last_page">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+
                 <!-- Empty state -->
                 <div v-else class="p-5 text-center">
                     <i class="bi bi-inbox" style="font-size: 64px; color: rgba(255, 255, 255, 0.3);"></i>
@@ -474,6 +780,9 @@ const saveBulkSet = async () => {
             <span class="count"><span>{{ selectedCount }}</span> carte selezionate</span>
             <button class="btn btn-warning btn-sm" @click="openBulkSetModal">
                 <i class="bi bi-collection"></i> Assegna Set
+            </button>
+            <button class="btn btn-info btn-sm text-white" @click="openBulkRarityModal">
+                <i class="bi bi-star"></i> Assegna Rarità
             </button>
             <button class="btn btn-outline-light btn-sm" @click="clearSelection">
                 <i class="bi bi-x-lg"></i> Annulla
@@ -507,6 +816,38 @@ const saveBulkSet = async () => {
                     <button type="button" class="btn btn-secondary" @click="closeBulkSetModal">Annulla</button>
                     <button type="button" class="btn btn-success" @click="saveBulkSet">
                         <i class="bi bi-check-lg"></i> Assegna Set
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Rarity Modal -->
+        <div v-if="showBulkRarityModal" class="modal-overlay" @click.self="closeBulkRarityModal">
+            <div class="modal-container" style="max-width: 500px;">
+                <div class="modal-header-custom">
+                    <h3>Assegna Rarità a Carte Selezionate</h3>
+                    <button type="button" class="btn-close-modal" @click="closeBulkRarityModal">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div class="modal-body" style="padding: 20px;">
+                    <p class="text-white-50 mb-3">Seleziona la rarità da assegnare a <strong>{{ selectedCards.size }}</strong> carte:</p>
+                    <select class="form-select bg-dark text-white border-secondary" v-model="bulkRarity">
+                        <option value="">Nessuna Rarità (rimuovi)</option>
+                        <option value="Comune">Comune</option>
+                        <option value="Non Comune">Non Comune</option>
+                        <option value="Rara">Rara</option>
+                        <option value="Rara Holo">Rara Holo</option>
+                        <option value="Ultra Rara">Ultra Rara</option>
+                        <option value="Segreta">Segreta</option>
+                        <option value="Promo">Promo</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @click="closeBulkRarityModal">Annulla</button>
+                    <button type="button" class="btn btn-info text-white" @click="saveBulkRarity" :disabled="isAssigningRarity">
+                        <span v-if="isAssigningRarity" class="spinner-border spinner-border-sm me-1"></span>
+                        <i v-else class="bi bi-check-lg"></i> Assegna Rarità
                     </button>
                 </div>
             </div>
@@ -548,6 +889,105 @@ const saveBulkSet = async () => {
                                     <tr v-if="currentCardData.estimated_value"><td><strong>💰 Valore Stimato</strong></td><td><strong style="color: #22c55e">{{ currentCardData.estimated_value }}</strong></td></tr>
                                 </tbody>
                             </table>
+                            
+                            <!-- Inventory Section -->
+                            <div class="inventory-section mt-4" style="border-top: 1px solid rgba(255, 203, 5, 0.3); padding-top: 15px;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="text-warning mb-0">
+                                        <i class="bi bi-box-seam me-2"></i>
+                                        Le Mie Copie
+                                        <span v-if="currentCardData.total_quantity" class="badge bg-warning text-dark ms-2">{{ currentCardData.total_quantity }}</span>
+                                    </h5>
+                                    <button class="btn btn-sm btn-warning" @click="openInventoryForm()">
+                                        <i class="bi bi-plus-lg"></i> Aggiungi
+                                    </button>
+                                </div>
+                                
+                                <!-- Inventory Form -->
+                                <div v-if="showInventoryForm" class="card bg-dark border-warning mb-3">
+                                    <div class="card-body">
+                                        <h6 class="text-warning mb-3">{{ editingInventoryId ? 'Modifica Copia' : 'Nuova Copia' }}</h6>
+                                        <div class="row g-2">
+                                            <div class="col-md-3">
+                                                <label class="form-label small text-white-50">Quantità</label>
+                                                <input type="number" min="1" class="form-control form-control-sm bg-dark text-white border-secondary" v-model.number="inventoryForm.quantity">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small text-white-50">Variante</label>
+                                                <select class="form-select form-select-sm bg-dark text-white border-secondary" v-model="inventoryForm.rarity_variant">
+                                                    <option v-for="variant in inventoryOptions.rarity_variants" :key="variant" :value="variant">{{ variant }}</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <label class="form-label small text-white-50">Condizione</label>
+                                                <select class="form-select form-select-sm bg-dark text-white border-secondary" v-model="inventoryForm.condition">
+                                                    <option v-for="cond in inventoryOptions.conditions" :key="cond" :value="cond">{{ cond }}</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small text-white-50">Note (opzionale)</label>
+                                                <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" v-model="inventoryForm.notes" placeholder="Note personali...">
+                                            </div>
+                                            <div class="col-12 mt-2">
+                                                <div class="d-flex gap-2">
+                                                    <button class="btn btn-sm btn-success" @click="saveInventory" :disabled="isSavingInventory">
+                                                        <span v-if="isSavingInventory" class="spinner-border spinner-border-sm me-1"></span>
+                                                        <i v-else class="bi bi-check-lg"></i> Salva
+                                                    </button>
+                                                    <button class="btn btn-sm btn-secondary" @click="closeInventoryForm">Annulla</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Inventory List -->
+                                <div v-if="currentCardData.inventory && currentCardData.inventory.length > 0">
+                                    <table class="table table-dark table-sm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Qtà</th>
+                                                <th>Variante</th>
+                                                <th>Condizione</th>
+                                                <th>Note</th>
+                                                <th class="text-end">Azioni</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="item in currentCardData.inventory" :key="item.id">
+                                                <td><span class="badge bg-warning text-dark">{{ item.quantity }}</span></td>
+                                                <td>{{ item.rarity_variant }}</td>
+                                                <td>
+                                                    <span class="badge" :class="{
+                                                        'bg-success': item.condition === 'Mint',
+                                                        'bg-info': item.condition === 'Near Mint',
+                                                        'bg-primary': item.condition === 'Excellent',
+                                                        'bg-secondary': item.condition === 'Good',
+                                                        'bg-warning text-dark': item.condition === 'Light Played',
+                                                        'bg-orange': item.condition === 'Played',
+                                                        'bg-danger': item.condition === 'Poor'
+                                                    }">{{ item.condition }}</span>
+                                                </td>
+                                                <td class="text-white-50"><small>{{ item.notes || '-' }}</small></td>
+                                                <td class="text-end">
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button class="btn btn-dark border-secondary" @click="openInventoryForm(item)" title="Modifica">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-danger" @click="deleteInventory(item.id)" title="Elimina">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div v-else class="text-white-50 text-center py-3">
+                                    <i class="bi bi-inbox" style="font-size: 24px;"></i>
+                                    <p class="mb-0 mt-2 small">Nessuna copia registrata. Clicca "Aggiungi" per iniziare.</p>
+                                </div>
+                            </div>
                         </div>
                         <!-- Edit Mode -->
                         <div v-else-if="isEditMode" class="row g-3">

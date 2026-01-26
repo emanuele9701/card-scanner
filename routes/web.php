@@ -64,6 +64,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/api/available-games', [CardUploadController::class, 'getAvailableGames'])->name('api.available-games');
         Route::get('/{card}/data', [CardUploadController::class, 'getCardData'])->name('cards.data');
         Route::delete('/{card}', [CardUploadController::class, 'destroy'])->name('cards.destroy');
+
+        // Card Inventory routes
+        Route::get('/{card}/inventory', [CardUploadController::class, 'getCardInventory'])->name('cards.inventory.get');
+        Route::post('/{card}/inventory', [CardUploadController::class, 'storeInventory'])->name('cards.inventory.store');
+        Route::put('/inventory/{inventory}', [CardUploadController::class, 'updateInventory'])->name('cards.inventory.update');
+        Route::delete('/inventory/{inventory}', [CardUploadController::class, 'destroyInventory'])->name('cards.inventory.destroy');
+        Route::get('/api/inventory-options', [CardUploadController::class, 'getInventoryOptions'])->name('api.inventory-options');
     });
 
     // Pokemon Cards management

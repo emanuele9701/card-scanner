@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo as UserBelongsTo;
 use Illuminate\Support\Facades\Log;
 
@@ -94,6 +95,22 @@ class PokemonCard extends Model
     public function marketCard(): BelongsTo
     {
         return $this->belongsTo(MarketCard::class);
+    }
+
+    /**
+     * Get the inventory items for this card
+     */
+    public function inventory(): HasMany
+    {
+        return $this->hasMany(CardInventory::class);
+    }
+
+    /**
+     * Get the total quantity of this card across all inventory items
+     */
+    public function getTotalQuantity(): int
+    {
+        return $this->inventory()->sum('quantity');
     }
 
     /**

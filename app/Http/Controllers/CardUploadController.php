@@ -391,38 +391,86 @@ class CardUploadController extends Controller
     }
 
     /**
-     * Get all scanned cards grouped by set
+     * Get all scanned cards with server-side pagination
      */
-    public function index()
+    public function index(Request $request)
     {
-        $allCards = PokemonCard::with('cardSet')
+        $perPage = $request->input('per_page', 25);
+        $search = $request->input('search', '');
+        $game = $request->input('game', '');
+        $set = $request->input('set', '');
+        $withoutSet = $request->input('without_set', false);
+        $sortColumn = $request->input('sort_column', '');
+        $sortDirection = $request->input('sort_direction', 'asc');
+
+        // Base query
+        $query = PokemonCard::with('cardSet')
+            ->withSum('inventory', 'quantity')
             ->where('user_id', auth()->id())
-            ->where('status', PokemonCard::STATUS_COMPLETED)
-            ->orderBy('card_name')
-            ->get();
+            ->where('status', PokemonCard::STATUS_COMPLETED);
 
+        // Apply search filter
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('card_name', 'like', '%' . $search . '%')
+                    ->orWhere('set_number', 'like', '%' . $search . '%');
+            });
+        }
 
-        // Separate cards with and without sets first
-        $cardsWithoutSet = $allCards->filter(fn($card) => $card->card_set_id === null)->values();
-        $cardsWithSet = $allCards->filter(fn($card) => $card->card_set_id !== null);
+        // Apply game filter
+        if ($game) {
+            $query->where('game', $game);
+        }
 
-        // Group cards with set by set name
-        $cardsBySet = $cardsWithSet->groupBy(fn($card) => $card->cardSet->name);
+        // Apply set filter
+        if ($set) {
+            $query->whereHas('cardSet', function ($q) use ($set) {
+                $q->where('name', $set);
+            });
+        }
 
+        // Apply without set filter
+        if ($withoutSet) {
+            $query->whereNull('card_set_id');
+        }
+
+        // Apply sorting
+        if ($sortColumn) {
+            $query->orderBy($sortColumn, $sortDirection);
+        } else {
+            $query->orderBy('card_name');
+        }
+
+        // Paginate results
+        $cards = $query->paginate($perPage);
+
+        // Get available filters
+        $availableGames = PokemonCard::where('user_id', auth()->id())
+            ->whereNotNull('game')
+            ->distinct()
+            ->pluck('game')
+            ->sort()
+            ->values();
+
+        $availableSets = CardSet::whereHas('pokemonCards', function ($q) {
+            $q->where('user_id', auth()->id());
+        })
+            ->pluck('name')
+            ->sort()
+            ->values();
 
         return Inertia::render('Cards/Index', [
-            'cardsBySet' => $cardsBySet,
-            'cardsWithoutSet' => $cardsWithoutSet,
-            'availableGames' => PokemonCard::where('user_id', auth()->id())
-                ->whereNotNull('game')
-                ->distinct()
-                ->pluck('game')
-                ->sort()
-                ->values(),
-            'availableSets' => $cardsWithSet->pluck('cardSet.name')
-                ->unique()
-                ->sort()
-                ->values()
+            'cards' => $cards,
+            'availableGames' => $availableGames,
+            'availableSets' => $availableSets,
+            'filters' => [
+                'search' => $search,
+                'game' => $game,
+                'set' => $set,
+                'without_set' => $withoutSet,
+                'sort_column' => $sortColumn,
+                'sort_direction' => $sortDirection,
+            ]
         ]);
     }
 
@@ -542,7 +590,7 @@ class CardUploadController extends Controller
         if ($card->user_id !== auth()->id()) {
             abort(403);
         }
-        $card->load('cardSet');
+        $card->load(['cardSet', 'inventory']);
 
         return response()->json([
             'success' => true,
@@ -565,6 +613,8 @@ class CardUploadController extends Controller
                 'card_set_id' => $card->card_set_id,
                 'card_set' => $card->cardSet ? ['name' => $card->cardSet->name] : null,
                 'estimated_value' => $card->formatted_estimated_value,
+                'inventory' => $card->inventory,
+                'total_quantity' => $card->getTotalQuantity(),
             ]
         ]);
     }
@@ -586,6 +636,116 @@ class CardUploadController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Carta eliminata con successo!'
+        ]);
+    }
+
+    /**
+     * Get inventory items for a specific card
+     */
+    public function getCardInventory(PokemonCard $card)
+    {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $inventory = $card->inventory()->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $inventory
+        ]);
+    }
+
+    /**
+     * Add or update inventory item
+     */
+    public function storeInventory(Request $request, PokemonCard $card)
+    {
+        if ($card->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+            'rarity_variant' => 'required|in:' . implode(',', \App\Models\CardInventory::RARITY_VARIANTS),
+            'condition' => 'required|in:' . implode(',', \App\Models\CardInventory::CONDITIONS),
+            'notes' => 'nullable|string'
+        ]);
+
+        // Check if this combination already exists
+        $inventory = \App\Models\CardInventory::updateOrCreate(
+            [
+                'pokemon_card_id' => $card->id,
+                'user_id' => auth()->id(),
+                'rarity_variant' => $request->rarity_variant,
+                'condition' => $request->condition
+            ],
+            [
+                'quantity' => $request->quantity,
+                'notes' => $request->notes
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Inventario aggiornato con successo!',
+            'data' => $inventory
+        ]);
+    }
+
+    /**
+     * Update an inventory item
+     */
+    public function updateInventory(Request $request, \App\Models\CardInventory $inventory)
+    {
+        if ($inventory->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'quantity' => 'sometimes|required|integer|min:1',
+            'rarity_variant' => 'sometimes|required|in:' . implode(',', \App\Models\CardInventory::RARITY_VARIANTS),
+            'condition' => 'sometimes|required|in:' . implode(',', \App\Models\CardInventory::CONDITIONS),
+            'notes' => 'nullable|string'
+        ]);
+
+        $inventory->update($request->only(['quantity', 'rarity_variant', 'condition', 'notes']));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Inventario aggiornato con successo!',
+            'data' => $inventory
+        ]);
+    }
+
+    /**
+     * Delete an inventory item
+     */
+    public function destroyInventory(\App\Models\CardInventory $inventory)
+    {
+        if ($inventory->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $inventory->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Elemento inventario eliminato!'
+        ]);
+    }
+
+    /**
+     * Get available rarity variants and conditions for dropdowns
+     */
+    public function getInventoryOptions()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'rarity_variants' => \App\Models\CardInventory::RARITY_VARIANTS,
+                'conditions' => \App\Models\CardInventory::CONDITIONS
+            ]
         ]);
     }
 }
