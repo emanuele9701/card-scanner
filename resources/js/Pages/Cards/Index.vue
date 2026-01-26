@@ -51,6 +51,14 @@ const hasSelectedCards = computed(() => selectedCards.value.size > 0);
 const searchQuery = ref('');
 const selectedGame = ref('');
 const selectedSet = ref('');
+const showCardsWithoutSet = ref(false);
+
+// Sorting
+const sortColumn = ref('');
+const sortDirection = ref('asc');
+
+// Multi-selection with shift
+const lastClickedIndex = ref(null);
 
 const filteredResults = computed(() => {
     let allCards = [];
@@ -66,7 +74,7 @@ const filteredResults = computed(() => {
     }
 
     // Filter
-    return allCards.filter(card => {
+    let filtered = allCards.filter(card => {
         const matchesSearch = !searchQuery.value || 
             card.card_name?.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
             card.set_number?.toLowerCase().includes(searchQuery.value.toLowerCase());
@@ -74,9 +82,43 @@ const filteredResults = computed(() => {
         const matchesGame = !selectedGame.value || card.game === selectedGame.value;
         const matchesSet = !selectedSet.value || 
             (card.card_set?.name === selectedSet.value);
+        
+        // Filter for cards without set
+        const matchesWithoutSet = !showCardsWithoutSet.value || !card.card_set_id;
 
-        return matchesSearch && matchesGame && matchesSet;
+        return matchesSearch && matchesGame && matchesSet && matchesWithoutSet;
     });
+    
+    // Sort
+    if (sortColumn.value) {
+        filtered.sort((a, b) => {
+            let aVal = a[sortColumn.value];
+            let bVal = b[sortColumn.value];
+            
+            // Handle set_number specially - extract numeric part for proper sorting
+            if (sortColumn.value === 'set_number') {
+                const extractNumber = (str) => {
+                    if (!str) return 0;
+                    const match = str.match(/\d+/);
+                    return match ? parseInt(match[0], 10) : 0;
+                };
+                aVal = extractNumber(aVal);
+                bVal = extractNumber(bVal);
+            }
+            
+            // Handle null/undefined values
+            if (aVal == null && bVal == null) return 0;
+            if (aVal == null) return 1;
+            if (bVal == null) return -1;
+            
+            // Compare values
+            if (aVal < bVal) return sortDirection.value === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDirection.value === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+    
+    return filtered;
 });
 
 onMounted(async () => {
@@ -101,16 +143,44 @@ const toggleSet = (event) => {
     header.classList.toggle('collapsed');
 };
 
-const toggleCardSelection = (cardId, checked) => {
-    if (checked) {
-        selectedCards.value.add(cardId);
+const toggleCardSelection = (cardId, checked, event, index) => {
+    if (event?.shiftKey && lastClickedIndex.value !== null && checked) {
+        // Shift-click range selection
+        const start = Math.min(lastClickedIndex.value, index);
+        const end = Math.max(lastClickedIndex.value, index);
+        
+        for (let i = start; i <= end; i++) {
+            if (filteredResults.value[i]) {
+                selectedCards.value.add(filteredResults.value[i].id);
+            }
+        }
     } else {
-        selectedCards.value.delete(cardId);
+        if (checked) {
+            selectedCards.value.add(cardId);
+        } else {
+            selectedCards.value.delete(cardId);
+        }
+    }
+    
+    if (checked) {
+        lastClickedIndex.value = index;
     }
 };
 
 const clearSelection = () => {
     selectedCards.value.clear();
+    lastClickedIndex.value = null;
+};
+
+const sortBy = (column) => {
+    if (sortColumn.value === column) {
+        // Toggle direction if same column
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        // New column, default to ascending
+        sortColumn.value = column;
+        sortDirection.value = 'asc';
+    }
 };
 
 const openFullscreenCard = (src) => {
@@ -266,7 +336,7 @@ const saveBulkSet = async () => {
             <div class="bg-gray-800 rounded-lg p-4 mb-5 border border-gray-700" style="background: rgba(30, 35, 60, 0.8); backdrop-filter: blur(10px); border-radius: 12px;">
                 <div class="row g-3">
                     <!-- Search -->
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label text-warning text-sm">Cerca</label>
                         <input
                             v-model="searchQuery"
@@ -277,7 +347,7 @@ const saveBulkSet = async () => {
                     </div>
                     
                     <!-- Game Filter -->
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label text-warning text-sm">Gioco</label>
                         <select
                             v-model="selectedGame"
@@ -289,7 +359,7 @@ const saveBulkSet = async () => {
                     </div>
 
                     <!-- Set Filter -->
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label text-warning text-sm">Set</label>
                         <select
                             v-model="selectedSet"
@@ -298,6 +368,23 @@ const saveBulkSet = async () => {
                             <option value="">Tutti i Set</option>
                             <option v-for="set in availableSets" :key="set" :value="set">{{ set }}</option>
                         </select>
+                    </div>
+                    
+                    <!-- Cards Without Set Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label text-warning text-sm">Filtri Aggiuntivi</label>
+                        <div class="form-check" style="margin-top: 8px;">
+                            <input
+                                v-model="showCardsWithoutSet"
+                                class="form-check-input"
+                                type="checkbox"
+                                id="filterWithoutSet"
+                                style="accent-color: #FFCB05;"
+                            />
+                            <label class="form-check-label text-white" for="filterWithoutSet">
+                                Solo carte senza set
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -313,7 +400,10 @@ const saveBulkSet = async () => {
                                     </div>
                                 </th>
                                 <th>Carta</th>
-                                <th>Numero</th>
+                                <th class="sortable" @click="sortBy('set_number')" style="cursor: pointer;">
+                                    Numero
+                                    <i v-if="sortColumn === 'set_number'" class="bi" :class="sortDirection === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down'" style="font-size: 0.75rem; margin-left: 5px;"></i>
+                                </th>
                                 <th>Set</th>
                                 <th>Gioco</th>
                                 <th>Rarità</th>
@@ -321,10 +411,10 @@ const saveBulkSet = async () => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="card in filteredResults" :key="card.id">
+                            <tr v-for="(card, index) in filteredResults" :key="card.id">
                                 <td>
                                     <div class="card-selector position-relative">
-                                        <input type="checkbox" @change="e => toggleCardSelection(card.id, e.target.checked)" :checked="selectedCards.has(card.id)">
+                                        <input type="checkbox" @change="e => toggleCardSelection(card.id, e.target.checked, e, index)" :checked="selectedCards.has(card.id)">
                                     </div>
                                 </td>
                                 <td>
@@ -876,5 +966,14 @@ const saveBulkSet = async () => {
 
 .btn-pokemon:hover {
     transform: scale(1.05);
+}
+
+.sortable {
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.sortable:hover {
+    background-color: rgba(255, 203, 5, 0.1) !important;
 }
 </style>
