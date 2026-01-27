@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsTo as UserBelongsTo;
 use Illuminate\Support\Facades\Log;
 
@@ -103,6 +104,14 @@ class PokemonCard extends Model
     public function inventory(): HasMany
     {
         return $this->hasMany(CardInventory::class);
+    }
+
+    /**
+     * Get the Google Drive file for this card
+     */
+    public function driveFile(): HasOne
+    {
+        return $this->hasOne(GoogleDriveFile::class);
     }
 
     /**
