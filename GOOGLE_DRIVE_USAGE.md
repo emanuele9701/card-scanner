@@ -12,10 +12,9 @@ Questo documento fornisce istruzioni complete su come utilizzare il comando `Dri
 Il file `.env` contiene le seguenti variabili già configurate:
 
 ```env
-GOOGLE_DRIVE_CLIENT_ID=972430454005-dbbcdho9hsh5kub0555bdl3j23oglb3b.apps.googleusercontent.com
-GOOGLE_DRIVE_CLIENT_SECRET=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
-GOOGLE_DRIVE_REFRESH_TOKEN=1//04r3BTYebxIxSCgYIARAAGAQSNwF-L9Ir-Js7Zhiey0lXvZTKLEL2WWH5JLqYz4aPVhxROCtmblHt93NFy9t_Bc6Hpw-3I3tRMWo
-GOOGLE_DRIVE_ACCESS_TOKEN=ya29.a0AUMWg_JfLEbitObwItiXS5IlBcC8aMO_1jg6caiUJbQseUuez-7BumtsL45RVlWC5KuSkxw_2DJINnqiFARRxUXQwhgpZxgXOYpGnobJvkWDrW7y7N7t0WUo9JlavIoiCww9qEAPh7wHVaFyHUjzra3IxyHjGbqP-ozI7Nv1Uve34tKg6DYOnY0DC0x7piRI_QtKnCYaCgYKAcoSARQSFQHGX2Mi7zY0ceSwt5dfHEel8j8-cA0206
+GOOGLE_DRIVE_CLIENT_ID=xxx
+GOOGLE_DRIVE_CLIENT_SECRET=xx
+GOOGLE_DRIVE_REFRESH_TOKEN=xxx
 GOOGLE_DRIVE_FOLDER=TCG_Cards_Image
 ```
 
