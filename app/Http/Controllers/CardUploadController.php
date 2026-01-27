@@ -400,6 +400,7 @@ class CardUploadController extends Controller
         $game = $request->input('game', '');
         $set = $request->input('set', '');
         $withoutSet = $request->input('without_set', false);
+        $withoutRarity = $request->input('without_rarity', false);
         $sortColumn = $request->input('sort_column', '');
         $sortDirection = $request->input('sort_direction', 'asc');
 
@@ -432,6 +433,13 @@ class CardUploadController extends Controller
         // Apply without set filter
         if ($withoutSet) {
             $query->whereNull('card_set_id');
+        }
+
+        // Apply without rarity filter
+        if ($withoutRarity) {
+            $query->where(function ($q) {
+                $q->whereNull('rarity')->orWhere('rarity', '');
+            });
         }
 
         // Apply sorting
@@ -468,6 +476,7 @@ class CardUploadController extends Controller
                 'game' => $game,
                 'set' => $set,
                 'without_set' => $withoutSet,
+                'without_rarity' => $withoutRarity,
                 'sort_column' => $sortColumn,
                 'sort_direction' => $sortDirection,
             ]

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import StatsCard from '@/Components/StatsCard.vue'
+import axios from 'axios'
 
 const props = defineProps({
   stats: Object,
@@ -18,6 +19,22 @@ const selectedSet = ref('')
 const selectedRarity = ref('')
 const sortField = ref('name')
 const sortDirection = ref('asc')
+
+// Selection state
+const selectedCards = ref(new Set())
+const lastClickedIndex = ref(null)
+const showBulkConditionModal = ref(false)
+const bulkCondition = ref('')
+const isAssigningCondition = ref(false)
+
+// Available conditions for bulk assignment
+const availableConditions = [
+  'Near Mint',
+  'Lightly Played',
+  'Moderately Played',
+  'Heavily Played',
+  'Damaged'
+]
 
 // Get unique sets and rarities for filters (these are now from backend)
 // But we keep these computed for backward compatibility if needed
@@ -150,6 +167,86 @@ const updateCondition = (cardId, condition) => {
   })
 }
 
+// Selection functions
+const toggleCardSelection = (cardId, checked, event, index) => {
+  if (event?.shiftKey && lastClickedIndex.value !== null && checked) {
+    const start = Math.min(lastClickedIndex.value, index)
+    const end = Math.max(lastClickedIndex.value, index)
+    
+    for (let i = start; i <= end; i++) {
+      if (filteredCards.value[i]) {
+        selectedCards.value.add(filteredCards.value[i].id)
+      }
+    }
+  } else {
+    if (checked) {
+      selectedCards.value.add(cardId)
+    } else {
+      selectedCards.value.delete(cardId)
+    }
+  }
+  
+  if (checked) {
+    lastClickedIndex.value = index
+  }
+}
+
+const selectAll = (checked) => {
+  if (checked) {
+    filteredCards.value.forEach(card => selectedCards.value.add(card.id))
+  } else {
+    clearSelection()
+  }
+}
+
+const clearSelection = () => {
+  selectedCards.value = new Set()
+  lastClickedIndex.value = null
+}
+
+// Bulk condition functions
+const openBulkConditionModal = () => {
+  showBulkConditionModal.value = true
+}
+
+const closeBulkConditionModal = () => {
+  showBulkConditionModal.value = false
+  bulkCondition.value = ''
+}
+
+const saveBulkCondition = async () => {
+  const cardIds = Array.from(selectedCards.value)
+  if (cardIds.length === 0) {
+    alert('Nessuna carta selezionata')
+    return
+  }
+
+  if (!bulkCondition.value) {
+    alert('Seleziona una condizione')
+    return
+  }
+
+  if (isAssigningCondition.value) return
+  isAssigningCondition.value = true
+
+  try {
+    // Update each card's condition
+    await Promise.all(cardIds.map(id => 
+      axios.post(`/cards/${id}/condition`, { condition: bulkCondition.value })
+    ))
+    
+    alert(`Condizione aggiornata per ${cardIds.length} carte!`)
+    closeBulkConditionModal()
+    clearSelection()
+    router.reload({ only: ['cards', 'stats'] })
+  } catch (error) {
+    console.error('Error assigning condition:', error)
+    alert('Errore durante l\'aggiornamento')
+  } finally {
+    isAssigningCondition.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -240,12 +337,42 @@ const updateCondition = (cardId, condition) => {
         </div>
       </div>
 
+      <!-- Bulk Actions Bar -->
+      <div v-if="selectedCards.size > 0" class="mb-4 p-4 rounded-lg" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(31, 41, 55, 0.8)); border: 1px solid rgba(59, 130, 246, 0.5);">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-3">
+            <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+              {{ selectedCards.size }} carte selezionate
+            </span>
+            <button class="text-gray-300 hover:text-white text-sm" @click="clearSelection">
+              ✕ Deseleziona
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <button 
+              class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
+              @click="openBulkConditionModal"
+            >
+              🏷️ Assegna Condizione
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Cards Table -->
       <div class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead class="bg-gray-700">
               <tr>
+                <th class="px-4 py-3 text-center" style="width: 40px;">
+                  <input 
+                    type="checkbox" 
+                    @change="selectAll($event.target.checked)"
+                    :checked="filteredCards.length > 0 && selectedCards.size === filteredCards.length"
+                    class="rounded bg-gray-600 border-gray-500"
+                  >
+                </th>
                 <th @click="sort('name')" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600">
                   Card Name {{ getSortIcon('name') }}
                 </th>
@@ -270,7 +397,15 @@ const updateCondition = (cardId, condition) => {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-700">
-              <tr v-for="card in filteredCards" :key="card.id" class="hover:bg-gray-750 transition-colors">
+              <tr v-for="(card, index) in filteredCards" :key="card.id" class="hover:bg-gray-750 transition-colors">
+                <td class="px-4 py-4 text-center">
+                  <input 
+                    type="checkbox" 
+                    :checked="selectedCards.has(card.id)"
+                    @change="toggleCardSelection(card.id, $event.target.checked, $event, index)"
+                    class="rounded bg-gray-600 border-gray-500"
+                  >
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
                     <div v-if="card.image" class="flex-shrink-0 h-16 w-12 mr-4">
@@ -323,6 +458,48 @@ const updateCondition = (cardId, condition) => {
         <!-- Empty state -->
         <div v-if="filteredCards.length === 0" class="text-center py-12">
           <p class="text-gray-400">No cards found matching your filters.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk Condition Modal -->
+    <div v-if="showBulkConditionModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="closeBulkConditionModal">
+      <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-700">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold text-white">Assegna Condizione</h3>
+          <button @click="closeBulkConditionModal" class="text-gray-400 hover:text-white">
+            ✕
+          </button>
+        </div>
+        <div class="mb-4">
+          <p class="text-gray-400 mb-4">
+            Seleziona la condizione da assegnare a <span class="font-bold text-white">{{ selectedCards.size }}</span> carte:
+          </p>
+          <select 
+            v-model="bulkCondition"
+            class="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
+          >
+            <option value="">Seleziona condizione...</option>
+            <option v-for="condition in availableConditions" :key="condition" :value="condition">
+              {{ condition }}
+            </option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button 
+            @click="closeBulkConditionModal"
+            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+          >
+            Annulla
+          </button>
+          <button 
+            @click="saveBulkCondition" 
+            :disabled="isAssigningCondition || !bulkCondition"
+            class="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors"
+          >
+            <span v-if="isAssigningCondition">Salvataggio...</span>
+            <span v-else>✓ Assegna Condizione</span>
+          </button>
         </div>
       </div>
     </div>

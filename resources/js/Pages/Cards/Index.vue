@@ -64,6 +64,7 @@ const searchQuery = ref(props.filters?.search || '');
 const selectedGame = ref(props.filters?.game || '');
 const selectedSet = ref(props.filters?.set || '');
 const showCardsWithoutSet = ref(props.filters?.without_set || false);
+const showCardsWithoutRarity = ref(props.filters?.without_rarity || false);
 const perPage = ref(25); // Cards per page
 
 // Sorting - initialized from server
@@ -83,6 +84,7 @@ const reloadCards = () => {
         game: selectedGame.value,
         set: selectedSet.value,
         without_set: showCardsWithoutSet.value ? 1 : 0,
+        without_rarity: showCardsWithoutRarity.value ? 1 : 0,
         sort_column: sortColumn.value,
         sort_direction: sortDirection.value,
         per_page: perPage.value,
@@ -102,7 +104,7 @@ watch(searchQuery, () => {
     }, 500);
 });
 
-watch([selectedGame, selectedSet, showCardsWithoutSet], () => {
+watch([selectedGame, selectedSet, showCardsWithoutSet, showCardsWithoutRarity], () => {
     reloadCards();
 });
 
@@ -590,7 +592,7 @@ onMounted(async () => {
                         </select>
                     </div>
                     
-                    <!-- Cards Without Set Filter -->
+                    <!-- Additional Filters -->
                     <div class="col-md-3">
                         <label class="form-label text-warning text-sm">Filtri Aggiuntivi</label>
                         <div class="form-check" style="margin-top: 8px;">
@@ -603,6 +605,18 @@ onMounted(async () => {
                             />
                             <label class="form-check-label text-white" for="filterWithoutSet">
                                 Solo carte senza set
+                            </label>
+                        </div>
+                        <div class="form-check" style="margin-top: 4px;">
+                            <input
+                                v-model="showCardsWithoutRarity"
+                                class="form-check-input"
+                                type="checkbox"
+                                id="filterWithoutRarity"
+                                style="accent-color: #FFCB05;"
+                            />
+                            <label class="form-check-label text-white" for="filterWithoutRarity">
+                                Solo carte senza rarità
                             </label>
                         </div>
                     </div>
