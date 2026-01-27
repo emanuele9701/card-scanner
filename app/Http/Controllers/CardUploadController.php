@@ -401,6 +401,8 @@ class CardUploadController extends Controller
         $set = $request->input('set', '');
         $withoutSet = $request->input('without_set', false);
         $withoutRarity = $request->input('without_rarity', false);
+        $onlyDuplicates = $request->input('only_duplicates', false);
+        $rarityVariant = $request->input('rarity_variant', '');
         $sortColumn = $request->input('sort_column', '');
         $sortDirection = $request->input('sort_direction', 'asc');
 
@@ -442,6 +444,24 @@ class CardUploadController extends Controller
             });
         }
 
+        // Apply duplicates filter (cards with quantity > 1)
+        if ($onlyDuplicates) {
+            $query->whereIn('id', function ($subquery) {
+                $subquery->select('pokemon_card_id')
+                    ->from('card_inventory')
+                    ->where('user_id', auth()->id())
+                    ->groupBy('pokemon_card_id')
+                    ->havingRaw('SUM(quantity) > 1');
+            });
+        }
+
+        // Apply rarity variant filter
+        if ($rarityVariant) {
+            $query->whereHas('inventory', function ($q) use ($rarityVariant) {
+                $q->where('rarity_variant', $rarityVariant);
+            });
+        }
+
         // Apply sorting
         if ($sortColumn) {
             $query->orderBy($sortColumn, $sortDirection);
@@ -467,16 +487,26 @@ class CardUploadController extends Controller
             ->sort()
             ->values();
 
+        // Get available rarity variants from user's inventory
+        $availableVariants = \App\Models\CardInventory::where('user_id', auth()->id())
+            ->distinct()
+            ->pluck('rarity_variant')
+            ->sort()
+            ->values();
+
         return Inertia::render('Cards/Index', [
             'cards' => $cards,
             'availableGames' => $availableGames,
             'availableSets' => $availableSets,
+            'availableVariants' => $availableVariants,
             'filters' => [
                 'search' => $search,
                 'game' => $game,
                 'set' => $set,
                 'without_set' => $withoutSet,
                 'without_rarity' => $withoutRarity,
+                'only_duplicates' => $onlyDuplicates,
+                'rarity_variant' => $rarityVariant,
                 'sort_column' => $sortColumn,
                 'sort_direction' => $sortDirection,
             ]

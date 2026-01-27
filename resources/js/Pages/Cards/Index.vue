@@ -10,6 +10,7 @@ const props = defineProps({
     cards: Object,
     availableGames: Array,
     availableSets: Array,
+    availableVariants: Array,
     filters: Object
 });
 
@@ -65,6 +66,8 @@ const selectedGame = ref(props.filters?.game || '');
 const selectedSet = ref(props.filters?.set || '');
 const showCardsWithoutSet = ref(props.filters?.without_set || false);
 const showCardsWithoutRarity = ref(props.filters?.without_rarity || false);
+const showOnlyDuplicates = ref(props.filters?.only_duplicates || false);
+const selectedVariant = ref(props.filters?.rarity_variant || '');
 const perPage = ref(25); // Cards per page
 
 // Sorting - initialized from server
@@ -85,6 +88,8 @@ const reloadCards = () => {
         set: selectedSet.value,
         without_set: showCardsWithoutSet.value ? 1 : 0,
         without_rarity: showCardsWithoutRarity.value ? 1 : 0,
+        only_duplicates: showOnlyDuplicates.value ? 1 : 0,
+        rarity_variant: selectedVariant.value,
         sort_column: sortColumn.value,
         sort_direction: sortDirection.value,
         per_page: perPage.value,
@@ -104,7 +109,7 @@ watch(searchQuery, () => {
     }, 500);
 });
 
-watch([selectedGame, selectedSet, showCardsWithoutSet, showCardsWithoutRarity], () => {
+watch([selectedGame, selectedSet, showCardsWithoutSet, showCardsWithoutRarity, showOnlyDuplicates, selectedVariant], () => {
     reloadCards();
 });
 
@@ -180,6 +185,9 @@ const goToPage = (page) => {
         game: selectedGame.value,
         set: selectedSet.value,
         without_set: showCardsWithoutSet.value ? 1 : 0,
+        without_rarity: showCardsWithoutRarity.value ? 1 : 0,
+        only_duplicates: showOnlyDuplicates.value ? 1 : 0,
+        rarity_variant: selectedVariant.value,
         sort_column: sortColumn.value,
         sort_direction: sortDirection.value,
         per_page: perPage.value,
@@ -591,6 +599,18 @@ onMounted(async () => {
                             <option :value="100">100</option>
                         </select>
                     </div>
+
+                    <!-- Variant Filter -->
+                    <div class="col-md-2">
+                        <label class="form-label text-warning text-sm">Variante</label>
+                        <select
+                            v-model="selectedVariant"
+                            class="form-select bg-dark text-white border-secondary"
+                        >
+                            <option value="">Tutte le Varianti</option>
+                            <option v-for="variant in availableVariants" :key="variant" :value="variant">{{ variant }}</option>
+                        </select>
+                    </div>
                     
                     <!-- Additional Filters -->
                     <div class="col-md-3">
@@ -617,6 +637,19 @@ onMounted(async () => {
                             />
                             <label class="form-check-label text-white" for="filterWithoutRarity">
                                 Solo carte senza rarità
+                            </label>
+                        </div>
+                        <div class="form-check" style="margin-top: 4px;">
+                            <input
+                                v-model="showOnlyDuplicates"
+                                class="form-check-input"
+                                type="checkbox"
+                                id="filterOnlyDuplicates"
+                                style="accent-color: #FFCB05;"
+                            />
+                            <label class="form-check-label text-white" for="filterOnlyDuplicates">
+                                <i class="bi bi-stack me-1"></i>
+                                Solo carte doppie
                             </label>
                         </div>
                     </div>
