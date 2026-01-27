@@ -27,27 +27,53 @@ class MarketDataController extends Controller
     }
 
     /**
-     * Import market data from uploaded JSON file
+     * Import market data from uploaded JSON file or raw JSON string
      */
     public function import(Request $request)
     {
+        // Validate: either file or raw_json must be provided
         $request->validate([
-            'json_file' => 'required|file|mimetypes:application/json,text/plain|max:10240', // Max 10MB
+            'json_file' => 'nullable|file|mimetypes:application/json,text/plain|max:10240', // Max 10MB
+            'raw_json' => 'nullable|string|max:10485760', // Max 10MB as string
         ]);
 
-        $file = $request->file('json_file');
-        $jsonContent = $file->get();
+        // Ensure at least one input is provided
+        if (!$request->hasFile('json_file') && !$request->filled('raw_json')) {
+            return back()->withErrors([
+                'import' => 'Please provide either a JSON file or raw JSON data.'
+            ]);
+        }
+
+        $jsonContent = null;
+
+        // Get JSON content from file or raw input
+        if ($request->hasFile('json_file')) {
+            $file = $request->file('json_file');
+            $jsonContent = $file->get();
+        } else {
+            $jsonContent = $request->input('raw_json');
+        }
+
+        // Validate JSON syntax
         $jsonData = json_decode($jsonContent, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             return back()->withErrors([
-                'json_file' => 'Invalid JSON file: ' . json_last_error_msg()
+                'import' => 'Invalid JSON: ' . json_last_error_msg()
             ]);
         }
 
+        // Validate JSON structure
         if (!isset($jsonData['result']) || !is_array($jsonData['result'])) {
             return back()->withErrors([
-                'json_file' => 'Invalid JSON structure. Expected "result" array.'
+                'import' => 'Invalid JSON structure. Expected "result" array.'
+            ]);
+        }
+
+        // Validate result array is not empty
+        if (empty($jsonData['result'])) {
+            return back()->withErrors([
+                'import' => 'The "result" array is empty. No data to import.'
             ]);
         }
 
