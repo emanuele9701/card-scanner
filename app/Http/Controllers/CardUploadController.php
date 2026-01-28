@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\PokemonCard;
 use App\Models\CardSet;
+use App\Models\GoogleDriveFile;
 use App\Services\GeminiService;
+use App\Services\GoogleDriveService;
 use App\Services\ImageResizeService;
 use Exception;
 use Illuminate\Http\Request;
@@ -361,9 +363,20 @@ class CardUploadController extends Controller
             'status' => PokemonCard::STATUS_COMPLETED,
         ]);
 
+        try {
+            $googleService = app(GoogleDriveService::class);
+            $gdriveFile = $googleService->uploadFile($card->storage_path, basename($card->storage_path), $card->user->id, $card->id);
+
+            Storage::disk('public')->delete($card->storage_path);
+        } catch (Exception $e) {
+            Log::error("Problema nel upload del file relativo alla carta #{$card->id} su google drive: {$e->getMessage()}");
+        }
+
+
         return response()->json([
             'success' => true,
-            'message' => 'Carta salvata correttamente!'
+            'message' => 'Carta salvata correttamente!',
+            'gfile' => $gdriveFile->drive_id
         ]);
     }
 
@@ -666,7 +679,11 @@ class CardUploadController extends Controller
         if ($card->user_id !== auth()->id()) {
             abort(403);
         }
-        if (Storage::disk('public')->exists($card->storage_path)) {
+
+        if ($card->driveFile && $card->driveFile->isUploaded()) {
+            $driveService = app(GoogleDriveService::class);
+            $driveService->deleteFile($card->driveFile->drive_id);
+        } else if ($card->storage_path && Storage::disk('public')->exists($card->storage_path)) {
             Storage::disk('public')->delete($card->storage_path);
         }
 
