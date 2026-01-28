@@ -14,6 +14,7 @@
         "inertiajs/inertia-laravel": "^2.0",
         "intervention/image": "^3.11",
         "laravel/framework": "^12.0",
+        "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.10.1",
         "yaza/laravel-google-drive-storage": "^4.1"
     },
