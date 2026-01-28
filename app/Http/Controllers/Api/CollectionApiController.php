@@ -82,6 +82,18 @@ class CollectionApiController extends Controller
                 'prev' => $cards->previousPageUrl(),
                 'next' => $cards->nextPageUrl(),
             ],
+            'stats' => [
+                'collection_value' => round(PokemonCard::where('user_id', $request->user()->id)
+                    ->where('status', PokemonCard::STATUS_COMPLETED)
+                    ->with('marketCard')
+                    ->get()
+                    ->sum(fn($card) => $card->getEstimatedValue() ?? 0), 2),
+                'total_sets' => PokemonCard::where('user_id', $request->user()->id)
+                    ->where('status', PokemonCard::STATUS_COMPLETED)
+                    ->whereNotNull('card_set_id')
+                    ->distinct('card_set_id')
+                    ->count('card_set_id'),
+            ],
         ], 200);
     }
 
@@ -172,7 +184,9 @@ class CollectionApiController extends Controller
             'printing' => $card->printing,
             'acquisition_price' => $card->acquisition_price,
             'acquisition_date' => $card->acquisition_date?->format('Y-m-d'),
-            'image_url' => $card->image_url,
+            // Use API specific route for image
+            'image_url' => route('api.image.card', ['card' => $card->id]),
+            'inventory_sum_quantity' => $card->getTotalQuantity(),
             'set' => $card->cardSet ? [
                 'id' => $card->cardSet->id,
                 'name' => $card->cardSet->name,

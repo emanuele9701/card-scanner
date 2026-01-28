@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\CollectionApiController;
 use App\Http\Controllers\Api\CardSetApiController;
+use App\Http\Controllers\ImageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -41,4 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [CardSetApiController::class, 'index']);
         Route::get('/{id}', [CardSetApiController::class, 'show']);
     });
+
+    // Image route
+    Route::get('/image/card/{card}', [ImageController::class, 'showCardImage'])->name('api.image.card');
 });
