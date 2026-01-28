@@ -10,6 +10,8 @@ use Google\Service\Drive\DriveFile;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use Exception;
+use Illuminate\Container\Attributes\Log;
+use Illuminate\Support\Facades\Log as FacadesLog;
 
 class DriveTest extends Command
 {
@@ -49,10 +51,14 @@ class DriveTest extends Command
 
             foreach ($cardsToUpload as $card) {
                 if (!$card->driveFile) {
-                    // Procedo al caricamento su drive
-                    $d = $gdriveClient->uploadFile($card->storage_path, basename($card->storage_path), $card->user->id, $card->id);
+                    try {
+                        // Procedo al caricamento su drive
+                        $d = $gdriveClient->uploadFile($card->storage_path, basename($card->storage_path), $card->user->id, $card->id);
 
-                    Storage::disk('public')->delete($card->storage_path);
+                        Storage::disk('public')->delete($card->storage_path);
+                    } catch (Exception $e) {
+                        FacadesLog::alert(__FILE__ . " si verifica questo errore durante l'upload del file relativo alla carta {$card->id}: " . $e->getMessage());
+                    }
                 }
             }
 
