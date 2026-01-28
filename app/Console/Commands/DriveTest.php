@@ -40,7 +40,7 @@ class DriveTest extends Command
     protected $driveService;
 
     /**
-     * Execute the console command.
+     * Execute the console command..
      */
     public function handle()
     {
