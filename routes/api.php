@@ -45,4 +45,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Image route
     Route::get('/image/card/{card}', [ImageController::class, 'showCardImage'])->name('api.image.card');
+
+    // Card Analysis & Confirmation
+    Route::post('/card/analyze', [\App\Http\Controllers\Api\CardAnalysisController::class, 'analyze']);
+    Route::post('/card/confirm', [\App\Http\Controllers\Api\CardAnalysisController::class, 'confirm']);
 });
