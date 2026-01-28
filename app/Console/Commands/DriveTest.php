@@ -58,6 +58,7 @@ class DriveTest extends Command
                         Storage::disk('public')->delete($card->storage_path);
                     } catch (Exception $e) {
                         FacadesLog::alert(__FILE__ . " si verifica questo errore durante l'upload del file relativo alla carta {$card->id}: " . $e->getMessage());
+                        if ($d->id) $d->delete();
                     }
                 }
             }
