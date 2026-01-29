@@ -184,6 +184,7 @@ class CollectionApiController extends Controller
             'printing' => $card->printing,
             'acquisition_price' => $card->acquisition_price,
             'acquisition_date' => $card->acquisition_date?->format('Y-m-d'),
+            'is_matched' => $card->hasMarketData(),
             // Use API specific route for image
             'image_url' => route('api.image.card', ['card' => $card->id]),
             'inventory_sum_quantity' => $card->getTotalQuantity(),

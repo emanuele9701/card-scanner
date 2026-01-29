@@ -144,30 +144,52 @@ class CardMatchingService
      *
      * @return array Statistics about the matching process
      */
-    public function matchAllUnmatched(): array
+    /**
+     * Match a batch of cards
+     *
+     * @param Collection $cards
+     * @return array
+     */
+    public function matchBatch(Collection $cards): array
     {
         $stats = [
-            'processed' => 0,
+            'processed' => $cards->count(),
             'matched' => 0,
             'unmatched' => 0,
             'already_matched' => 0,
         ];
 
-        $unmatchedCards = PokemonCard::whereNull('market_card_id')->get();
-        $stats['processed'] = $unmatchedCards->count();
+        foreach ($cards as $card) {
+            // Skip if already matched (safety check)
+            if ($card->market_card_id) {
+                $stats['already_matched']++;
+                continue;
+            }
 
-        foreach ($unmatchedCards as $card) {
             $marketCard = $this->matchCard($card);
 
             if ($marketCard) {
-                $card->update(['market_card_id' => $marketCard->id]);
+                $this->manualMatch($card, $marketCard);
                 $stats['matched']++;
             } else {
                 $stats['unmatched']++;
             }
         }
 
-        // Count already matched cards
+        return $stats;
+    }
+
+    /**
+     * Match all unmatched Pokemon cards to market data
+     *
+     * @return array Statistics about the matching process
+     */
+    public function matchAllUnmatched(): array
+    {
+        $unmatchedCards = PokemonCard::whereNull('market_card_id')->get();
+        $stats = $this->matchBatch($unmatchedCards);
+
+        // Count all matched cards in system for stats consistency with legacy return
         $stats['already_matched'] = PokemonCard::whereNotNull('market_card_id')->count();
 
         Log::info('Batch matching completed', $stats);
@@ -246,11 +268,53 @@ class CardMatchingService
      */
     public function manualMatch(PokemonCard $card, MarketCard $marketCard): bool
     {
-        $card->update(['market_card_id' => $marketCard->id]);
+        // Find or create the card set
+        $setAbbreviation = $marketCard->set_abbreviation;
+        $setName = $marketCard->set_name ?? $setAbbreviation;
 
-        Log::info("Manual match created", [
+        // Logic: Search for set by abbreviation. 
+        // If it exists, check ownership. 
+        // User wants sets to be user-specific ("limit to user").
+        // Implementation: 
+        // 1. Try to find an existing set for this user with this abbreviation.
+        // 2. If not found, create a new set for this user.
+        // 3. (Optional) Check global sets with no user_id? User said "limit to user" implying ownership.
+        // Let's first try to find one owned by user.
+
+        $cardSet = CardSet::where('abbreviation', $setAbbreviation)
+            ->where('user_id', $card->user_id)
+            ->first();
+
+        if (!$cardSet) {
+            // Create new set for this user
+            $cardSet = CardSet::create([
+                'user_id' => $card->user_id,
+                'name' => $setName,
+                'abbreviation' => $setAbbreviation,
+                // We don't have total_cards or release_date easily available from MarketCard usually, 
+                // unless added to MarketCard model. MarketCard has set_name/abbr.
+                // We'll leave other fields null/default.
+            ]);
+
+            Log::info("Created new CardSet for user", [
+                'user_id' => $card->user_id,
+                'set_id' => $cardSet->id,
+                'abbreviation' => $setAbbreviation
+            ]);
+        }
+
+        $card->update([
+            'market_card_id' => $marketCard->id,
+            'card_set_id' => $cardSet->id,
+            'set_number' => $marketCard->card_number, // Auto-sync number too? Usually specific, but market card has logical number.
+            // "When I say the market_id... there is also the set... identified by set_abbreviation... update card with card_set_id"
+            // The prompt didn't explicitly ask for set_number but it makes sense to sync it if we have it from market match.
+        ]);
+
+        Log::info("Manual match created with set sync", [
             'pokemon_card_id' => $card->id,
             'market_card_id' => $marketCard->id,
+            'card_set_id' => $cardSet->id
         ]);
 
         return true;

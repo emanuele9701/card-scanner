@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class CardSet extends Model
 {
     protected $fillable = [
+        'user_id',
         'name',
         'abbreviation',
         'release_date',
@@ -17,6 +18,14 @@ class CardSet extends Model
     protected $casts = [
         'release_date' => 'date',
     ];
+
+    /**
+     * Get the user that owns this set (if any)
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     /**
      * Get all Pokemon cards in this set

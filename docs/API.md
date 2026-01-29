@@ -199,6 +199,7 @@ GET /api/collection/cards?game=Pokemon&rarity=Rare&per_page=20&page=1
       "printing": "1st Edition",
       "acquisition_price": "50.00",
       "acquisition_date": "2024-01-15",
+      "is_matched": true,
       "image_url": "http://domain.com/image/card/1",
       "set": {
         "id": 1,
