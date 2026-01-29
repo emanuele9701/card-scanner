@@ -49,4 +49,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // Card Analysis & Confirmation
     Route::post('/card/analyze', [\App\Http\Controllers\Api\CardAnalysisController::class, 'analyze']);
     Route::post('/card/confirm', [\App\Http\Controllers\Api\CardAnalysisController::class, 'confirm']);
+    Route::delete('/card/delete', [\App\Http\Controllers\Api\CardAnalysisController::class, 'delete']);
 });

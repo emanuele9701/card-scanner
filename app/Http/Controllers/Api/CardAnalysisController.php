@@ -225,4 +225,36 @@ class CardAnalysisController extends Controller
             ], 500);
         }
     }
+    /**
+     * Delete a card (if user cancels or rejects analysis)
+     */
+    public function delete(Request $request)
+    {
+        try {
+            $request->validate([
+                'card_id' => 'required|exists:pokemon_cards,id',
+            ]);
+
+            $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
+
+            // Delete storage file
+            if ($card->storage_path && Storage::disk('public')->exists($card->storage_path)) {
+                Storage::disk('public')->delete($card->storage_path);
+            }
+
+            // Delete database record
+            $card->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Carta eliminata correttamente.'
+            ]);
+        } catch (Exception $e) {
+            Log::error('API Delete Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore durante l\'eliminazione.'
+            ], 500);
+        }
+    }
 }

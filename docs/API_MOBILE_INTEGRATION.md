@@ -153,6 +153,35 @@ Questo passaggio aggiorna i dati nel database, carica l'immagine su Google Drive
 
 ---
 
+## 3. Eliminazione Carta (Annulla)
+
+Se l'utente decide di non salvare la carta dopo l'analisi (o in qualsiasi momento prima della conferma definitiva), chiamare questo endpoint per rimuovere l'immagine temporanea e il record dal DB.
+
+**Endpoint:** `DELETE /card/delete`
+
+**Headers:**
+- `Authorization: Bearer <tuo_token>`
+- `Content-Type: application/json`
+- `Accept: application/json`
+
+**Body (JSON):**
+```json
+{
+    "card_id": 15
+}
+```
+
+### Esempio di Risposta (Successo)
+
+```json
+{
+    "success": true,
+    "message": "Carta eliminata correttamente."
+}
+```
+
+---
+
 ## Esempio di Implementazione Flutter
 
 Esempio utilizzando il pacchetto `http`.
@@ -165,27 +194,27 @@ Future<Map<String, dynamic>> analyzeCard(File imageFile, String authToken) async
 
 // 2. Conferma
 Future<void> confirmCard(int cardId, Map<String, dynamic> cardData, String authToken) async {
-  var url = Uri.parse('http://il-tuo-indrizzo-api/api/card/confirm');
-  
-  var body = {
-    'card_id': cardId,
-    ...cardData // Spread operatore per inserire tutti i campi
-  };
+  // ... vedere esempio precedente ...
+}
 
-  var response = await http.post(
+// 3. Elimina/Annulla
+Future<void> deleteCard(int cardId, String authToken) async {
+  var url = Uri.parse('http://il-tuo-indrizzo-api/api/card/delete');
+  
+  var response = await http.delete(
     url,
     headers: {
       'Authorization': 'Bearer $authToken',
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
-    body: jsonEncode(body),
+    body: jsonEncode({'card_id': cardId}),
   );
 
   if (response.statusCode == 200) {
-    print('Carta salvata con successo!');
+    print('Carta eliminata.');
   } else {
-    print('Errore: ${response.body}');
+    print('Errore eliminazione: ${response.body}');
   }
 }
 ```
