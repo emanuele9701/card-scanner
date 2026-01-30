@@ -157,8 +157,38 @@ Authorization: Bearer {your-token}
 **Query Parameters:**
 - `game` (string, optional): Filtra per gioco (es. "Pokemon", "Yu-Gi-Oh")
 - `set_id` (integer, optional): Filtra per ID del set
-- `rarity` (string, optional): Filtra per rarità
+- `rarity` (string, optional): Filtra per rarità. Valori consentiti:
+  - `Comune`
+  - `Non Comune`
+  - `Rara`
+  - `Rara Olografica/Foil`
+  - `Rara Doppia/Ultrarara`
+  - `Rara Illustrazione`
+  - `Rara Illustrazione Speciale`
+  - `Secret Rare`
+  - `Rara Cromatica`
+  - `Vintage/1ª Edizione`
 - `condition` (string, optional): Filtra per condizione
+- `type` (string, optional): Filtra per tipo di carta. Valori consentiti:
+  - `Normale`
+  - `Fuoco`
+  - `Acqua`
+  - `Erba`
+  - `Elettro`
+  - `Ghiaccio`
+  - `Lotta`
+  - `Veleno`
+  - `Terra`
+  - `Volante`
+  - `Psico`
+  - `Coleottero`
+  - `Roccia`
+  - `Spettro`
+  - `Drago`
+  - `Buio`
+  - `Acciaio`
+  - `Folletto`
+  - `Strumento`
 - `search` (string, optional): Cerca nel nome della carta
 - `sort_by` (string, optional): Campo per ordinamento (created_at, card_name, set_number, rarity, acquisition_date). Default: created_at
 - `sort_order` (string, optional): Direzione ordinamento (asc, desc). Default: desc

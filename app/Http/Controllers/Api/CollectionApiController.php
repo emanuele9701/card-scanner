@@ -25,6 +25,19 @@ class CollectionApiController extends Controller
             ->where('user_id', $request->user()->id)
             ->where('status', PokemonCard::STATUS_COMPLETED);
 
+        // Validate filters
+        $request->validate([
+            'game' => 'nullable|string',
+            'set_id' => 'nullable|integer',
+            'rarity' => 'nullable|in:Comune,Non Comune,Rara,Rara Olografica/Foil,Rara Doppia/Ultrarara,Rara Illustrazione,Rara Illustrazione Speciale,Secret Rare,Rara Cromatica,Vintage/1ª Edizione',
+            'condition' => 'nullable|string',
+            'type' => 'nullable|in:Normale,Fuoco,Acqua,Erba,Elettro,Ghiaccio,Lotta,Veleno,Terra,Volante,Psico,Coleottero,Roccia,Spettro,Drago,Buio,Acciaio,Folletto,Strumento',
+            'search' => 'nullable|string',
+            'sort_by' => 'nullable|in:created_at,card_name,set_number,rarity,acquisition_date',
+            'sort_order' => 'nullable|in:asc,desc',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
         // Apply filters if provided
         if ($request->has('game')) {
             $query->where('game', $request->input('game'));
@@ -40,6 +53,10 @@ class CollectionApiController extends Controller
 
         if ($request->has('condition')) {
             $query->where('condition', $request->input('condition'));
+        }
+
+        if ($request->has('type')) {
+            $query->where('type', $request->input('type'));
         }
 
         // Search by name

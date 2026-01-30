@@ -37,9 +37,9 @@ class CardApiController extends Controller
         $validated = $request->validate([
             'card_name' => 'nullable|string|max:255',
             'hp' => 'nullable|string|max:255',
-            'type' => 'nullable|string|max:255',
+            'type' => 'nullable|in:Normale,Fuoco,Acqua,Erba,Elettro,Ghiaccio,Lotta,Veleno,Terra,Volante,Psico,Coleottero,Roccia,Spettro,Drago,Buio,Acciaio,Folletto,Strumento',
             'evolution_stage' => 'nullable|string|max:255',
-            'rarity' => 'nullable|string|max:255',
+            'rarity' => 'nullable|in:Comune,Non Comune,Rara,Rara Olografica/Foil,Rara Doppia/Ultrarara,Rara Illustrazione,Rara Illustrazione Speciale,Secret Rare,Rara Cromatica,Vintage/1ª Edizione',
             'set_number' => 'nullable|string|max:255',
             'illustrator' => 'nullable|string|max:255',
             'flavor_text' => 'nullable|string',
