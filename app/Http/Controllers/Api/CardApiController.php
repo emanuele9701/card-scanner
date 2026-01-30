@@ -114,9 +114,13 @@ class CardApiController extends Controller
             $card->save();
             DB::commit();
 
+            // Transform response to use API image URL
+            $cardData = $card->toArray();
+            $cardData['image_url'] = route('api.image.card', ['card' => $card->id]);
+
             return response()->json([
                 'message' => 'Card updated successfully',
-                'data' => $card,
+                'data' => $cardData,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
