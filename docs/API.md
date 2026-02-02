@@ -560,3 +560,70 @@ await login('user@example.com', 'password123');
 const cards = await getCards({ game: 'Pokemon', per_page: 20 });
 console.log(cards.data);
 ```
+
+---
+
+## 7. Import Market Data
+
+### POST /api/market-data/import
+
+Importa dati di mercato da JSON.
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+Content-Type: application/json
+```
+
+**Body della Richiesta:**
+```json
+{
+  "count": 577,
+  "total": 577,
+  "result": [
+    {
+      "productID": 662125,
+      "productConditionID": 0,
+      "condition": "Lightly Played",
+      "game": "Pokemon",
+      "isSupplemental": false,
+      "lowPrice": 0.01,
+      "marketPrice": 0.09,
+      "number": "063/094",
+      "printing": "Normal",
+      "productName": "Absol",
+      "rarity": "Common",
+      "sales": 0,
+      "set": "ME02: Phantasmal Flames",
+      "setAbbrv": "PFL",
+      "type": "Cards"
+    }
+  ]
+}
+```
+
+**Risposta (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Market data imported successfully",
+  "stats": {
+    "total_processed": 544,
+    "cards_created": 500,
+    "cards_updated": 44,
+    "prices_created": 1200
+  }
+}
+```
+
+**Errori Possibili:**
+- `401 Unauthorized`: Token mancante o non valido
+- `422 Unprocessable Entity`: Dati non validi o struttura JSON errata
+- `500 Internal Server Error`: Errore durante l'importazione
+
+**Note:**
+- Il campo `result` deve essere un array non vuoto
+- Ogni oggetto in `result` rappresenta una carta di mercato con i suoi prezzi
+- L'import è idempotente: carte esistenti vengono aggiornate, nuove vengono create
+- I campi `count` e `total` sono opzionali e vengono ignorati
+

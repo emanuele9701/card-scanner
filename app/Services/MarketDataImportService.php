@@ -61,7 +61,7 @@ class MarketDataImportService
                     ],
                     [
                         'product_name' => $firstVariant['productName'],
-                        'card_number' => $firstVariant['number'],
+                        'card_number' => $firstVariant['number'] ?? 'N/A',
                         'set_name' => $firstVariant['set'],
                         'set_abbreviation' => $firstVariant['setAbbrv'],
                         'rarity' => $firstVariant['rarity'],

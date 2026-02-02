@@ -68,4 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/cards/{card}/match', [\App\Http\Controllers\Api\MatchingApiController::class, 'match']);
         Route::post('/auto-match', [\App\Http\Controllers\Api\MatchingApiController::class, 'autoMatch']);
     });
+
+    // Market Data routes
+    Route::post('/market-data/import', [\App\Http\Controllers\Api\MarketDataApiController::class, 'import']);
 });
