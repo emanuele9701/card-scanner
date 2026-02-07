@@ -187,26 +187,31 @@ class CardAnalysisController extends Controller
                 'status' => PokemonCard::STATUS_COMPLETED,
             ]);
 
-            // Upload to Google Drive
+            // Upload to Google Drive if enabled
             $gdriveFile = null;
-            try {
-                if ($card->storage_path && Storage::disk('public')->exists($card->storage_path)) {
-                    $gdriveFile = $this->googleDriveService->uploadFile(
-                        $card->storage_path,
-                        basename($card->storage_path),
-                        $card->user->id,
-                        $card->id
-                    );
+            if (config('services.google_drive.enabled', true)) {
+                try {
+                    if ($card->storage_path && Storage::disk('public')->exists($card->storage_path)) {
+                        $gdriveFile = $this->googleDriveService->uploadFile(
+                            $card->storage_path,
+                            basename($card->storage_path),
+                            $card->user->id,
+                            $card->id
+                        );
 
-                    // Delete local file after successful upload
-                    Storage::disk('public')->delete($card->storage_path);
-                } else {
-                    Log::warning("File locale non trovato per upload Drive: {$card->storage_path}");
+                        // Delete local file after successful upload
+                        Storage::disk('public')->delete($card->storage_path);
+                    } else {
+                        Log::warning("File locale non trovato per upload Drive: {$card->storage_path}");
+                    }
+                } catch (Exception $e) {
+                    Log::error("Problema nel upload del file relativo alla carta #{$card->id} su google drive: {$e->getMessage()}");
+                    // We don't fail the request here, but log it.
+                    // Status is COMPLETED but file might not be on Drive.
                 }
-            } catch (Exception $e) {
-                Log::error("Problema nel upload del file relativo alla carta #{$card->id} su google drive: {$e->getMessage()}");
-                // We don't fail the request here, but log it.
-                // Status is COMPLETED but file might not be on Drive.
+            } else {
+                // Google Drive disabled - keep file locally
+                Log::info("Google Drive upload disabled - file kept locally for card #{$card->id}");
             }
 
             return response()->json([

@@ -175,6 +175,105 @@ class CollectionApiController extends Controller
     }
 
     /**
+     * Get all unmatched cards in user's collection (cards without market_card_id)
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function unmatchedCards(Request $request)
+    {
+        $query = PokemonCard::with([
+            'cardSet',
+            'game',
+        ])
+            ->where('user_id', $request->user()->id)
+            ->where('status', PokemonCard::STATUS_COMPLETED)
+            ->whereNull('market_card_id'); // Solo carte non matchate
+
+        // Validate filters
+        $request->validate([
+            'game' => 'nullable|string',
+            'set_id' => 'nullable|integer',
+            'rarity' => 'nullable|in:Comune,Non Comune,Rara,Rara Olografica/Foil,Rara Doppia/Ultrarara,Rara Illustrazione,Rara Illustrazione Speciale,Secret Rare,Rara Cromatica,Vintage/1ª Edizione',
+            'condition' => 'nullable|string',
+            'type' => 'nullable|in:Normale,Fuoco,Acqua,Erba,Elettro,Ghiaccio,Lotta,Veleno,Terra,Volante,Psico,Coleottero,Roccia,Spettro,Drago,Buio,Acciaio,Folletto,Strumento',
+            'search' => 'nullable|string',
+            'sort_by' => 'nullable|in:created_at,card_name,set_number,rarity,acquisition_date',
+            'sort_order' => 'nullable|in:asc,desc',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        // Apply filters if provided
+        if ($request->has('game')) {
+            $query->where('game', $request->input('game'));
+        }
+
+        if ($request->has('set_id')) {
+            $query->where('card_set_id', $request->input('set_id'));
+        }
+
+        if ($request->has('rarity')) {
+            $query->where('rarity', $request->input('rarity'));
+        }
+
+        if ($request->has('condition')) {
+            $query->where('condition', $request->input('condition'));
+        }
+
+        if ($request->has('type')) {
+            $query->where('type', $request->input('type'));
+        }
+
+        // Search by name
+        if ($request->has('search')) {
+            $search = $request->input('search');
+            $query->where('card_name', 'LIKE', "%{$search}%");
+        }
+
+        // Sorting
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        $allowedSortFields = ['created_at', 'card_name', 'set_number', 'rarity', 'acquisition_date'];
+        if (in_array($sortBy, $allowedSortFields)) {
+            $query->orderBy($sortBy, $sortOrder);
+        }
+
+        // Pagination
+        $perPage = min($request->input('per_page', 15), 100); // Max 100 items per page
+        $cards = $query->paginate($perPage);
+
+        // Transform the data
+        $cardsData = $cards->getCollection()->map(function ($card) {
+            return $this->transformCard($card);
+        });
+
+        return response()->json([
+            'data' => $cardsData,
+            'meta' => [
+                'current_page' => $cards->currentPage(),
+                'last_page' => $cards->lastPage(),
+                'per_page' => $cards->perPage(),
+                'total' => $cards->total(),
+                'from' => $cards->firstItem(),
+                'to' => $cards->lastItem(),
+            ],
+            'links' => [
+                'first' => $cards->url(1),
+                'last' => $cards->url($cards->lastPage()),
+                'prev' => $cards->previousPageUrl(),
+                'next' => $cards->nextPageUrl(),
+            ],
+            'stats' => [
+                'unmatched_cards' => $cards->total(),
+                'total_collection_cards' => PokemonCard::where('user_id', $request->user()->id)
+                    ->where('status', PokemonCard::STATUS_COMPLETED)
+                    ->count(),
+            ],
+        ], 200);
+    }
+
+    /**
      * Transform a PokemonCard model to API response format
      *
      * @param PokemonCard $card

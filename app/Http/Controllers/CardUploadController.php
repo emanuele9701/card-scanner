@@ -363,20 +363,35 @@ class CardUploadController extends Controller
             'status' => PokemonCard::STATUS_COMPLETED,
         ]);
 
-        try {
-            $googleService = app(GoogleDriveService::class);
-            $gdriveFile = $googleService->uploadFile($card->storage_path, basename($card->storage_path), $card->user->id, $card->id);
+        // Check if Google Drive upload is enabled
+        $driveFileId = null;
+        if (config('services.google_drive.enabled', true)) {
+            try {
+                $googleService = app(GoogleDriveService::class);
+                $gdriveFile = $googleService->uploadFile(
+                    $card->storage_path,
+                    basename($card->storage_path),
+                    $card->user->id,
+                    $card->id
+                );
 
-            Storage::disk('public')->delete($card->storage_path);
-        } catch (Exception $e) {
-            Log::error("Problema nel upload del file relativo alla carta #{$card->id} su google drive: {$e->getMessage()}");
+                // Delete local file after successful upload
+                Storage::disk('public')->delete($card->storage_path);
+
+                $driveFileId = $gdriveFile->drive_id;
+            } catch (Exception $e) {
+                Log::error("Problema nel upload del file relativo alla carta #{$card->id} su google drive: {$e->getMessage()}");
+            }
+        } else {
+            // Google Drive disabled - keep file locally
+            Log::info("Google Drive upload disabled - file kept locally for card #{$card->id}");
         }
-
 
         return response()->json([
             'success' => true,
             'message' => 'Carta salvata correttamente!',
-            'gfile' => $gdriveFile->drive_id
+            'gfile' => $driveFileId,
+            'storage_mode' => config('services.google_drive.enabled') ? 'drive' : 'local'
         ]);
     }
 

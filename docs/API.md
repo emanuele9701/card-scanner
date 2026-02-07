@@ -302,6 +302,90 @@ Authorization: Bearer {your-token}
 
 ---
 
+#### 2.3 Lista carte non matchate
+Restituisce tutte le carte nella collezione dell'utente che **non hanno ancora un match** con i dati di mercato (market_card_id IS NULL).
+
+**Endpoint:** `GET /api/collection/cards/unmatched`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+```
+
+**Query Parameters:**
+- `game` (string, optional): Filtra per gioco
+- `set_id` (integer, optional): Filtra per ID del set
+- `rarity` (string, optional): Filtra per rarità (valori: vedi sezione 2.1)
+- `condition` (string, optional): Filtra per condizione
+- `type` (string, optional): Filtra per tipo di carta (valori: vedi sezione 2.1)
+- `search` (string, optional): Cerca nel nome della carta
+- `sort_by` (string, optional): Campo per ordinamento (created_at, card_name, set_number, rarity, acquisition_date). Default: created_at
+- `sort_order` (string, optional): Direzione ordinamento (asc, desc). Default: desc
+- `per_page` (integer, optional): Numero di risultati per pagina (max 100). Default: 15
+- `page` (integer, optional): Numero della pagina
+
+**Esempio:**
+```
+GET /api/collection/cards/unmatched?game=Pokemon&sort_by=card_name&per_page=20
+```
+
+**Risposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": 5,
+      "name": "Pikachu",
+      "hp": "60",
+      "type": "Elettro",
+      "rarity": "Comune",
+      "set_number": "25",
+      "game": "Pokemon",
+      "condition": "Near Mint",
+      "is_matched": false,
+      "image_url": "http://domain.com/api/image/card/5",
+      "inventory_sum_quantity": 1,
+      "set": {
+        "id": 1,
+        "name": "Base Set",
+        "abbreviation": "BS"
+      },
+      "market_data": {
+        "has_data": false,
+        "estimated_value": null,
+        "profit_loss": null,
+        "profit_loss_percentage": null
+      }
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "last_page": 2,
+    "per_page": 15,
+    "total": 23,
+    "from": 1,
+    "to": 15
+  },
+  "links": {
+    "first": "http://domain.com/api/collection/cards/unmatched?page=1",
+    "last": "http://domain.com/api/collection/cards/unmatched?page=2",
+    "prev": null,
+    "next": "http://domain.com/api/collection/cards/unmatched?page=2"
+  },
+  "stats": {
+    "unmatched_cards": 23,
+    "total_collection_cards": 150
+  }
+}
+```
+
+**Note:**
+- `stats.unmatched_cards`: Numero totale di carte non matchate
+- `stats.total_collection_cards`: Numero totale di carte nella collezione (matchate + non matchate)
+- Utile per visualizzare il progresso del matching o preparare l'auto-match
+
+---
+
 ### 3. Sets (Espansioni)
 
 #### 3.1 Lista tutti i sets
@@ -413,6 +497,684 @@ Authorization: Bearer {your-token}
 {
   "message": "No query results for model [App\\Models\\CardSet] {id}"
 }
+```
+
+---
+
+### 4. Gestione Carte Individuali
+
+#### 4.1 Aggiorna dati carta
+Aggiorna i dati di una carta esistente nella collezione dell'utente.
+
+**Endpoint:** `POST /api/collection/cards/{card}`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+Content-Type: multipart/form-data (se includi immagine) o application/json
+```
+
+**Path Parameters:**
+- `card` (integer, required): ID della carta
+
+**Body Parameters (form-data o JSON):**
+- `card_name` (string, optional): Nome della carta
+- `hp` (string, optional): Punti vita
+- `type` (string, optional): Tipo carta (Normale, Fuoco, Acqua, Erba, Elettro, Ghiaccio, Lotta, Veleno, Terra, Volante, Psico, Coleottero, Roccia, Spettro, Drago, Buio, Acciaio, Folletto, Strumento)
+- `evolution_stage` (string, optional): Stadio evoluzione
+- `rarity` (string, optional): Rarità (vedi sezione 2.1)
+- `set_number` (string, optional): Numero nel set
+- `illustrator` (string, optional): Nome illustratore
+- `flavor_text` (string, optional): Testo flavor
+- `game` (string, optional): Nome gioco
+- `condition` (string, optional): Condizione carta
+- `printing` (string, optional): Tipo di stampa
+- `acquisition_price` (numeric, optional): Prezzo di acquisto
+- `acquisition_date` (date, optional): Data di acquisto (formato: YYYY-MM-DD)
+- `image` (file, optional): Nuova immagine (max 10MB, formati: jpeg, png, jpg, webp)
+
+**Esempio:**
+```json
+{
+  "card_name": "Charizard",
+  "hp": "120",
+  "condition": "Near Mint",
+  "acquisition_price": 50.00,
+  "acquisition_date": "2024-01-15"
+}
+```
+
+**Risposta (200 OK):**
+```json
+{
+  "message": "Card updated successfully",
+  "data": {
+    "id": 1,
+    "card_name": "Charizard",
+    "hp": "120",
+    "condition": "Near Mint",
+    "acquisition_price": "50.00",
+    "acquisition_date": "2024-01-15",
+    "image_url": "http://domain.com/api/image/card/1",
+    "updated_at": "2024-01-20T10:30:00Z"
+  }
+}
+```
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta
+- `422 Unprocessable Entity`: Errori di validazione
+- `500 Internal Server Error`: Errore durante upload su Google Drive o salvataggio
+
+**Note:**
+- Solo il proprietario può modificare la carta
+- L'update dell'immagine elimina automaticamente la precedente da Google Drive
+- Se fornisci una nuova immagine, viene caricata su Google Drive
+
+---
+
+#### 4.2 Elimina carta
+Elimina una carta dalla collezione dell'utente, inclusa l'immagine da Google Drive.
+
+**Endpoint:** `DELETE /api/collection/cards/{card}`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+```
+
+**Path Parameters:**
+- `card` (integer, required): ID della carta
+
+**Risposta (200 OK):**
+```json
+{
+  "message": "Card deleted successfully"
+}
+```
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta
+- `404 Not Found`: Carta non trovata
+- `500 Internal Server Error`: Errore durante eliminazione
+
+**Note:**
+- Elimina anche il file immagine da Google Drive (se presente)
+- Elimina il file locale
+- L'operazione è definitiva e non reversibile
+
+---
+
+#### 4.3 Ottieni condizioni disponibili
+Restituisce le condizioni disponibili per una carta matchata basate sui dati di mercato.
+
+**Endpoint:** `GET /api/collection/cards/{card}/conditions`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+```
+
+**Path Parameters:**
+- `card` (integer, required): ID della carta
+
+**Risposta (200 OK):**
+```json
+{
+  "card_id": 1,
+  "market_card_id": 662125,
+  "conditions": [
+    "Near Mint",
+    "Lightly Played",
+    "Moderately Played",
+    "Heavily Played",
+    "Damaged"
+  ]
+}
+```
+
+**Risposta (422 Unprocessable Entity) - Carta non matchata:**
+```json
+{
+  "message": "Card must be matched to get market conditions",
+  "conditions": []
+}
+```
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta
+- `422 Unprocessable Entity`: La carta non è matchata (market_card_id è null)
+
+**Note:**
+- Restituisce le condizioni disponibili per la carta di mercato associata
+- Se la carta non ha market data, restituisce le condizioni standard
+
+---
+
+#### 4.4 Aggiorna condizione carta
+Aggiorna la condizione di una carta nella collezione.
+
+**Endpoint:** `POST /api/collection/cards/{card}/condition`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `card` (integer, required): ID della carta
+
+**Body:**
+```json
+{
+  "condition": "Near Mint"
+}
+```
+
+**Risposta (200 OK):**
+```json
+{
+  "message": "Card condition updated successfully",
+  "data": {
+    "id": 1,
+    "condition": "Near Mint",
+    "estimated_value": 150.00,
+    "formatted_value": "$150.00"
+  }
+}
+```
+
+**Validazioni:**
+- `condition`: obbligatorio, stringa, max 255 caratteri
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta
+- `422 Unprocessable Entity`: Validazione fallita
+
+**Note:**
+- Aggiorna automaticamente l'`estimated_value` basato sulla nuova condizione e sui dati di mercato
+
+---
+
+#### 4.5 Associa set a carta
+Associa un set (espansione) a una carta nella collezione.
+
+**Endpoint:** `POST /api/collection/cards/{card}/set`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `card` (integer, required): ID della carta
+
+**Body:**
+```json
+{
+  "card_set_id": 1,
+  "set_number": "4/102"
+}
+```
+
+**Validazioni:**
+- `card_set_id`: obbligatorio, deve esistere nella tabella card_sets
+- `set_number`: opzionale, stringa, max 255 caratteri
+
+**Risposta (200 OK):**
+```json
+{
+  "message": "Card set updated successfully",
+  "data": {
+    "id": 1,
+    "card_set_id": 1,
+    "set_number": "4/102",
+    "set": {
+      "id": 1,
+      "name": "Base Set",
+      "abbreviation": "BS"
+    }
+  }
+}
+```
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta
+- `422 Unprocessable Entity`: card_set_id non valido o non esistente
+
+---
+
+#### 4.6 Rimuovi set da carta
+Rimuove l'associazione set da una carta (imposta card_set_id a null).
+
+**Endpoint:** `DELETE /api/collection/cards/{card}/set`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+```
+
+**Path Parameters:**
+- `card` (integer, required): ID della carta
+
+**Risposta (200 OK):**
+```json
+{
+  "message": "Card set removed successfully",
+  "data": {
+    "id": 1,
+    "card_set_id": null
+  }
+}
+```
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta
+
+---
+
+### 5. Analisi e Riconoscimento Carte (AI)
+
+Questi endpoint utilizzano **Gemini AI** per analizzare automaticamente le immagini delle carte e riconoscere i dati.
+
+#### 5.1 Analizza carta da immagine
+Carica un'immagine di una carta e utilizza Gemini AI per riconoscere automaticamente i dati.
+
+**Endpoint:** `POST /api/card/analyze`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+Content-Type: multipart/form-data
+```
+
+**Body (form-data):**
+- `image` (file, required): Immagine della carta (max 30MB, formati: jpeg, png, jpg, webp)
+
+**Risposta (200 OK) - Carta valida riconosciuta:**
+```json
+{
+  "success": true,
+  "message": "Analisi completata con successo.",
+  "data": {
+    "card_id": 42,
+    "image_url": "http://domain.com/api/image/card/42",
+    "analysis": {
+      "is_valid_card": true,
+      "card_name": "Pikachu",
+      "hp": "60",
+      "type": "Elettro",
+      "evolution_stage": "Base",
+      "rarity": "Comune",
+      "set_number": "25/102",
+      "attacks": [
+        {
+          "name": "Thunder Shock",
+          "cost": ["Elettro"],
+          "damage": "10"
+        }
+      ],
+      "weakness": "Lotta",
+      "resistance": null,
+      "retreat_cost": "1",
+      "illustrator": "Atsuko Nishida",
+      "flavor_text": "When several of these Pokémon gather...",
+      "game": "Pokemon"
+    }
+  }
+}
+```
+
+**Risposta (422 Unprocessable Entity) - Immagine non valida:**
+```json
+{
+  "success": false,
+  "message": "L'immagine non sembra essere una carta da gioco valida",
+  "data": {
+    "card_id": 42,
+    "is_valid_card": false
+  }
+}
+```
+
+**Validazioni:**
+- `image`: obbligatorio, deve essere un'immagine valida (jpeg, png, jpg, webp), max 30MB
+
+**Errori:**
+- `422 Unprocessable Entity`: File non valido o immagine non riconosciuta come carta
+- `500 Internal Server Error`: Errore durante l'elaborazione o chiamata a Gemini AI
+
+**Note:**
+- La carta viene salvata con status `PENDING` durante l'analisi
+- Se l'analisi ha successo, lo status diventa `REVIEW`
+- Se l'analisi fallisce, lo status diventa `FAILED`
+- L'immagine viene ridimensionata automaticamente se troppo grande
+- I dati analizzati devono essere verificati e confermati dall'utente (vedi endpoint 5.2)
+
+---
+
+#### 5.2 Conferma e salva carta analizzata
+Conferma i dati riconosciuti dall'AI (eventualmente modificati dall'utente) e salva definitivamente la carta.
+
+**Endpoint:** `POST /api/card/confirm`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "card_id": 42,
+  "card_name": "Pikachu",
+  "hp": "60",
+  "type": "Elettro",
+  "evolution_stage": "Base",
+  "attacks": [
+    {
+      "name": "Thunder Shock",
+      "cost": ["Elettro"],
+      "damage": "10"
+    }
+  ],
+  "weakness": "Lotta",
+  "resistance": null,
+  "retreat_cost": "1",
+  "rarity": "Comune",
+  "set_number": "25/102",
+  "illustrator": "Atsuko Nishida",
+  "flavor_text": "When several of these Pokémon gather...",
+  "card_set_id": 1,
+  "game": "Pokemon"
+}
+```
+
+**Validazioni:**
+- `card_id`: obbligatorio, deve esistere
+- `game`: obbligatorio, stringa
+- `type`: opzionale, deve essere uno dei valori validi (vedi sezione 2.1)
+- `rarity`: opzionale, deve essere uno dei valori validi (vedi sezione 2.1)
+- `card_set_id`: opzionale, deve esistere nella tabella card_sets
+- `attacks_json`: opzionale, stringa JSON (alternativa ad `attacks` array)
+
+**Risposta (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Carta salvata correttamente!",
+  "data": {
+    "card_id": 42,
+    "drive_file_id": "1a2b3c4d5e6f7g8h9i"
+  }
+}
+```
+
+**Errori:**
+- `422 Unprocessable Entity`: Validazione fallita o card_id non trovato
+- `500 Internal Server Error`: Errore durante il salvataggio o upload su Google Drive
+
+**Note:**
+- Lo status della carta diventa `COMPLETED`
+- L'immagine viene caricata su Google Drive
+- Il file locale viene eliminato dopo l'upload su Drive
+- Se il gioco non esiste, viene creato automaticamente per l'utente
+- L'utente può modificare i dati riconosciuti dall'AI prima della conferma
+
+---
+
+#### 5.3 Elimina carta temporanea
+Elimina una carta in stato PENDING o REVIEW se l'utente decide di non confermarla.
+
+**Endpoint:** `DELETE /api/card/delete`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "card_id": 42
+}
+```
+
+**Validazioni:**
+- `card_id`: obbligatorio, deve esistere
+
+**Risposta (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Carta eliminata correttamente."
+}
+```
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta
+- `422 Unprocessable Entity`: card_id non valido
+- `500 Internal Server Error`: Errore durante eliminazione
+
+**Note:**
+- Elimina il file immagine locale (storage/public)
+- Elimina il record dal database
+- Utile per scartare analisi non corrette o immagini caricate per errore
+
+---
+
+### 6. Sistema di Matching
+
+Il sistema di matching associa le carte della collezione con i dati di mercato (market_cards) per ottenere prezzi e valutazioni.
+
+#### 6.1 Ottieni suggerimenti di match
+Restituisce suggerimenti di carte di mercato corrispondenti per una carta specifica.
+
+**Endpoint:** `GET /api/matching/cards/{card}/suggestions`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+```
+
+**Path Parameters:**
+- `card` (integer, required): ID della carta
+
+**Risposta (200 OK):**
+```json
+{
+  "card": {
+    "id": 1,
+    "name": "Charizard",
+    "number": "4",
+    "set": "Base Set",
+    "image": "http://domain.com/api/image/card/1"
+  },
+  "suggestions": [
+    {
+      "id": 662125,
+      "name": "Charizard",
+      "number": "004/102",
+      "set": "BS",
+      "rarity": "Rara Olografica/Foil",
+      "price": {
+        "market": 150.00,
+        "low": 120.00,
+        "condition": "Near Mint"
+      }
+    },
+    {
+      "id": 662126,
+      "name": "Charizard",
+      "number": "004/102",
+      "set": "BS",
+      "rarity": "Rara Olografica/Foil",
+      "price": {
+        "market": 90.00,
+        "low": 75.00,
+        "condition": "Lightly Played"
+      }
+    }
+  ]
+}
+```
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta
+- `404 Not Found`: Carta non trovata
+
+**Note:**
+- Restituisce massimo 10 suggerimenti
+- I suggerimenti sono ordinati per rilevanza (algoritmo di matching)
+- Include prezzi di mercato più recenti per ogni suggerimento
+
+---
+
+#### 6.2 Effettua match manuale
+Associa manualmente una carta della collezione a una carta di mercato specifica.
+
+**Endpoint:** `POST /api/matching/cards/{card}/match`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `card` (integer, required): ID della carta
+
+**Body:**
+```json
+{
+  "market_card_id": 662125
+}
+```
+
+**Validazioni:**
+- `market_card_id`: obbligatorio, deve esistere nella tabella market_cards
+
+**Risposta (200 OK):**
+```json
+{
+  "message": "Card matched successfully",
+  "matched_card": {
+    "id": 1,
+    "market_card_id": 662125,
+    "status": "matched"
+  }
+}
+```
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta
+- `422 Unprocessable Entity`: market_card_id non valido
+- `500 Internal Server Error`: Errore durante il matching
+
+**Note:**
+- Imposta `market_card_id` sulla carta
+- Abilita la visualizzazione dei prezzi di mercato
+- Permette il calcolo di `estimated_value` e `profit_loss`
+
+---
+
+#### 6.3 Auto-match multiplo
+Esegue il matching automatico di tutte le carte non matchate (o di carte specifiche).
+
+**Endpoint:** `POST /api/matching/auto-match`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+Content-Type: application/json
+```
+
+**Body (opzionale):**
+```json
+{
+  "card_ids": [1, 5, 10, 15]
+}
+```
+
+**Validazioni:**
+- `card_ids`: opzionale, array di integer
+
+**Risposta (200 OK):**
+```json
+{
+  "message": "Auto-match completed",
+  "stats": {
+    "total_processed": 42,
+    "matched": 38,
+    "failed": 4,
+    "already_matched": 0
+  }
+}
+```
+
+**Comportamento:**
+- **Senza `card_ids`**: Matcha tutte le carte dell'utente con `market_card_id = null`
+- **Con `card_ids`**: Matcha solo le carte specificate (se non matchate)
+
+**Errori:**
+- `500 Internal Server Error`: Errore durante il processo di matching batch
+
+**Note:**
+- Utilizza l'algoritmo di matching automatico del `CardMatchingService`
+- Processa le carte in batch per performance
+- Restituisce statistiche dettagliate del processo
+- Le carte già matchate vengono saltate
+
+---
+
+### 8. Immagini
+
+#### 8.1 Ottieni immagine carta
+Restituisce l'immagine di una carta specifica.
+
+**Endpoint:** `GET /api/image/card/{card}`
+
+**Headers:**
+```
+Authorization: Bearer {your-token}
+```
+
+**Path Parameters:**
+- `card` (integer, required): ID della carta
+
+**Risposta (200 OK):**
+- Content-Type: `image/jpeg` o `image/png` o `image/webp`
+- Body: Binary image data
+
+**Errori:**
+- `403 Forbidden`: L'utente non possiede questa carta o manca autenticazione
+- `404 Not Found`: Carta non trovata o immagine non disponibile
+
+**Note:**
+- **Richiede autenticazione** (Bearer token)
+- Restituisce l'immagine binaria direttamente
+- Utilizzato negli altri endpoint come `image_url`
+- L'immagine può provenire da Google Drive o storage locale
+
+**Esempio utilizzo (HTML):**
+```html
+<img src="http://domain.com/api/image/card/1" 
+     headers='{"Authorization": "Bearer YOUR_TOKEN"}' />
+```
+
+**Esempio utilizzo (JavaScript Fetch):**
+```javascript
+const response = await fetch('http://domain.com/api/image/card/1', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+const blob = await response.blob();
+const imageUrl = URL.createObjectURL(blob);
 ```
 
 ---

@@ -34,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Collection routes
     Route::prefix('collection')->group(function () {
         Route::get('/cards', [CollectionApiController::class, 'cards']);
+        Route::get('/cards/unmatched', [CollectionApiController::class, 'unmatchedCards']);
         Route::get('/games', [CollectionApiController::class, 'games']);
 
         // Individual Card management (nested under collection)
