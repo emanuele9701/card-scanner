@@ -121,7 +121,10 @@ class MarketDataImportService
     private function ensureSetExists(array $cardData): bool
     {
         $set = CardSet::firstOrCreate(
-            ['abbreviation' => $cardData['setAbbrv']],
+            [
+                'abbreviation' => $cardData['setAbbrv'],
+                'user_id' => auth()->id()
+            ],
             ['name' => $cardData['set']]
         );
 

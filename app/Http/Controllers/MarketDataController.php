@@ -49,7 +49,7 @@ class MarketDataController extends Controller
         // Get JSON content from file or raw input
         if ($request->hasFile('json_file')) {
             $file = $request->file('json_file');
-            $jsonContent = $file->get();
+            $jsonContent = file_get_contents($file->getRealPath());
         } else {
             $jsonContent = $request->input('raw_json');
         }

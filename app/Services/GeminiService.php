@@ -86,7 +86,12 @@ class GeminiService
                 "topK" => 10,
             ]
         ];
-
+        Log::info('Gemini Service - ' . $this->baseUrl);
+        Log::info('Gemini Service - Headers: ' . json_encode([
+            'Content-Type' => 'application/json',
+            'x-goog-api-key' => $apiKey
+        ], JSON_PRETTY_PRINT));
+        Log::info('Gemini Service: ' . json_encode($payload, JSON_PRETTY_PRINT));
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
