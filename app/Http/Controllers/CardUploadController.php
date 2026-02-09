@@ -273,15 +273,18 @@ class CardUploadController extends Controller
         $aiResult = $geminiService->enhanceCardData($base64Image, '');
 
         if ($aiResult) {
+            // Map new Gemini structured data to legacy format
+            $mappedData = $geminiService->mapGeminiToLegacyFormat($aiResult);
+
             // Check if AI detected this is NOT a valid card
-            if (isset($aiResult['is_valid_card']) && $aiResult['is_valid_card'] === false) {
+            if (isset($mappedData['is_valid_card']) && $mappedData['is_valid_card'] === false) {
                 // Update card status to failed
                 $card->update(['status' => PokemonCard::STATUS_FAILED]);
 
                 return response()->json([
                     'success' => false,
                     'is_not_card' => true,
-                    'message' => $aiResult['error_message'] ?? 'L\'immagine non sembra essere una carta da gioco collezionabile'
+                    'message' => $mappedData['error_message'] ?? 'L\'immagine non sembra essere una carta da gioco collezionabile'
                 ], 422);
             }
 
@@ -291,7 +294,7 @@ class CardUploadController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Riconoscimento AI completato!',
-                'data' => $aiResult
+                'data' => $mappedData
             ]);
         }
 
@@ -313,6 +316,10 @@ class CardUploadController extends Controller
             'type' => 'nullable|string',
             'evolution_stage' => 'nullable|string',
             'attacks_json' => 'nullable|string',
+            'attacks' => 'nullable|array',
+            'weakness' => 'nullable|string',
+            'resistance' => 'nullable|string',
+            'retreat_cost' => 'nullable|string',
             'rarity' => 'nullable|string',
             'set_number' => 'nullable|string',
             'illustrator' => 'nullable|string',
@@ -322,9 +329,13 @@ class CardUploadController extends Controller
 
         $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
 
-        // Decode attacks JSON string if present
+        // Handle attacks - accept both JSON string and array
         $attacks = null;
-        if ($request->attacks_json) {
+        if ($request->filled('attacks') && is_array($request->attacks)) {
+            // Direct array from new frontend
+            $attacks = $request->attacks;
+        } elseif ($request->filled('attacks_json')) {
+            // JSON string from old frontend or API
             $attacks = json_decode($request->attacks_json, true);
         }
 
@@ -346,6 +357,9 @@ class CardUploadController extends Controller
             'type' => $request->type,
             'evolution_stage' => $request->evolution_stage,
             'attacks' => $attacks,
+            'weakness' => $request->weakness,
+            'resistance' => $request->resistance,
+            'retreat_cost' => $request->retreat_cost,
             'rarity' => $request->rarity,
             'set_number' => $request->set_number,
             'illustrator' => $request->illustrator,
@@ -378,6 +392,9 @@ class CardUploadController extends Controller
             // Google Drive disabled - keep file locally
             Log::info("Google Drive upload disabled - file kept locally for card #{$card->id}");
         }
+
+        // Auto-create CardInventory for this card
+        $this->createCardInventory($card);
 
         return response()->json([
             'success' => true,
@@ -802,5 +819,57 @@ class CardUploadController extends Controller
                 'conditions' => \App\Models\CardInventory::CONDITIONS
             ]
         ]);
+    }
+
+    /**
+     * Auto-create CardInventory for a newly saved card
+     * Uses visual_analysis data to determine rarity variant and condition
+     */
+    protected function createCardInventory(PokemonCard $card)
+    {
+        try {
+            // Check if inventory already exists for this card
+            $existingInventory = \App\Models\CardInventory::where('pokemon_card_id', $card->id)
+                ->where('user_id', $card->user_id)
+                ->first();
+
+            if ($existingInventory) {
+                Log::info("CardInventory already exists for card #{$card->id}");
+                return;
+            }
+
+            // Determine rarity variant from visual_analysis
+            $rarityVariant = 'Standard'; // Default
+
+            // Use rarity field to determine variant
+            if ($card->rarity) {
+                $rarityLower = strtolower($card->rarity);
+
+                if (str_contains($rarityLower, 'reverse') || str_contains($rarityLower, 'reverse holo')) {
+                    $rarityVariant = 'Reverse Holo';
+                } elseif (str_contains($rarityLower, 'holo')) {
+                    $rarityVariant = 'Holo';
+                } elseif (str_contains($rarityLower, 'first edition') || str_contains($rarityLower, '1st')) {
+                    $rarityVariant = 'First Edition';
+                } elseif (str_contains($rarityLower, 'promo')) {
+                    $rarityVariant = 'Promo';
+                }
+            }
+
+            // Create inventory record
+            \App\Models\CardInventory::create([
+                'pokemon_card_id' => $card->id,
+                'user_id' => $card->user_id,
+                'quantity' => 1,
+                'rarity_variant' => $rarityVariant,
+                'condition' => 'Near Mint', // Default condition for new cards
+                'notes' => 'Auto-created from card upload'
+            ]);
+
+            Log::info("Auto-created CardInventory for card #{$card->id} with variant: {$rarityVariant}");
+        } catch (\Exception $e) {
+            Log::error("Failed to auto-create CardInventory for card #{$card->id}: " . $e->getMessage());
+            // Don't throw - inventory creation failure shouldn't block card save
+        }
     }
 }

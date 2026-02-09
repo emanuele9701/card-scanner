@@ -17,13 +17,13 @@ return [
     'enabled' => env('IMAGE_RESIZE_ENABLED', true),
 
     // Maximum width in pixels
-    'max_width' => env('IMAGE_RESIZE_MAX_WIDTH', 1920),
+    'max_width' => env('IMAGE_RESIZE_MAX_WIDTH', 2160),
 
     // Maximum height in pixels
-    'max_height' => env('IMAGE_RESIZE_MAX_HEIGHT', 1080),
+    'max_height' => env('IMAGE_RESIZE_MAX_HEIGHT', 3240),
 
     // Image quality (1-100, higher is better quality but larger file size)
-    'quality' => env('IMAGE_RESIZE_QUALITY', 85),
+    'quality' => env('IMAGE_RESIZE_QUALITY', 100),
 
     // Maintain aspect ratio when resizing
     'maintain_aspect_ratio' => env('IMAGE_RESIZE_MAINTAIN_RATIO', true),

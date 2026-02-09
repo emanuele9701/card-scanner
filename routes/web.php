@@ -97,6 +97,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/cards/{card}/match', [CardMatchingController::class, 'match'])->name('matching.match');
         Route::post('/cards/{card}/unmatch', [CardMatchingController::class, 'unmatch'])->name('matching.unmatch');
     });
+
+    // API Test Page
+    Route::get('/test/api', function () {
+        return inertia('Test/ApiTest');
+    })->name('test.api');cv                          llllllllllll,,òòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòv
 });
 
 // Admin / Utility Routes

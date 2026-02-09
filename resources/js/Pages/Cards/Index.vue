@@ -696,7 +696,6 @@ onMounted(async () => {
                                 <th>Set</th>
                                 <th>Gioco</th>
                                 <th>Quantità</th>
-                                <th>Rarità</th>
                                 <th class="text-end">Azioni</th>
                             </tr>
                         </thead>
@@ -734,23 +733,6 @@ onMounted(async () => {
                                         {{ card.inventory_sum_quantity }}
                                     </span>
                                     <span v-else class="text-white-50">0</span>
-                                </td>
-                                <td>
-                                    <select 
-                                        class="form-select form-select-sm bg-dark text-white border-secondary" 
-                                        style="width: auto; min-width: 120px; cursor: pointer;"
-                                        :value="card.rarity || ''"
-                                        @change="updateCardRarity(card.id, $event.target.value)"
-                                    >
-                                        <option value="">Seleziona...</option>
-                                        <option value="Comune">Comune</option>
-                                        <option value="Non Comune">Non Comune</option>
-                                        <option value="Rara">Rara</option>
-                                        <option value="Rara Holo">Rara Holo</option>
-                                        <option value="Ultra Rara">Ultra Rara</option>
-                                        <option value="Segreta">Segreta</option>
-                                        <option value="Promo">Promo</option>
-                                    </select>
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
@@ -933,6 +915,21 @@ onMounted(async () => {
                                     <tr><td>Numero Set</td><td>{{ currentCardData.set_number || 'N/A' }}</td></tr>
                                     <tr><td>Rarità</td><td>{{ currentCardData.rarity || 'N/A' }}</td></tr>
                                     <tr><td>Illustratore</td><td>{{ currentCardData.illustrator || 'N/A' }}</td></tr>
+                                    <tr v-if="currentCardData.attacks && currentCardData.attacks.length">
+                                        <td><strong>Attacchi</strong></td>
+                                        <td>
+                                            <div v-for="(attack, idx) in currentCardData.attacks" :key="idx" class="mb-2">
+                                                <div class="fw-bold text-warning">{{ attack.name || 'N/D' }}</div>
+                                                <div v-if="attack.cost" class="small text-white-50">
+                                                    <i class="bi bi-lightning-charge"></i> Costo: {{ Array.isArray(attack.cost) ? attack.cost.join(', ') : attack.cost }}
+                                                </div>
+                                                <div v-if="attack.damage" class="small text-danger">
+                                                    <i class="bi bi-heartbreak"></i> Danno: {{ attack.damage }}
+                                                </div>
+                                                <div v-if="attack.text" class="small text-white-50 fst-italic">{{ attack.text }}</div>
+                                            </div>
+                                        </td>
+                                    </tr>
                                     <tr v-if="currentCardData.estimated_value"><td><strong>💰 Valore Stimato</strong></td><td><strong style="color: #22c55e">{{ currentCardData.estimated_value }}</strong></td></tr>
                                 </tbody>
                             </table>

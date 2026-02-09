@@ -96,8 +96,8 @@ class ImageResizeService
                 $width = $image->width();
                 $height = $image->height();
 
-                $maxWidth = config('images.max_width', 1920);
-                $maxHeight = config('images.max_height', 1080);
+                $maxWidth = config('images.max_width', 2160);
+                $maxHeight = config('images.max_height', 3240);
             } catch (RuntimeException $ex) {
                 Log::error('ImageResizeService: Error loading image', [
                     'full_path' => $fullPath,
@@ -157,7 +157,7 @@ class ImageResizeService
             }
 
             // Save with configured quality
-            $quality = config('images.quality', 85);
+            $quality = config('images.quality', 100);
 
             $this->logMemoryUsage('BEFORE - Saving image');
 

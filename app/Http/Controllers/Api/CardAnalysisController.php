@@ -80,11 +80,14 @@ class CardAnalysisController extends Controller
 
             // 6. Handle Gemini Result
             if ($aiResult) {
-                if (isset($aiResult['is_valid_card']) && $aiResult['is_valid_card'] === false) {
+                // Map new Gemini structured data to legacy format
+                $mappedData = $this->geminiService->mapGeminiToLegacyFormat($aiResult);
+
+                if (isset($mappedData['is_valid_card']) && $mappedData['is_valid_card'] === false) {
                     $card->update(['status' => PokemonCard::STATUS_FAILED]);
                     return response()->json([
                         'success' => false,
-                        'message' => $aiResult['error_message'] ?? 'L\'immagine non sembra essere una carta da gioco valida',
+                        'message' => $mappedData['error_message'] ?? 'L\'immagine non sembra essere una carta da gioco valida',
                         'data' => [
                             'card_id' => $card->id,
                             'is_valid_card' => false
@@ -102,7 +105,7 @@ class CardAnalysisController extends Controller
                     'data' => [
                         'card_id' => $card->id,
                         'image_url' => route('api.image.card', ['card' => $card->id]),
-                        'analysis' => $aiResult
+                        'analysis' => $mappedData
                     ]
                 ]);
             } else {
@@ -133,7 +136,11 @@ class CardAnalysisController extends Controller
                 'hp' => 'nullable|string',
                 'type' => 'nullable|in:Normale,Fuoco,Acqua,Erba,Elettro,Ghiaccio,Lotta,Veleno,Terra,Volante,Psico,Coleottero,Roccia,Spettro,Drago,Buio,Acciaio,Folletto,Strumento',
                 'evolution_stage' => 'nullable|string',
-                'attacks_json' => 'nullable|string', // Expecting JSON string for complexity, or array if handled by validation
+                'attacks_json' => 'nullable|string',
+                'attacks' => 'nullable|array',
+                'weakness' => 'nullable|string',
+                'resistance' => 'nullable|string',
+                'retreat_cost' => 'nullable|integer',
                 'rarity' => 'nullable|in:Comune,Non Comune,Rara,Rara Olografica/Foil,Rara Doppia/Ultrarara,Rara Illustrazione,Rara Illustrazione Speciale,Secret Rare,Rara Cromatica,Vintage/1ª Edizione',
                 'set_number' => 'nullable|string',
                 'illustrator' => 'nullable|string',
@@ -170,6 +177,9 @@ class CardAnalysisController extends Controller
                 'type' => $request->type,
                 'evolution_stage' => $request->evolution_stage,
                 'attacks' => $attacks,
+                'weakness' => $request->weakness,
+                'resistance' => $request->resistance,
+                'retreat_cost' => $request->retreat_cost,
                 'rarity' => $request->rarity,
                 'set_number' => $request->set_number,
                 'illustrator' => $request->illustrator,

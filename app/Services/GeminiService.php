@@ -30,52 +30,94 @@ class GeminiService
         // In a real app, I'd rely solely on env.
         $apiKey = $this->apiKey;
 
-        $prompt = "Sei un esperto di carte collezionabili (TCG) e visione artificiale.
-        Il tuo compito è estrarre dati strutturati dall'immagine di una carta per un database di collezionismo.
+        $prompt = <<<TEXT
+        Sei un'AI esperta in visione artificiale e catalogazione di carte collezionabili (TCG).
+Il tuo compito è analizzare l'immagine fornita ed estrarre dati strutturati per un database di collezionismo.
 
-        Fase 1: Validazione
-        Verifica se l'immagine è una carta collezionabile (TCG).
-        Se NO: Restituisci JSON con { \"is_valid_card\": false, \"error_message\": \"...\" }
+--- FASE 1: VALIDAZIONE ---
+Verifica se l'immagine mostra una carta da gioco collezionabile (Pokemon, Magic, Yu-Gi-Oh!, One Piece, Lorcana, etc.).
+Se l'immagine NON è una carta, restituisci SOLO questo JSON:
+{ "is_valid_card": false, "error_message": "L'immagine non sembra essere una carta da gioco." }
 
-        Fase 2: Estrazione Dati (Se valida)
-        Identifica il gioco e tutti i dettagli tecnici.
-        IMPORTANTE: Se il testo sulla carta è in una lingua diversa dall'INGLESE (es. Giapponese), devi fornire ANCHE la traduzione inglese standard nel campo \"standardized_name\".
+--- FASE 2: GUIDA RICONOSCIMENTO VISIVO (Solo per POKÉMON) ---
+Se identifichi la carta come "Pokemon", segui RIGOROSAMENTE questi passaggi logici prima di compilare il JSON.
 
-        Restituisci SOLO un JSON con questa struttura:
+A. IDENTIFICAZIONE TIPO (Elemento) - NON INDOVINARE DAL DISEGNO:
+1.  Localizza il piccolo simbolo sferico nell'angolo in ALTO A DESTRA.
+2.  Confronta la forma del simbolo:
+    -   PUGNO chiuso -> "Fighting"
+    -   GOCCIA d'acqua -> "Water"
+    -   FIAMMA -> "Fire"
+    -   FOGLIA -> "Grass"
+    -   FULMINE -> "Lightning"
+    -   OCCHIO -> "Psychic"
+    -   LUNA/Teschio/Nero -> "Darkness"
+    -   BULLONE/Ingranaggio -> "Metal"
+    -   STELLA (sfondo bianco) -> "Colorless"
+    -   Z stilizzata (sfondo oro) -> "Dragon"
+    -   ALA (sfondo rosa) -> "Fairy"
+3.  Conferma col colore di sfondo (es. Marrone=Fighting, Blu=Water).
 
+B. IDENTIFICAZIONE RARITÀ (Simbolo in basso):
+Guarda nell'angolo in BASSO A SINISTRA o BASSO A DESTRA (vicino al numero).
+Mappa il simbolo trovato:
+    -   Cerchio (●) -> "Common"
+    -   Rombo (◆) -> "Uncommon"
+    -   Stella (★) -> "Rare"
+    -   Stella Argento/Brillante -> "Holo Rare"
+    -   Lettere "C"/"U" -> "Common/Uncommon"
+    -   Lettera "R" -> "Rare"
+    -   Lettere "RR" -> "Double Rare"
+    -   Lettere "AR"/"IR" -> "Illustration Rare"
+    -   Lettere "SR"/"SAR"/"UR" -> "Ultra/Secret Rare"
+
+--- FASE 3: ESTRAZIONE DATI ---
+Se l'immagine è valida, restituisci ESCLUSIVAMENTE un oggetto JSON.
+IMPORTANTE: Se la carta è straniera, traduci il nome in 'standardized_name_en'.
+
+{
+    "is_valid_card": true,
+    "game": "Nome del gioco (es. Pokemon)",
+    "detected_language": "Lingua (es. Italian, English, Japanese)",
+    "card_header": {
+        "name_on_card": "Nome come scritto sulla carta",
+        "standardized_name_en": "Nome inglese ufficiale (es. 'Croagunk')",
+        "hp": "Valore numerico (es. 70) o null",
+        "type": "Usa Guida A (es. Fighting)",
+        "evolution_stage": "Basic, Stage 1, Stage 2, V, etc."
+    },
+    "attacks_and_abilities": [
         {
-            \"is_valid_card\": true,
-            \"game\": \"Nome del gioco (Pokemon, Magic, Yu-Gi-Oh!, etc.)\",
-            \"card_language\": \"Lingua rilevata del testo sulla carta (es. Japanese, English, Italian)\",
-            \"card_attributes\": {
-                \"name_on_card\": \"Nome esattamente come appare sulla carta\",
-                \"standardized_name\": \"Nome standard in INGLESE (per ricerca DB)\",
-                \"hp\": \"Valore numerico (es. 180) o null\",
-                \"primary_type\": \"Tipo principale (es. Water, Fire)\",
-                \"evolution_stage\": \"Basic, Stage 1, Stage 2, VMAX, etc.\",
-                \"attacks\": [
-                    { 
-                        \"name\": \"Nome mossa\", 
-                        \"cost\": [\"Water\", \"Colorless\"], 
-                        \"damage\": \"Danno (es. 70x)\", 
-                        \"effect_summary\": \"Riassunto breve effetto\" 
-                    }
-                ]
-            },
-            \"set_details\": {
-                \"set_code\": \"Codice del set stampato sulla carta (es. sv9a, MEW, OP05)\",
-                \"set_number\": \"Numero della carta (es. 026/063)\",
-                \"regulation_mark\": \"Lettera di regolamento se presente (es. E, F, G, H)\",
-                \"rarity_symbol\": \"Descrizione simbolo rarità (es. Star, Circle, R, SR)\"
-            },
-            \"visual_analysis\": {
-                \"is_holo\": boolean,
-                \"is_full_art\": boolean,
-                \"illustrator\": \"Nome artista\"
-            },
-            \"notes\": \"Eventuali note su condizioni visibili o particolarità\"
+            "type": "Attack o Ability",
+            "name": "Nome mossa",
+            "cost": ["Water", "Colorless"], 
+            "damage": "Danno (es. 20) o null",
+            "text": "Testo effetto"
         }
-        ";
+    ],
+    "bottom_stats": {
+        "weakness": {"type": "Tipo", "value": "Valore"},
+        "resistance": {"type": "Tipo", "value": "Valore"},
+        "retreat_cost": "Numero intero (conta le stelle)"
+    },
+    "set_info": {
+        "set_code": "Codice in basso a sx (es. MEG, sv9a). ATTENZIONE: Leggi lettera per lettera, non allucinare codici famosi come MEW.",
+        "set_number": "Numero (es. 078/132)",
+        "regulation_mark": "Lettera isolata in basso a sx (es. F, G, H, I) o null",
+        "rarity_details": {
+             "symbol_visible": "Descrivi cosa vedi (es. 'Cerchio', 'Stella', 'RR')",
+             "rarity_type": "Usa Guida B (es. Common, Rare)"
+        },
+        "illustrator": "Nome artista"
+    },
+    "visual_analysis": {
+        "is_holo": boolean,
+        "is_reverse_holo": boolean (true se brilla il testo ma NON l'immagine),
+        "is_full_art": boolean,
+        "texture_notes": "Note su texture/rilievo"
+    }
+}
+TEXT;
 
         $payload = [
             "contents" => [
@@ -104,7 +146,7 @@ class GeminiService
             'Content-Type' => 'application/json',
             'x-goog-api-key' => $apiKey
         ], JSON_PRETTY_PRINT));
-        Log::info('Gemini Service: ' . json_encode($payload, JSON_PRETTY_PRINT));
+        // Log::info('Gemini Service: ' . json_encode($payload, JSON_PRETTY_PRINT));
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
@@ -120,8 +162,8 @@ class GeminiService
                 // Clean up potential markdown code blocks
                 $jsonString = str_replace(['```json', '```'], '', $generatedText);
                 $jsonString = trim($jsonString);
-
                 $result = json_decode($jsonString, true);
+                Log::info("Response: " . json_encode($result, JSON_PRETTY_PRINT));
 
                 // Check if it's a valid card
                 if ($result && isset($result['is_valid_card']) && $result['is_valid_card'] === false) {
@@ -141,5 +183,59 @@ class GeminiService
             Log::error('Gemini Service Exception: ' . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Map new Gemini AI structured data to legacy database format
+     * This allows backward compatibility without database schema changes
+     * 
+     * @param array $geminiData New structured data from Gemini AI
+     * @return array Legacy format data ready for database insertion
+     */
+    public function mapGeminiToLegacyFormat(array $geminiData): array
+    {
+        // Handle invalid cards
+        if (isset($geminiData['is_valid_card']) && $geminiData['is_valid_card'] === false) {
+            return [
+                'is_valid_card' => false,
+                'error_message' => $geminiData['error_message'] ?? 'Carta non valida'
+            ];
+        }
+
+        // Extract nested data with safe defaults - UPDATED STRUCTURE
+        $cardHeader = $geminiData['card_header'] ?? [];
+        $attacksAndAbilities = $geminiData['attacks_and_abilities'] ?? [];
+        $bottomStats = $geminiData['bottom_stats'] ?? [];
+        $setInfo = $geminiData['set_info'] ?? [];
+        $visualAnalysis = $geminiData['visual_analysis'] ?? [];
+
+        // Map to legacy format
+        return [
+            'is_valid_card' => true,
+            'card_name' => $cardHeader['standardized_name_en'] ?? $cardHeader['name_on_card'] ?? null,
+            'hp' => $cardHeader['hp'] ?? null,
+            'type' => $cardHeader['type'] ?? null,
+            'evolution_stage' => $cardHeader['evolution_stage'] ?? null,
+            'attacks' => $attacksAndAbilities,
+
+            // Bottom stats (weakness, resistance, retreat_cost)
+            'weakness' => isset($bottomStats['weakness']) ?
+                trim(($bottomStats['weakness']['type'] ?? '') . ' ' . ($bottomStats['weakness']['value'] ?? '')) : null,
+            'resistance' => isset($bottomStats['resistance']) ?
+                trim(($bottomStats['resistance']['type'] ?? '') . ' ' . ($bottomStats['resistance']['value'] ?? '')) : null,
+            'retreat_cost' => isset($bottomStats['retreat_cost']) ? (string)$bottomStats['retreat_cost'] : null,
+
+            'rarity' => $setInfo['rarity_details']['rarity_type'] ?? $setInfo['rarity_symbol'] ?? null,
+            'set_number' => $setInfo['set_number'] ?? null,
+            'illustrator' => $setInfo['illustrator'] ?? null,
+            'flavor_text' => $visualAnalysis['texture_notes'] ?? null,
+
+            // Additional fields that might be useful
+            'game' => $geminiData['game'] ?? null,
+            'card_language' => $geminiData['detected_language'] ?? null,
+
+            // Store original Gemini data for future reference (optional)
+            '_gemini_raw' => $geminiData
+        ];
     }
 }

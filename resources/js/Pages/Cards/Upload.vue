@@ -41,6 +41,7 @@ const editForm = reactive({
     hp: '',
     type: '',
     evolution_stage: '',
+    attacks: [],
     weakness: '',
     resistance: '',
     retreat_cost: '',
@@ -110,9 +111,9 @@ const handleFileSelect = (e) => {
  */
 const resizeImageIfNeeded = (file) => {
     return new Promise((resolve, reject) => {
-        const MAX_WIDTH = 1920;
-        const MAX_HEIGHT = 1080;
-        const QUALITY = 0.85; // 85% quality for JPEG
+        const MAX_WIDTH = 2160;
+        const MAX_HEIGHT = 3240;
+        const QUALITY = 1; // 85% quality for JPEG
 
         // Create image object
         const img = new Image();
@@ -350,12 +351,23 @@ const openEditModal = async (card) => {
     editingCardId.value = card.tempId;
     
     // Reset form and validation errors
-    Object.keys(editForm).forEach(key => editForm[key] = '');
+    Object.keys(editForm).forEach(key => {
+        if (key === 'attacks') {
+            editForm[key] = [];
+        } else {
+            editForm[key] = '';
+        }
+    });
     validationErrors.value = {};
 
     if (card.data) {
         Object.keys(editForm).forEach(key => {
-            if (card.data[key]) editForm[key] = card.data[key];
+            if (key === 'attacks' && card.data.attacks) {
+                // Deep copy attacks array to avoid mutations
+                editForm.attacks = JSON.parse(JSON.stringify(card.data.attacks));
+            } else if (card.data[key]) {
+                editForm[key] = card.data[key];
+            }
         });
     }
 
@@ -419,6 +431,22 @@ const saveEdit = async () => {
     
     showEditModal.value = false;
     showToast('Dati salvati localmente', 'success');
+};
+
+const addAttack = () => {
+    if (!editForm.attacks) {
+        editForm.attacks = [];
+    }
+    editForm.attacks.push({
+        name: '',
+        cost: '',
+        damage: '',
+        text: ''
+    });
+};
+
+const removeAttack = (index) => {
+    editForm.attacks.splice(index, 1);
 };
 
 const saveCard = async (card, notify = true) => {
@@ -781,7 +809,15 @@ onBeforeUnmount(() => {
                         <!-- Info -->
                          <div v-if="card.data" class="mt-2 small text-white-50">
                             <strong>{{ card.data.card_name || 'Sconosciuta' }}</strong><br>
-                            {{ card.data.type }}
+                            <span v-if="card.data.type">{{ card.data.type }}</span>
+                            <span v-if="card.data.hp"> - HP {{ card.data.hp }}</span><br>
+                            <div v-if="card.data.attacks && card.data.attacks.length" class="mt-1">
+                                <small><strong>Attacchi:</strong></small>
+                                <div v-for="(attack, idx) in card.data.attacks" :key="idx" class="ms-2 small">
+                                    {{ attack.name || 'N/D' }} 
+                                    <span v-if="attack.damage">({{ attack.damage }})</span>
+                                </div>
+                            </div>
                          </div>
                     </div>
                 </div>
@@ -937,13 +973,14 @@ onBeforeUnmount(() => {
                                         <label>Rarità</label>
                                         <select v-model="editForm.rarity">
                                             <option value="">Seleziona...</option>
-                                            <option value="Common">Comune</option>
-                                            <option value="Uncommon">Non Comune</option>
-                                            <option value="Rare">Rara</option>
-                                            <option value="Rare Holo">Rara Holo</option>
-                                            <option value="Ultra Rare">Ultra Rara</option>
-                                            <option value="Secret Rare">Segreta</option>
-                                            <option value="Promo">Promo</option>
+                                            <option value="Common">Common</option>
+                                            <option value="Uncommon">Uncommon</option>
+                                            <option value="Rare">Rare</option>
+                                            <option value="Holo Rare">Holo Rare</option>
+                                            <option value="Double Rare">Double Rare</option>
+                                            <option value="Illustration Rare">Illustration Rare</option>
+                                            <option value="Ultra Rare">Ultra Rare</option>
+                                            <option value="Secret Rare">Secret Rare</option>
                                         </select>
                                     </div>
                                 </div>
@@ -956,6 +993,48 @@ onBeforeUnmount(() => {
                                 <div class="form-group-custom">
                                     <label>Testo del Gusto (Flavor)</label>
                                     <textarea v-model="editForm.flavor_text" rows="2" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; color: white; border-radius: 8px;"></textarea>
+                                </div>
+
+                                <!-- Attacks Editor -->
+                                <div class="form-group-custom">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="mb-0">Attacchi</label>
+                                        <button type="button" class="btn btn-sm btn-success" @click="addAttack">
+                                            <i class="bi bi-plus-lg"></i> Aggiungi Attacco
+                                        </button>
+                                    </div>
+                                    
+                                    <div v-if="editForm.attacks && editForm.attacks.length > 0" class="attacks-list">
+                                        <div v-for="(attack, index) in editForm.attacks" :key="index" class="attack-item mb-3 p-3" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="text-warning mb-0">Attacco {{ index + 1 }}</h6>
+                                                <button type="button" class="btn btn-sm btn-danger" @click="removeAttack(index)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-md-6">
+                                                    <label class="small text-white-50">Nome</label>
+                                                    <input v-model="attack.name" type="text" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="es. Lanciafiamme">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="small text-white-50">Danno</label>
+                                                    <input v-model="attack.damage" type="text" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="es. 50">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="small text-white-50">Costo</label>
+                                                    <input v-model="attack.cost" type="text" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="es. Fire, Fire">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="small text-white-50">Effetto/Testo</label>
+                                                    <textarea v-model="attack.text" rows="2" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Descrizione dell'effetto..."></textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div v-else class="text-center text-white-50 p-3" style="background: rgba(0,0,0,0.1); border: 1px dashed rgba(255,255,255,0.2); border-radius: 8px;">
+                                        <i class="bi bi-inbox"></i> Nessun attacco. Clicca "Aggiungi Attacco" per iniziare.
+                                    </div>
                                 </div>
                              </div>
                               <div class="mt-3 text-end">
