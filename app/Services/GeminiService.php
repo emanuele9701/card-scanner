@@ -30,39 +30,52 @@ class GeminiService
         // In a real app, I'd rely solely on env.
         $apiKey = $this->apiKey;
 
-        $prompt = "Sei un esperto di carte collezionabili (TCG/CCG). Analizza l'immagine fornita.
+        $prompt = "Sei un esperto di carte collezionabili (TCG) e visione artificiale.
+        Il tuo compito è estrarre dati strutturati dall'immagine di una carta per un database di collezionismo.
 
-        IMPORTANTE: Prima di tutto, verifica se l'immagine mostra una carta da gioco collezionabile (Pokemon, Magic: The Gathering, Yu-Gi-Oh!, Digimon, One Piece, Dragon Ball, o simili).
-        Se l'immagine NON è una carta da gioco, restituisci SOLO questo JSON:
-        {
-            \"is_valid_card\": false,
-            \"error_message\": \"L'immagine non sembra essere una carta da gioco collezionabile\"
-        }
+        Fase 1: Validazione
+        Verifica se l'immagine è una carta collezionabile (TCG).
+        Se NO: Restituisci JSON con { \"is_valid_card\": false, \"error_message\": \"...\" }
 
-        Se l'immagine È una carta da gioco, identifica PRIMA il tipo di gioco (Pokemon, Yu-Gi-Oh!, Magic: The Gathering, etc.) e poi analizza i dettagli.
-        
-        Rispondi ESCLUSIVAMENTE con un oggetto JSON valido (senza markdown o altro testo) con questa struttura esatta:
+        Fase 2: Estrazione Dati (Se valida)
+        Identifica il gioco e tutti i dettagli tecnici.
+        IMPORTANTE: Se il testo sulla carta è in una lingua diversa dall'INGLESE (es. Giapponese), devi fornire ANCHE la traduzione inglese standard nel campo \"standardized_name\".
+
+        Restituisci SOLO un JSON con questa struttura:
+
         {
             \"is_valid_card\": true,
-            \"game\": \"Nome del gioco (es. Pokemon, Yu-Gi-Oh!, Magic: The Gathering, Digimon, One Piece, etc.)\",
-            \"card_name\": \"Nome della carta\",
-            \"hp\": \"HP/ATK/DEF (a seconda del gioco)\",
-            \"type\": \"Tipo/Colore (es. Fuoco, Acqua per Pokemon; Creatura, Stregoneria per Magic; Mostro, Magia per Yu-Gi-Oh!)\",
-            \"evolution_stage\": \"Stadio evolutivo (se applicabile, es. Base, Fase 1 per Pokemon)\",
-            \"attacks\": [
-                { \"name\": \"Nome Attacco/Abilità\", \"damage\": \"Danno\", \"cost\": \"Costo\", \"effect\": \"Descrizione effetto\" }
-            ],
-            \"weakness\": \"Debolezza\",
-            \"resistance\": \"Resistenza\",
-            \"retreat_cost\": \"Costo ritirata (o equivalente)\",
-            \"rarity\": \"Rarità\",
-            \"set_number\": \"Numero serie (es. 001/151)\",
-            \"illustrator\": \"Illustratore/Artista\",
-            \"flavor_text\": \"Testo descrittivo\",
-            \"analysis_notes\": \"Breve nota su cosa hai identificato\"
+            \"game\": \"Nome del gioco (Pokemon, Magic, Yu-Gi-Oh!, etc.)\",
+            \"card_language\": \"Lingua rilevata del testo sulla carta (es. Japanese, English, Italian)\",
+            \"card_attributes\": {
+                \"name_on_card\": \"Nome esattamente come appare sulla carta\",
+                \"standardized_name\": \"Nome standard in INGLESE (per ricerca DB)\",
+                \"hp\": \"Valore numerico (es. 180) o null\",
+                \"primary_type\": \"Tipo principale (es. Water, Fire)\",
+                \"evolution_stage\": \"Basic, Stage 1, Stage 2, VMAX, etc.\",
+                \"attacks\": [
+                    { 
+                        \"name\": \"Nome mossa\", 
+                        \"cost\": [\"Water\", \"Colorless\"], 
+                        \"damage\": \"Danno (es. 70x)\", 
+                        \"effect_summary\": \"Riassunto breve effetto\" 
+                    }
+                ]
+            },
+            \"set_details\": {
+                \"set_code\": \"Codice del set stampato sulla carta (es. sv9a, MEW, OP05)\",
+                \"set_number\": \"Numero della carta (es. 026/063)\",
+                \"regulation_mark\": \"Lettera di regolamento se presente (es. E, F, G, H)\",
+                \"rarity_symbol\": \"Descrizione simbolo rarità (es. Star, Circle, R, SR)\"
+            },
+            \"visual_analysis\": {
+                \"is_holo\": boolean,
+                \"is_full_art\": boolean,
+                \"illustrator\": \"Nome artista\"
+            },
+            \"notes\": \"Eventuali note su condizioni visibili o particolarità\"
         }
-        
-        NOTA: Il campo 'game' è OBBLIGATORIO e deve essere il nome preciso del gioco di carte.";
+        ";
 
         $payload = [
             "contents" => [
