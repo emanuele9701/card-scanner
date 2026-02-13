@@ -99,6 +99,9 @@ class CardAnalysisController extends Controller
                 // Lo stato della carta viene aggiornato a STATUS_REVIEW per indicare il completamento dell'analisi automatica.
                 $card->update(['status' => PokemonCard::STATUS_REVIEW]);
 
+                // Recupero informazioni carta da API esterne
+
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Analisi completata con successo.',

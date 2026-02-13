@@ -17,10 +17,10 @@ return [
     'enabled' => env('IMAGE_RESIZE_ENABLED', true),
 
     // Maximum width in pixels
-    'max_width' => env('IMAGE_RESIZE_MAX_WIDTH', 2160),
+    'max_width' => env('IMAGE_RESIZE_MAX_WIDTH', 2160 / 1.5),
 
     // Maximum height in pixels
-    'max_height' => env('IMAGE_RESIZE_MAX_HEIGHT', 3240),
+    'max_height' => env('IMAGE_RESIZE_MAX_HEIGHT', 3240 / 1.5),
 
     // Image quality (1-100, higher is better quality but larger file size)
     'quality' => env('IMAGE_RESIZE_QUALITY', 100),

@@ -10,6 +10,9 @@ use App\Http\Controllers\CardMatchingController;
 use App\Http\Controllers\PokemonCardController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\AdminController;
+use TCGdex\Model\Card;
+use TCGdex\Query;
+use TCGdex\TCGdex;
 
 /*
 |--------------------------------------------------------------------------
@@ -101,7 +104,42 @@ Route::middleware('auth')->group(function () {
     // API Test Page
     Route::get('/test/api', function () {
         return inertia('Test/ApiTest');
-    })->name('test.api');cv                          llllllllllll,,òòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòòv
+    })->name('test.api');
+});
+
+
+Route::get('/pippo', function () {
+    $json = <<<JSON
+    {
+      "card_id": 108,
+      "image_url": "http://127.0.0.1:8000/api/image/card/108",
+      "analysis": {
+        "is_valid_card": true,
+        "card_name": "Ludicolo",
+        "set_code": "PFL",
+        "set_number": "007/094",
+        "illustrator": "Anesaki Dynamic",
+        "hp": null,
+        "type": null,
+        "evolution_stage": null,
+        "attacks": [],
+        "weakness": null,
+        "resistance": null,
+        "retreat_cost": null,
+        "rarity": null,
+        "flavor_text": null,
+        "game": "Pokémon",
+        "card_language": null
+      }
+    }
+    JSON;
+    $data = json_decode($json, true);
+    $tcg = new TCGdex('it');
+    $number = explode("/", $data['analysis']['set_number'])[0];
+    $query = Query::create()->equal('name', $data['analysis']['card_name'])->equal('localId', $number);
+    $card = $tcg->card->list($query);
+
+    dd($card, $tcg->set->getCard('me02', '007'));
 });
 
 // Admin / Utility Routes
