@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CardSet;
 use App\Models\PokemonCard;
 use App\Models\Game;
 use App\Services\GeminiService;
@@ -12,6 +13,7 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use TCGdex\TCGdex;
 
 class CardAnalysisController extends Controller
 {
@@ -78,10 +80,20 @@ class CardAnalysisController extends Controller
             // We pass empty string for OCR text as it's not strictly required by the service signature if we just want image analysis
             $aiResult = $this->geminiService->enhanceCardData($base64Image, '');
 
+
+
             // 6. Handle Gemini Result
             if ($aiResult) {
                 // Map new Gemini structured data to legacy format
                 $mappedData = $this->geminiService->mapGeminiToLegacyFormat($aiResult);
+                $number = explode("/", $mappedData['set_number']);
+                $set = CardSet::where('user_id', auth()->id())->where('name', $mappedData['set_info']['set_name'])->first();
+                if ($set) {
+                    $tcg = new TCGdex('it');
+                    $a = $tcg->set->getCard($set->abbreviation, $number[0]);
+
+                }
+                // Recupero i dettagli della carta da TCGDex
 
                 if (isset($mappedData['is_valid_card']) && $mappedData['is_valid_card'] === false) {
                     $card->update(['status' => PokemonCard::STATUS_FAILED]);

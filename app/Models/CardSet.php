@@ -12,8 +12,13 @@ class CardSet extends Model
         'game_id',
         'name',
         'abbreviation',
+        'card_set_abbreviation',
         'release_date',
         'total_cards',
+        'external_set_id',
+        'external_category_id',
+        'is_supplemental',
+        'is_active',
     ];
 
     protected $casts = [

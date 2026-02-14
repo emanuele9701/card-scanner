@@ -33,9 +33,8 @@ class GeminiService
         $apiKey = $this->apiKey;
 
         $gameId = Game::where('name', 'Pokemon')->first()->id;
-        $allSets = CardSet::where('game_id', $gameId)->where('user_id', auth()->id())->pluck('name', 'abbreviation');
+        $allSets = CardSet::where('game_id', $gameId)->where('user_id', auth()->id())->pluck('name', 'card_set_abbreviation');
         $jsonSets = json_encode($allSets);
-
         $prompt = <<<TEXT
         Sei un sistema OCR rigoroso per l'estrazione dati da carte TCG.
 ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente sulla carta, DEVI restituire "null". 
@@ -155,6 +154,7 @@ TEXT;
         }
     }
 
+
     /**
      * Map new Gemini AI structured data to legacy database format
      * This allows backward compatibility without database schema changes
@@ -172,16 +172,15 @@ TEXT;
             ];
         }
 
-        // Extract the main metadata object from the new prompt structure
-        $cardMetadata = str_replace(["it", "en"], "", $geminiData['card_metadata']) ?? [];
+        $cardIdentity = $geminiData['card_identity'] ?? [];
+        $setDetails = $geminiData['set_details'] ?? [];
 
-        // Map to legacy format
         return [
             'is_valid_card' => true,
-            'card_name' => $cardMetadata['pokemon_name'] ?? null,
-            'set_code' => $cardMetadata['set_code'] ?? null,
-            'set_number' => $cardMetadata['set_number'] ?? null,
-            'illustrator' => $cardMetadata['illustrator'] ?? null,
+            'card_name' => $cardIdentity['pokemon_name'] ?? null,
+            'set_code' => $setDetails['set_abbreviation'] ?? null,
+            'set_number' => $cardIdentity['set_number'] ?? null,
+            'illustrator' => $cardIdentity['illustrator'] ?? null,
 
             // Fields not present in the new prompt but required by legacy format/UI
             'hp' => null,
@@ -193,8 +192,9 @@ TEXT;
             'retreat_cost' => null,
             'rarity' => null,
             'flavor_text' => null,
-            'game' => $geminiData['game'] ?? 'Pokémon',
-            'card_language' => $geminiData['detected_language'] ?? null,
+            'game' => 'Pokémon',
+            'card_language' => null,
+            'set_info' => $geminiData['set_details'] ?? null,
         ];
     }
 }
