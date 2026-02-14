@@ -15,4 +15,9 @@ class Game extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function cardSets()
+    {
+        return $this->hasMany(CardSet::class);
+    }
 }

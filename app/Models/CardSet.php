@@ -9,6 +9,7 @@ class CardSet extends Model
 {
     protected $fillable = [
         'user_id',
+        'game_id',
         'name',
         'abbreviation',
         'release_date',
@@ -26,6 +27,15 @@ class CardSet extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * Get the game this set belongs to
+     */
+    public function game()
+    {
+        return $this->belongsTo(Game::class);
+    }
+
 
     /**
      * Get all Pokemon cards in this set

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\CardSet;
+use App\Models\Game;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -30,36 +32,59 @@ class GeminiService
         // In a real app, I'd rely solely on env.
         $apiKey = $this->apiKey;
 
+        $gameId = Game::where('name', 'Pokemon')->first()->id;
+        $allSets = CardSet::where('game_id', $gameId)->where('user_id', auth()->id())->pluck('name', 'abbreviation');
+        $jsonSets = json_encode($allSets);
+
         $prompt = <<<TEXT
-        Sei un sistema OCR di precisione per l'archiviazione di carte collezionabili.
-Il tuo compito è scansionare la carta per estrarre 4 dati identificativi specifici.
-Ignora HP, Attacchi, Descrizioni e tutto ciò che riguarda il gioco.
+        Sei un sistema OCR rigoroso per l'estrazione dati da carte TCG.
+ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente sulla carta, DEVI restituire "null". 
+NON usare mai la tua conoscenza pregressa per indovinare. NON usare mai i testi forniti negli esempi qui sotto come risposte reali.
 
---- ISTRUZIONI DI ESTRAZIONE ---
+--- DATABASE SET CONOSCIUTI ---
+$jsonSets
 
-1. NOME DEL POKEMON (Target: Alto Sinistra):
-   - Cerca il testo più grande in alto.
-   - Trascrivilo esattamente (es. "Genesect", "Ludicolo").
+--- REGOLE DI ESTRAZIONE E GESTIONE DEI VUOTI (NULL) ---
 
-2. DATI DEL SET (Target: Basso Sinistra/Destra):
-   - CODICE SET: Cerca una sigla alfanumerica breve, spesso in un rettangolino o vicino al numero (es. "PFLit", "sv4pt5", "SVI").
-   - NUMERO SET: Cerca il formato "XXX/YYY" (es. "008/094"). Riporta l'intera stringa con lo slash.
+1. NOME DELLA CARTA (Alto Sinistra):
+   - Trascrivi il testo in alto (es. "Imakuni?").
 
-3. ILLUSTRATORE (Target: Bordo Inferiore Sinistro/Destro):
-   - Cerca il testo preceduto da "Ill." o "Illus.".
-   - Esempio: Se leggi "Ill. Mitsuhiro Arita", estrai "Mitsuhiro Arita".
-   - Esempio: Se leggi "Illus. Gemi", estrai "Gemi".
-   - ATTENZIONE: NON estrarre i testi di copyright come "©2023 Pokémon", "Nintendo", "Creatures" o "GAME FREAK". Quelli NON sono l'illustratore.
+2. NUMERO DELLA CARTA (Basso Sinistra/Destra):
+   - Cerca il formato "XXX/YYY" o solo "XXX". Se lo trovi, riportalo (es. "63/83").
 
---- FORMATO OUTPUT ---
-Restituisci SOLO questo JSON.
+3. ILLUSTRATORE (Regola Zero Tolleranza):
+   - Cerca ESPLICITAMENTE il prefisso "Ill." o "Illus." sul bordo inferiore.
+   - Se c'è, estrai il nome.
+   - SE NON C'È (es. la carta ha una fotografia o è vecchia), devi OBBLIGATORIAMENTE restituire null. NON inventare artisti.
+
+4. RILEVAZIONE DEL SET (IL PROBLEMA DELLE CARTE VECCHIE):
+   - Le carte moderne hanno un codice alfanumerico stampato (es. "PFLit", "SVI").
+   - Le carte più vecchie NON HANNO codici testuali, ma solo SIMBOLI GRAFICI.
+   
+   SCENARIO A (Vedi un codice di testo di 3-6 lettere):
+   - Leggi il codice grezzo (es. "sv4pt5it"). Rimuovi la lingua ("it") per trovare la radice ("sv4pt5").
+   - Cerca la radice nel [DATABASE SET CONOSCIUTI].
+   - Compila "set_name" (da DB o null se non trovato), "set_abbreviation" (radice calcolata) e imposta "is_new_set" a true/false di conseguenza.
+
+   SCENARIO B (NON vedi nessun codice testuale in basso):
+   - Se vedi solo un simbolo grafico, o non c'è nulla vicino al numero della carta, FERMATI.
+   - Devi OBBLIGATORIAMENTE impostare "raw_printed_code", "set_abbreviation" e "set_name" a null.
+   - Imposta "is_new_set" a false.
+
+--- FORMATO OUTPUT JSON ---
+Restituisci ESCLUSIVAMENTE questo JSON senza aggiungere altro testo.
 
 {
-    "card_metadata": {
-        "pokemon_name": "Nome estratto",
-        "set_code": "Codice set (es. PFLit)",
-        "set_number": "Numero completo (es. 008/094)",
-        "illustrator": "Nome Artista (Senza 'Ill.' o 'Illus.')"
+    "card_identity": {
+        "pokemon_name": "Testo",
+        "set_number": "Testo",
+        "illustrator": "Nome o null"
+    },
+    "set_details": {
+        "raw_printed_code": "Codice testuale stampato o null",
+        "set_abbreviation": "Radice calcolata o null",
+        "set_name": "Nome da DB o null",
+        "is_new_set": boolean
     }
 }
 TEXT;

@@ -115,10 +115,10 @@ Route::get('/pippo', function () {
       "image_url": "http://127.0.0.1:8000/api/image/card/108",
       "analysis": {
         "is_valid_card": true,
-        "card_name": "Ludicolo",
-        "set_code": "PFL",
-        "set_number": "007/094",
-        "illustrator": "Anesaki Dynamic",
+        "card_name": "Imakumi",
+        "set_code": null,
+        "set_number": "63/83",
+        "illustrator": null,
         "hp": null,
         "type": null,
         "evolution_stage": null,
@@ -136,10 +136,10 @@ Route::get('/pippo', function () {
     $data = json_decode($json, true);
     $tcg = new TCGdex('it');
     $number = explode("/", $data['analysis']['set_number'])[0];
-    $query = Query::create()->equal('name', $data['analysis']['card_name'])->equal('localId', $number);
+    $query = Query::create()->equal('name', $data['analysis']['card_name']);
     $card = $tcg->card->list($query);
 
-    dd($card, $tcg->set->getCard('me02', '007'));
+    dd($tcg->set->list()[167]);
 });
 
 // Admin / Utility Routes
