@@ -91,4 +91,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(PokemonCard::class);
     }
+
+    /**
+     * The games that belong to the user.
+     */
+    public function games()
+    {
+        return $this->belongsToMany(Game::class, 'game_user');
+    }
+
+    /**
+     * The card sets that belong to the user.
+     */
+    public function cardSets()
+    {
+        return $this->belongsToMany(CardSet::class, 'card_set_user');
+    }
 }

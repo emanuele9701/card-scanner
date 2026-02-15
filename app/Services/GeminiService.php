@@ -33,42 +33,40 @@ class GeminiService
         $apiKey = $this->apiKey;
 
         $gameId = Game::where('name', 'Pokemon')->first()->id;
-        $allSets = CardSet::where('game_id', $gameId)->where('user_id', auth()->id())->pluck('name', 'card_set_abbreviation');
+        $allSets = CardSet::where('game_id', $gameId)->pluck('name', 'card_set_abbreviation');
         $jsonSets = json_encode($allSets);
         $prompt = <<<TEXT
         Sei un sistema OCR rigoroso per l'estrazione dati da carte TCG.
-ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente sulla carta, DEVI restituire "null". 
-NON usare mai la tua conoscenza pregressa per indovinare. NON usare mai i testi forniti negli esempi qui sotto come risposte reali.
+ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente, restituisci "null". 
+NON unire testi lontani tra loro. NON inventare dati.
 
 --- DATABASE SET CONOSCIUTI ---
 $jsonSets
 
---- REGOLE DI ESTRAZIONE E GESTIONE DEI VUOTI (NULL) ---
+--- REGOLE DI ESTRAZIONE E GESTIONE SPAZIALE ---
 
 1. NOME DELLA CARTA (Alto Sinistra):
-   - Trascrivi il testo in alto (es. "Imakuni?").
+   - Trascrivi il testo in alto (es. "Vileplume", "Imakuni?").
 
-2. NUMERO DELLA CARTA (Basso Sinistra/Destra):
-   - Cerca il formato "XXX/YYY" o solo "XXX". Se lo trovi, riportalo (es. "63/83").
+2. NUMERO DELLA CARTA (IL TRABOCCHETTO DEL POKÉDEX):
+   - DOVE: ESCLUSIVAMENTE lungo il bordo inferiore estremo (in basso a sinistra o destra).
+   - IL TRABOCCHETTO: Subito sotto l'illustrazione c'è una riga grigia con il numero enciclopedico (es. "N. 0045"). DEVI IGNORARE TOTALMENTE QUESTO NUMERO. Non ha nulla a che fare con il set.
+   - REGOLE DI ESTRAZIONE: Cerca il formato "XXX/YYY" o "XXX" in fondo alla carta. Se leggi "003/094", trascrivi ESATTAMENTE "003/094".
+   - DIVIETO ASSOLUTO: È severamente vietato prendere il numero del Pokédex ("N. XXXX") e unirlo al numero del set in basso.
 
 3. ILLUSTRATORE (Regola Zero Tolleranza):
-   - Cerca ESPLICITAMENTE il prefisso "Ill." o "Illus." sul bordo inferiore.
-   - Se c'è, estrai il nome.
-   - SE NON C'È (es. la carta ha una fotografia o è vecchia), devi OBBLIGATORIAMENTE restituire null. NON inventare artisti.
+   - Cerca ESPLICITAMENTE il prefisso "Ill." o "Illus." sul bordo inferiore. Estrai solo il nome.
+   - SE NON C'È PREFISSO (es. la carta ha una fotografia), devi OBBLIGATORIAMENTE restituire null.
 
 4. RILEVAZIONE DEL SET (IL PROBLEMA DELLE CARTE VECCHIE):
-   - Le carte moderne hanno un codice alfanumerico stampato (es. "PFLit", "SVI").
-   - Le carte più vecchie NON HANNO codici testuali, ma solo SIMBOLI GRAFICI.
-   
-   SCENARIO A (Vedi un codice di testo di 3-6 lettere):
-   - Leggi il codice grezzo (es. "sv4pt5it"). Rimuovi la lingua ("it") per trovare la radice ("sv4pt5").
+   SCENARIO A (Vedi un codice di testo, es. "PFLit", "sv4pt5it"):
+   - Rimuovi la lingua ("it", "en") per trovare la radice ("PFL").
    - Cerca la radice nel [DATABASE SET CONOSCIUTI].
    - Compila "set_name" (da DB o null se non trovato), "set_abbreviation" (radice calcolata) e imposta "is_new_set" a true/false di conseguenza.
 
-   SCENARIO B (NON vedi nessun codice testuale in basso):
-   - Se vedi solo un simbolo grafico, o non c'è nulla vicino al numero della carta, FERMATI.
-   - Devi OBBLIGATORIAMENTE impostare "raw_printed_code", "set_abbreviation" e "set_name" a null.
-   - Imposta "is_new_set" a false.
+   SCENARIO B (NON vedi codici testuali, ma solo simboli, es. carte vecchie):
+   - Se in basso non c'è una sigla testuale vicino al numero, FERMATI.
+   - Imposta "raw_printed_code", "set_abbreviation" e "set_name" a null. Imposta "is_new_set" a false.
 
 --- FORMATO OUTPUT JSON ---
 Restituisci ESCLUSIVAMENTE questo JSON senza aggiungere altro testo.
@@ -76,11 +74,11 @@ Restituisci ESCLUSIVAMENTE questo JSON senza aggiungere altro testo.
 {
     "card_identity": {
         "pokemon_name": "Testo",
-        "set_number": "Testo",
+        "set_number": "Testo estratto DAL BORDO INFERIORE o null",
         "illustrator": "Nome o null"
     },
     "set_details": {
-        "raw_printed_code": "Codice testuale stampato o null",
+        "raw_printed_code": "Codice testuale o null",
         "set_abbreviation": "Radice calcolata o null",
         "set_name": "Nome da DB o null",
         "is_new_set": boolean
@@ -181,6 +179,7 @@ TEXT;
             'set_code' => $setDetails['set_abbreviation'] ?? null,
             'set_number' => $cardIdentity['set_number'] ?? null,
             'illustrator' => $cardIdentity['illustrator'] ?? null,
+            'set_info' => $setDetails,
 
             // Fields not present in the new prompt but required by legacy format/UI
             'hp' => null,
@@ -194,7 +193,6 @@ TEXT;
             'flavor_text' => null,
             'game' => 'Pokémon',
             'card_language' => null,
-            'set_info' => $geminiData['set_details'] ?? null,
         ];
     }
 }

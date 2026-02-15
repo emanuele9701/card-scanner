@@ -102,10 +102,10 @@ Route::middleware('auth')->group(function () {
     });
 
     // API Test Page
-    Route::get('/test/api', function () {
-        return inertia('Test/ApiTest');
-    })->name('test.api');
 });
+Route::get('/test/api', function () {
+    return inertia('Test/ApiTest');
+})->name('test.api');
 
 
 Route::get('/pippo', function () {

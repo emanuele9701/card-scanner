@@ -30,6 +30,9 @@ class MarketDataImportService
         ];
 
         $importDate = now()->toDateString();
+        // Since we are running globally, we might want to log who triggered it or system context.
+        // But for market data import, it is usually a system command or admin action.
+        // We no longer scope by auth()->id() for CREATION of structure.
 
         DB::beginTransaction();
         try {
@@ -39,25 +42,23 @@ class MarketDataImportService
             foreach ($groupedByProduct as $productId => $variants) {
                 $firstVariant = $variants->first();
 
-                // Ensure set exists
+                // Ensure set exists (Global)
                 $setCreated = $this->ensureSetExists($firstVariant);
                 if ($setCreated) {
                     $stats['sets_created']++;
                 }
 
-                // Ensure game exists
+                // Ensure game exists (Global)
                 $game = Game::firstOrCreate(
                     [
                         'name' => $firstVariant['game'],
-                        'user_id' => auth()->id()
                     ]
                 );
 
-                // Create or update market card
+                // Create or update market card (Global by product_id)
                 $marketCard = MarketCard::updateOrCreate(
                     [
                         'product_id' => $productId,
-                        'user_id' => auth()->id(), // Associate with current user
                     ],
                     [
                         'product_name' => $firstVariant['productName'],
@@ -76,7 +77,7 @@ class MarketDataImportService
                     ? $stats['cards_created']++
                     : $stats['cards_updated']++;
 
-                // Create price records for each condition/printing variant
+                // Create price records for each condition/printing variant (Global)
                 foreach ($variants as $variant) {
                     try {
                         MarketPrice::create([
@@ -123,7 +124,6 @@ class MarketDataImportService
         $set = CardSet::firstOrCreate(
             [
                 'abbreviation' => $cardData['setAbbrv'],
-                'user_id' => auth()->id()
             ],
             ['name' => $cardData['set']]
         );
@@ -167,22 +167,15 @@ class MarketDataImportService
      */
     public function getStats(): array
     {
-        $userId = auth()->id();
-
+        // Stats are now global
         return [
             'total_sets' => MarketCard::distinct('set_abbreviation')
                 ->whereNotNull('set_abbreviation')
                 ->count('set_abbreviation'),
-            'total_cards' => MarketCard::count(), // Already filtered by Global Scope
-            'total_prices' => MarketPrice::whereHas('marketCard', function ($query) use ($userId) {
-                $query->withoutGlobalScope('user')->where('user_id', $userId);
-            })->count(),
-            'latest_import' => MarketPrice::whereHas('marketCard', function ($query) use ($userId) {
-                $query->withoutGlobalScope('user')->where('user_id', $userId);
-            })->max('import_date'),
-            'unique_import_dates' => MarketPrice::whereHas('marketCard', function ($query) use ($userId) {
-                $query->withoutGlobalScope('user')->where('user_id', $userId);
-            })->distinct('import_date')->count('import_date'),
+            'total_cards' => MarketCard::count(),
+            'total_prices' => MarketPrice::count(),
+            'latest_import' => MarketPrice::max('import_date'),
+            'unique_import_dates' => MarketPrice::distinct('import_date')->count('import_date'),
         ];
     }
 
@@ -194,13 +187,8 @@ class MarketDataImportService
      */
     public function cleanupOldPrices(int $keepImports = 12): int
     {
-        $userId = auth()->id();
-
-        // Get the dates of the most recent imports for current user
-        $datesToKeep = MarketPrice::whereHas('marketCard', function ($query) use ($userId) {
-            $query->withoutGlobalScope('user')->where('user_id', $userId);
-        })
-            ->select('import_date')
+        // Get the dates of the most recent imports globally
+        $datesToKeep = MarketPrice::select('import_date')
             ->distinct()
             ->orderBy('import_date', 'desc')
             ->limit($keepImports)
@@ -210,15 +198,11 @@ class MarketDataImportService
             return 0;
         }
 
-        // Delete prices not in the dates to keep (only for current user's cards)
-        $deleted = MarketPrice::whereHas('marketCard', function ($query) use ($userId) {
-            $query->withoutGlobalScope('user')->where('user_id', $userId);
-        })
-            ->whereNotIn('import_date', $datesToKeep)
+        // Delete prices not in the dates to keep
+        $deleted = MarketPrice::whereNotIn('import_date', $datesToKeep)
             ->delete();
 
         Log::info('Cleaned up old market prices', [
-            'user_id' => $userId,
             'deleted' => $deleted,
             'kept_imports' => $keepImports,
         ]);

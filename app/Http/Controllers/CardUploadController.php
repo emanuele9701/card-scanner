@@ -8,12 +8,17 @@ use App\Models\GoogleDriveFile;
 use App\Services\GeminiService;
 use App\Services\GoogleDriveService;
 use App\Services\ImageResizeService;
+use App\Models\MarketCard;
+use App\Models\MarketPrice;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
 use Inertia\Inertia;
+use TCGdex\TCGdex;
+use TCGdex\Model\Card;
+use TCGdex\Model\SubModel\Attack;
 
 class CardUploadController extends Controller
 {
@@ -276,6 +281,89 @@ class CardUploadController extends Controller
             // Map new Gemini structured data to legacy format
             $mappedData = $geminiService->mapGeminiToLegacyFormat($aiResult);
 
+            if (isset($mappedData['set_info']['set_name']) && isset($mappedData['set_number'])) {
+                $number = explode("/", $mappedData['set_number']);
+                $set = CardSet::where('name', $mappedData['set_info']['set_name'])->first();
+
+                if ($set) {
+                    $mappedData['card_set_id'] = $set->id;
+                    $tcg = new TCGdex('it');
+                    // Use try-catch or safe call in case SDK fails or set not found in SDK
+                    try {
+                        $a = $tcg->set->getCard($set->abbreviation, $number[0]);
+                        // Recupero i dettagli della carta da TCGDex
+                        if ($a instanceof Card) {
+                            $mappedData['hp'] = $a->hp;
+                            $mappedData['type'] = $a->types[0] ?? null;
+                            $mappedData['evolution_stage'] = $a->stage;
+
+                            if ($a->attacks) {
+                                $mappedData['attacks'] = array_map(function ($attack) {
+                                    /**
+                                     * @var Attack $attack
+                                     */
+                                    return ['cost' => $attack->cost, 'name' => $attack->name, 'text' => $attack->effect, 'damage' => $attack->damage];
+                                }, $a->attacks);
+                            }
+
+                            $mappedData['weakness'] = is_array($a->weaknesses) ? implode(', ', array_map(fn($w) => "{$w->type} {$w->value}", $a->weaknesses)) : $a->weaknesses;
+                            $mappedData['resistance'] = is_array($a->resistances) ? implode(', ', array_map(fn($r) => "{$r->type} {$r->value}", $a->resistances)) : $a->resistances;
+                            $mappedData['retreat_cost'] = is_array($a->retreat) ? count($a->retreat) : (string) $a->retreat;
+                            $mappedData['rarity'] = $this->mapRarity($a->rarity);
+
+                            // Extract pricing from TCGdex pricing object
+                            if (isset($a->pricing) && isset($a->pricing->cardmarket)) {
+                                $cm = $a->pricing->cardmarket;
+                                $mappedData['pricing'] = [
+                                    'avg' => $cm->avg ?? null,
+                                    'low' => $cm->low ?? null,
+                                    'trend' => $cm->trend ?? null,
+                                    'updated' => $cm->updated ?? null,
+                                    'unit' => $cm->unit ?? 'EUR',
+                                    'idProduct' => $cm->idProduct ?? null,
+                                ];
+
+                                // Find or create MarketCard association
+                                // Using withoutGlobalScope because product_id is unique globally
+                                if (isset($cm->idProduct)) {
+                                    // Ensure we have the Game ID for Pokemon
+                                    $gameModel = \App\Models\Game::firstOrCreate(
+                                        [
+                                            'name' => 'Pokemon',
+                                        ]
+                                    );
+
+                                    $marketCard = MarketCard::withoutGlobalScope('user')->firstOrCreate(
+                                        ['product_id' => $cm->idProduct],
+                                        [
+                                            'product_name' => $a->name,
+                                            'card_number' => $a->localId,
+                                            'set_name' => $a->set->name,
+                                            'set_abbreviation' => $a->set->id,
+                                            'rarity' => $a->rarity ?? 'Unknown',
+                                            'type' => $a->types[0] ?? 'Unknown',
+                                            'game' => 'Pokemon',
+                                            'game_id' => $gameModel->id,
+                                        ]
+                                    );
+                                    $mappedData['market_card_id'] = $marketCard->id;
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // Ignore TCGDex errors, proceed with Gemini data
+                        Log::warning("TCGDex error: " . $e->getMessage());
+                    }
+                }
+            }
+
+            // Normalize game name to match database (remove accents, etc.)
+            if (isset($mappedData['game'])) {
+                if (preg_match('/Pokemon/i', $mappedData['game'])) {
+                    $mappedData['game'] = 'Pokemon';
+                }
+            }
+
             // Check if AI detected this is NOT a valid card
             if (isset($mappedData['is_valid_card']) && $mappedData['is_valid_card'] === false) {
                 // Update card status to failed
@@ -312,19 +400,21 @@ class CardUploadController extends Controller
         $request->validate([
             'card_id' => 'required|exists:pokemon_cards,id',
             'card_name' => 'nullable|string',
-            'hp' => 'nullable|string',
+            'hp' => 'nullable',
             'type' => 'nullable|string',
             'evolution_stage' => 'nullable|string',
             'attacks_json' => 'nullable|string',
             'attacks' => 'nullable|array',
-            'weakness' => 'nullable|string',
-            'resistance' => 'nullable|string',
-            'retreat_cost' => 'nullable|string',
+            'weakness' => 'nullable',
+            'resistance' => 'nullable',
+            'retreat_cost' => 'nullable',
             'rarity' => 'nullable|string',
-            'set_number' => 'nullable|string',
+            'set_number' => 'nullable',
             'illustrator' => 'nullable|string',
             'card_set_id' => 'nullable|exists:card_sets,id',
             'game' => 'required|string',
+            'market_card_id' => 'nullable|exists:market_cards,id',
+            'pricing' => 'nullable|array',
         ]);
 
         $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
@@ -345,7 +435,6 @@ class CardUploadController extends Controller
             $gameModel = \App\Models\Game::firstOrCreate(
                 [
                     'name' => $request->game,
-                    'user_id' => auth()->id()
                 ]
             );
             $gameId = $gameModel->id;
@@ -363,11 +452,43 @@ class CardUploadController extends Controller
             'rarity' => $request->rarity,
             'set_number' => $request->set_number,
             'illustrator' => $request->illustrator,
+            'flavor_text' => $request->flavor_text,
             'card_set_id' => $request->card_set_id,
+            'market_card_id' => $request->market_card_id,
             'game' => $request->game,
             'game_id' => $gameId,
             'status' => PokemonCard::STATUS_COMPLETED,
         ]);
+
+        // Persist market pricing if provided
+        if ($request->filled('pricing') && $request->filled('market_card_id')) {
+            $pricing = $request->pricing;
+            $marketCardId = $request->market_card_id;
+
+            // Convert TCGdex updated timestamp to Y-m-d
+            $importDate = isset($pricing['updated']) ? date('Y-m-d', strtotime($pricing['updated'])) : null;
+
+            if ($importDate) {
+                // Check if we need to update or create a new price record
+                // We only add a new record if the date is more recent than the latest stored for this card
+                $latestPrice = MarketPrice::where('market_card_id', $marketCardId)
+                    ->orderBy('import_date', 'desc')
+                    ->first();
+
+                if (!$latestPrice || $importDate > $latestPrice->getRawOriginal('import_date')) {
+                    MarketPrice::create([
+                        'market_card_id' => $marketCardId,
+                        'condition' => 'Near Mint', // Default condition for imported trend prices
+                        'printing' => 'Normal',    // Default printing
+                        'low_price' => $pricing['low'] ?? 0,
+                        'market_price' => $pricing['avg'] ?? 0,
+                        'import_date' => $importDate,
+                    ]);
+
+                    Log::info("Created new MarketPrice for MarketCard #{$marketCardId} from {$importDate}");
+                }
+            }
+        }
 
         // Check if Google Drive upload is enabled
         $driveFileId = null;
@@ -586,7 +707,6 @@ class CardUploadController extends Controller
             $gameModel = \App\Models\Game::firstOrCreate(
                 [
                     'name' => $request->game,
-                    'user_id' => auth()->id()
                 ]
             );
             $data['game_id'] = $gameModel->id;
@@ -640,8 +760,7 @@ class CardUploadController extends Controller
      */
     public function getAvailableGames()
     {
-        $games = \App\Models\Game::where('user_id', auth()->id())
-            ->orderBy('name')
+        $games = \App\Models\Game::orderBy('name')
             ->get();
 
         return response()->json([
@@ -871,5 +990,38 @@ class CardUploadController extends Controller
             Log::error("Failed to auto-create CardInventory for card #{$card->id}: " . $e->getMessage());
             // Don't throw - inventory creation failure shouldn't block card save
         }
+    }
+    /**
+     * Map TCGDex rarity to internal format
+     */
+    private function mapRarity(?string $rarity): ?string
+    {
+        if (!$rarity)
+            return null;
+
+        $map = [
+            'Common' => 'Common',
+            'Comune' => 'Common',
+            'Uncommon' => 'Uncommon',
+            'Non comune' => 'Uncommon',
+            'Rare' => 'Rare',
+            'Rara' => 'Rare',
+            'Rare Holo' => 'Holo Rare',
+            'Olografica rara' => 'Holo Rare',
+            'Double Rare' => 'Double Rare',
+            'Rara doppia' => 'Double Rare',
+            'Illustration Rare' => 'Illustration Rare',
+            'Rara illustrazione' => 'Illustration Rare',
+            'Special Illustration Rare' => 'Illustration Rare',
+            'Rara illustrazione speciale' => 'Illustration Rare',
+            'Ultra Rare' => 'Ultra Rare',
+            'Ultra rara' => 'Ultra Rare',
+            'Secret Rare' => 'Secret Rare',
+            'Rara segreta' => 'Secret Rare',
+            'Hyper Rare' => 'Secret Rare',
+            'Rara Hyper' => 'Secret Rare',
+        ];
+
+        return $map[$rarity] ?? $rarity;
     }
 }

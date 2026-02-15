@@ -51,10 +51,16 @@ const editForm = reactive({
     flavor_text: '',
     card_set_id: '',
     game: '',
+    pricing: null,
+    market_card_id: null,
 });
 const cardSets = ref([]);
 const availableGames = ref([]);
 const validationErrors = ref({});
+
+const editingCard = computed(() => {
+    return cards.value.find(c => c.tempId === editingCardId.value || c.id === editingCardId.value);
+});
 
 // Cropper State
 const showCropperModal = ref(false);
@@ -392,10 +398,20 @@ const openEditModal = async (card) => {
     
     // If AI detected a game that's NOT in the available list, clear it
     // This forces the user to manually select a valid game
-    if (card.data && card.data.game && !availableGames.value.some(g => g.name === card.data.game)) {
-        console.warn(`AI detected game "${card.data.game}" is not in available games list. User must select manually.`);
-        editForm.game = '';
-        validationErrors.value.game = `Il game "${card.data.game}" rilevato dall'AI non è valido. Seleziona manualmente.`;
+    if (card.data && card.data.game) {
+        const detectedGame = card.data.game.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const matchedGame = availableGames.value.find(g => {
+            const gameName = g.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return gameName === detectedGame || gameName.includes(detectedGame) || detectedGame.includes(gameName);
+        });
+
+        if (matchedGame) {
+            editForm.game = matchedGame.name;
+        } else {
+            console.warn(`AI detected game "${card.data.game}" is not in available games list. User must select manually.`);
+            editForm.game = '';
+            validationErrors.value.game = `Il game "${card.data.game}" rilevato dall'AI non è valido. Seleziona manualmente.`;
+        }
     }
     
     showEditModal.value = true;
@@ -808,7 +824,12 @@ onBeforeUnmount(() => {
                         
                         <!-- Info -->
                          <div v-if="card.data" class="mt-2 small text-white-50">
-                            <strong>{{ card.data.card_name || 'Sconosciuta' }}</strong><br>
+                            <div class="d-flex justify-content-between align-items-start">
+                                <strong>{{ card.data.card_name || 'Sconosciuta' }}</strong>
+                                <span v-if="card.data.pricing" class="badge bg-warning text-dark ms-1" style="font-size: 0.7rem;">
+                                    € {{ card.data.pricing.avg || card.data.pricing.low || '0.00' }}
+                                </span>
+                            </div>
                             <span v-if="card.data.type">{{ card.data.type }}</span>
                             <span v-if="card.data.hp"> - HP {{ card.data.hp }}</span><br>
                             <div v-if="card.data.attacks && card.data.attacks.length" class="mt-1">
@@ -866,113 +887,87 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-             <!-- Edit Modal -->
-            <div v-if="showEditModal" class="custom-modal-overlay">
-                <div class="card-edit-container">
-                    <div class="modal-header-custom">
-                         <h4>
-                            <i class="bi bi-pencil-square"></i>
-                            <span>{{ editingCardId ? 'Modifica Carta' : 'Inserimento Manuale' }}</span>
-                        </h4>
-                        <button class="modal-close-btn" @click="showEditModal = false">
+            <!-- Edit Modal (Teleported to body for better z-index handling) -->
+        <Teleport to="body">
+            <div v-if="showEditModal" class="custom-modal-overlay" @click.self="showEditModal = false">
+                <div class="card-edit-glass-container">
+                    <div class="glass-header">
+                        <h4 class="mb-0 text-white"><i class="bi bi-pencil-square me-2 text-warning"></i>Modifica Carta</h4>
+                        <button class="glass-close-btn" @click="showEditModal = false">
                             <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
-                    <div class="modal-body-custom">
-                         <!-- Form here (simplified for brevity, should map editForm) -->
-                         <!-- I'll add the form fields properly -->
-                         <div style="padding: 20px; overflow-y: auto; max-height: 70vh; width: 100%;">
-                             <div class="form-grid">
-                                <div class="form-group-custom">
-                                    <label>Nome Carta *</label>
-                                    <input 
-                                        v-model="editForm.card_name" 
-                                        type="text"
-                                        :class="{ 'border-error': validationErrors.card_name }"
-                                    >
-                                    <span v-if="validationErrors.card_name" class="error-message">
-                                        {{ validationErrors.card_name }}
-                                    </span>
-                                </div>
-                                <div class="form-group-custom">
-                                    <label>HP</label>
-                                    <input v-model="editForm.hp" type="text">
-                                </div>
-                                <div class="form-group-custom">
-                                    <label>Tipo</label>
-                                    <select v-model="editForm.type">
-                                        <option value="">Seleziona...</option>
-                                        <option value="Grass">Erba</option>
-                                        <option value="Fire">Fuoco</option>
-                                        <option value="Water">Acqua</option>
-                                        <option value="Lightning">Elettro</option>
-                                        <option value="Psychic">Psico</option>
-                                        <option value="Fighting">Lotta</option>
-                                        <option value="Darkness">Oscurità</option>
-                                        <option value="Metal">Metallo</option>
-                                        <option value="Fairy">Folletto</option>
-                                        <option value="Dragon">Drago</option>
-                                        <option value="Colorless">Incolore</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group-custom">
-                                    <label>Stadio Evolutivo</label>
-                                    <input v-model="editForm.evolution_stage" type="text" placeholder="es. Base, Fase 1">
-                                </div>
+                    
+                    <div class="glass-body">
+                     <div class="row g-3">
+                        <!-- Image Column -->
+                        <div class="col-md-4">
+                             <div class="glass-image-container mb-3 d-flex align-items-center justify-content-center" style="background: rgba(0,0,0,0.2); border-radius: 12px; height: 100%; min-height: 400px;">
+                                 <img v-if="editingCard" :src="editingCard.cropped_image || editingCard.thumbnail || editingCard.image_url" class="img-fluid rounded shadow-sm" style="max-height: 400px; width: auto; object-fit: contain;">
+                                 <div v-else class="text-white-50 text-center">
+                                     <div>Immagine non disponibile</div>
+                                     <small class="text-muted" style="font-size: 0.65rem;">ID: {{ editingCard.id || editingCard.tempId }}</small>
+                                 </div>
+                             </div>
+                        </div>
 
-                                <div class="d-flex gap-2">
-                                    <div class="form-group-custom w-50">
-                                        <label>Debolezza</label>
-                                        <input v-model="editForm.weakness" type="text">
-                                    </div>
-                                    <div class="form-group-custom w-50">
-                                        <label>Resistenza</label>
-                                        <input v-model="editForm.resistance" type="text">
+                        <!-- Center Column: Core Info -->
+                        <div class="col-md-4">
+                            <h6 class="section-title">Informazioni Base</h6>
+                            
+                            <div class="form-floating-custom mb-3">
+                                <input type="text" v-model="editForm.card_name" id="cardName" placeholder=" " class="glass-input" :class="{ 'border-error': validationErrors.card_name }">
+                                <label for="cardName">Nome Carta *</label>
+                                <span v-if="validationErrors.card_name" class="error-text">{{ validationErrors.card_name }}</span>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                     <div class="form-floating-custom">
+                                        <input type="text" v-model="editForm.hp" id="hp" placeholder=" " class="glass-input">
+                                        <label for="hp">HP</label>
                                     </div>
                                 </div>
-
-                                <div class="form-group-custom">
-                                    <label>Costo Ritirata</label>
-                                    <input v-model="editForm.retreat_cost" type="text">
-                                </div>
-
-                                <div class="form-group-custom">
-                                    <label>Set</label>
-                                    <select v-model="editForm.card_set_id">
-                                        <option value="">Seleziona Set...</option>
-                                        <option v-for="set in cardSets" :key="set.id" :value="set.id">
-                                            {{ set.name }} ({{ set.abbreviation || set.series }})
-                                        </option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group-custom">
-                                    <label>Game *</label>
-                                    <select 
-                                        v-model="editForm.game" 
-                                        required
-                                        :class="{ 'border-error': validationErrors.game }"
-                                    >
-                                        <option value="">Seleziona Game...</option>
-                                        <option v-for="game in availableGames" :key="game.id" :value="game.name">
-                                            {{ game.name }}
-                                        </option>
-                                    </select>
-                                    <span v-if="validationErrors.game" class="error-message">
-                                        {{ validationErrors.game }}
-                                    </span>
-                                </div>
-
-                                <div class="d-flex gap-2">
-                                     <div class="form-group-custom w-50">
-                                        <label>Numero Set</label>
-                                        <input v-model="editForm.set_number" type="text">
+                                <div class="col-6">
+                                    <div class="form-floating-custom">
+                                        <input type="text" v-model="editForm.type" id="type" placeholder=" " class="glass-input">
+                                        <label for="type">Tipo</label>
                                     </div>
-                                    <div class="form-group-custom w-50">
-                                        <label>Rarità</label>
-                                        <select v-model="editForm.rarity">
-                                            <option value="">Seleziona...</option>
+                                </div>
+                            </div>
+
+                            <div class="form-floating-custom mb-3">
+                                <select v-model="editForm.game" id="game" class="glass-select" :class="{ 'border-error': validationErrors.game }">
+                                    <option value="" disabled selected>Seleziona Game</option>
+                                    <option v-for="game in availableGames" :key="game.id" :value="game.name">
+                                        {{ game.name }}
+                                    </option>
+                                </select>
+                                <label for="game">Gioco *</label>
+                                <span v-if="validationErrors.game" class="error-text">{{ validationErrors.game }}</span>
+                            </div>
+
+                            <div class="form-floating-custom mb-3">
+                                <select v-model="editForm.card_set_id" id="set" class="glass-select">
+                                    <option value="">Nessun Set</option>
+                                    <option v-for="set in cardSets" :key="set.id" :value="set.id">
+                                        {{ set.name }} ({{ set.abbreviation }})
+                                    </option>
+                                </select>
+                                <label for="set">Set</label>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <div class="form-floating-custom">
+                                        <input type="text" v-model="editForm.set_number" id="setNumber" placeholder=" " class="glass-input">
+                                        <label for="setNumber">N. Set</label>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                     <div class="form-floating-custom">
+                                        <select v-model="editForm.rarity" id="rarity" class="glass-select">
+                                            <option value="">Seleziona Rarità...</option>
                                             <option value="Common">Common</option>
                                             <option value="Uncommon">Uncommon</option>
                                             <option value="Rare">Rare</option>
@@ -982,69 +977,108 @@ onBeforeUnmount(() => {
                                             <option value="Ultra Rare">Ultra Rare</option>
                                             <option value="Secret Rare">Secret Rare</option>
                                         </select>
+                                        <label for="rarity">Rarità</label>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div class="form-group-custom">
-                                    <label>Illustratore</label>
-                                    <input v-model="editForm.illustrator" type="text">
+                            <div class="form-floating-custom mb-3">
+                                <input type="text" v-model="editForm.illustrator" id="illustrator" placeholder=" " class="glass-input">
+                                <label for="illustrator">Illustratore</label>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Stats & Attacks -->
+                        <div class="col-md-4">
+                            <h6 class="section-title">Statistiche & Attacchi</h6>
+
+                            <!-- Market Data -->
+                            <div v-if="editForm.pricing" class="glass-card mb-3 p-2" style="background: rgba(255, 203, 5, 0.1); border: 1px solid rgba(255, 203, 5, 0.3);">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-warning small fw-bold text-uppercase"><i class="bi bi-graph-up me-1"></i> Valore di Mercato</span>
+                                    <span class="badge bg-dark-pokemon text-warning" style="font-size: 0.65rem;">Cardmarket</span>
                                 </div>
-
-                                <div class="form-group-custom">
-                                    <label>Testo del Gusto (Flavor)</label>
-                                    <textarea v-model="editForm.flavor_text" rows="2" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; color: white; border-radius: 8px;"></textarea>
-                                </div>
-
-                                <!-- Attacks Editor -->
-                                <div class="form-group-custom">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <label class="mb-0">Attacchi</label>
-                                        <button type="button" class="btn btn-sm btn-success" @click="addAttack">
-                                            <i class="bi bi-plus-lg"></i> Aggiungi Attacco
-                                        </button>
+                                <div class="row g-2 text-center text-white">
+                                    <div class="col-6 border-end border-white-10">
+                                        <div class="small text-white-50">Media</div>
+                                        <div class="fw-bold">€ {{ editForm.pricing.avg || '0.00' }}</div>
                                     </div>
-                                    
-                                    <div v-if="editForm.attacks && editForm.attacks.length > 0" class="attacks-list">
-                                        <div v-for="(attack, index) in editForm.attacks" :key="index" class="attack-item mb-3 p-3" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;">
-                                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                                <h6 class="text-warning mb-0">Attacco {{ index + 1 }}</h6>
-                                                <button type="button" class="btn btn-sm btn-danger" @click="removeAttack(index)">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
+                                    <div class="col-6">
+                                        <div class="small text-white-50">Basso</div>
+                                        <div class="fw-bold">€ {{ editForm.pricing.low || '0.00' }}</div>
+                                    </div>
+                                </div>
+                                <div v-if="editForm.pricing.updated" class="mt-2 text-center" style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">
+                                    Aggiornato: {{ new Date(editForm.pricing.updated).toLocaleDateString('it-IT') }}
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                 <div class="col-4">
+                                    <div class="form-floating-custom">
+                                        <input type="text" v-model="editForm.weakness" id="weakness" placeholder=" " class="glass-input">
+                                        <label for="weakness">Debolezza</label>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="form-floating-custom">
+                                        <input type="text" v-model="editForm.resistance" id="resistance" placeholder=" " class="glass-input">
+                                        <label for="resistance">Resistenza</label>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="form-floating-custom">
+                                        <input type="text" v-model="editForm.retreat_cost" id="retreat" placeholder=" " class="glass-input">
+                                        <label for="retreat">Ritirata</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="attacks-section mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="text-white-50 small text-uppercase fw-bold">Attacchi</label>
+                                    <button type="button" class="btn btn-xs btn-outline-success rounded-pill" @click="addAttack">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="attacks-container custom-scrollbar">
+                                    <div v-if="editForm.attacks && editForm.attacks.length > 0">
+                                        <div v-for="(attack, index) in editForm.attacks" :key="index" class="attack-card mb-2">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <input v-model="attack.name" class="glass-input-sm fw-bold w-50" placeholder="Nome Attacco">
+                                                <input v-model="attack.damage" class="glass-input-sm text-end w-25" placeholder="Danno">
+                                                <button type="button" class="btn-icon-danger" @click="removeAttack(index)"><i class="bi bi-x"></i></button>
                                             </div>
-                                            <div class="row g-2">
-                                                <div class="col-md-6">
-                                                    <label class="small text-white-50">Nome</label>
-                                                    <input v-model="attack.name" type="text" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="es. Lanciafiamme">
-                                                </div>
-                                                <div class="col-md-3">
-                                                    <label class="small text-white-50">Danno</label>
-                                                    <input v-model="attack.damage" type="text" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="es. 50">
-                                                </div>
-                                                <div class="col-md-3">
-                                                    <label class="small text-white-50">Costo</label>
-                                                    <input v-model="attack.cost" type="text" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="es. Fire, Fire">
-                                                </div>
-                                                <div class="col-12">
-                                                    <label class="small text-white-50">Effetto/Testo</label>
-                                                    <textarea v-model="attack.text" rows="2" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Descrizione dell'effetto..."></textarea>
-                                                </div>
+                                            <div class="d-flex gap-2 mb-1">
+                                                <input v-model="attack.cost" class="glass-input-sm w-100" placeholder="Costo (es. Fire, Fire)">
                                             </div>
+                                            <textarea v-model="attack.text" class="glass-input-sm w-100" rows="2" placeholder="Effetto..."></textarea>
                                         </div>
                                     </div>
-                                    <div v-else class="text-center text-white-50 p-3" style="background: rgba(0,0,0,0.1); border: 1px dashed rgba(255,255,255,0.2); border-radius: 8px;">
-                                        <i class="bi bi-inbox"></i> Nessun attacco. Clicca "Aggiungi Attacco" per iniziare.
+                                    <div v-else class="text-center py-4 text-white-50 border border-dashed border-secondary rounded">
+                                        <small>Nessun attacco aggiunto</small>
                                     </div>
                                 </div>
-                             </div>
-                              <div class="mt-3 text-end">
-                                <button class="btn btn-secondary me-2" @click="showEditModal = false">Annulla</button>
-                                <button class="btn btn-pokemon" @click="saveEdit">Salva</button>
                             </div>
-                         </div>
+                            
+                            <div class="form-floating-custom">
+                                <textarea v-model="editForm.flavor_text" id="flavor" class="glass-textarea" placeholder=" " style="height: 80px"></textarea>
+                                <label for="flavor">Testo del Gusto</label>
+                            </div>
+                        </div>
+                     </div>
+                    </div>
+
+                    <div class="glass-footer">
+                        <button class="btn btn-glass-secondary me-2" @click="showEditModal = false">Annulla</button>
+                        <button class="btn btn-glass-primary" @click="saveEdit">
+                            <i class="bi bi-check-lg me-1"></i> Salva Modifiche
+                        </button>
                     </div>
                 </div>
             </div>
+        </Teleport>
             
             <!-- Fullscreen Viewer -->
             <div v-if="showFullscreen" class="fullscreen-viewer" @click="showFullscreen = false">
@@ -1214,6 +1248,160 @@ onBeforeUnmount(() => {
 }
 .modal-close-btn { background: none; border: none; color: white; cursor: pointer; font-size: 1.2rem; }
 
+/* Glassmorphism Edit Modal */
+.card-edit-glass-container {
+    background: rgba(30, 35, 60, 0.7);
+    backdrop-filter: blur(20px);
+    width: 95%;
+    max-width: 1200px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+.glass-header {
+    padding: 20px 30px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.glass-close-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.glass-close-btn:hover { background: rgba(255, 255, 255, 0.2); transform: rotate(90deg); }
+
+.glass-body {
+    padding: 30px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.glass-footer {
+    padding: 20px 30px;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.section-title {
+    color: #FFCB05;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Glass Inputs */
+.glass-input, .glass-select, .glass-textarea {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+.glass-input:focus, .glass-select:focus, .glass-textarea:focus {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: #FFCB05;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(255, 203, 5, 0.1);
+}
+
+/* Floating Label Override */
+.form-floating-custom { position: relative; }
+.form-floating-custom label {
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    background: #1e233c; /* Match bg mainly */
+    padding: 0 5px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    border-radius: 4px;
+}
+
+/* Attacks */
+.attacks-section {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 16px;
+    padding: 15px;
+}
+.attacks-container {
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+.attack-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.glass-input-sm {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 0.9rem;
+    padding: 2px 5px;
+}
+.glass-input-sm:focus { outline: none; background: rgba(0,0,0,0.2); border-radius: 4px; }
+.btn-icon-danger {
+    background: rgba(239, 68, 68, 0.2);
+    border: none;
+    color: #ef4444;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+}
+.btn-icon-danger:hover { background: #ef4444; color: white; }
+
+/* Buttons */
+.btn-glass-primary {
+    background: linear-gradient(135deg, #FFCB05 0%, #f39c12 100%);
+    border: none;
+    color: #000;
+    font-weight: 600;
+    padding: 10px 24px;
+    border-radius: 50px;
+}
+.btn-glass-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 10px 24px;
+    border-radius: 50px;
+}
+.btn-glass-secondary:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* Scrollbar */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+
 /* Buttons */
 .btn-pokemon {
     background: linear-gradient(135deg, #FFCB05 0%, #f39c12 100%);
@@ -1279,5 +1467,15 @@ onBeforeUnmount(() => {
     color: #ef4444;
     font-size: 0.875rem;
     margin-top: 0.25rem;
+}
+
+/* Glass Image Container */
+.glass-image-container {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.glass-image-container:hover {
+    background: rgba(0,0,0,0.3) !important;
+    border-color: rgba(255, 255, 255, 0.2);
 }
 </style>

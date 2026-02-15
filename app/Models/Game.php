@@ -8,12 +8,11 @@ class Game extends Model
 {
     protected $fillable = [
         'name',
-        'user_id'
     ];
 
-    public function user()
+    public function users()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsToMany(User::class, 'game_user');
     }
 
     public function cardSets()

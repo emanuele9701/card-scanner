@@ -31,8 +31,10 @@ class ImportCardSetPokemon extends Command
      */
     public function handle()
     {
-        $allUsers = User::all();
-        $pokemonGame = Game::where('name', 'Pokemon')->first();
+        // Create global Pokemon Game
+        $pokemonGame = Game::firstOrCreate(
+            ['name' => 'Pokemon']
+        );
 
         $sets = file_get_contents('https://mpapi.tcgplayer.com/v2/Catalog/SetNames?categoryId=3&active=true');
 
@@ -46,19 +48,16 @@ class ImportCardSetPokemon extends Command
             die;
         }
 
+        foreach ($allSets['results'] as $key => $set) {
+            $abbreviation = explode("-", $set['urlName'])[0];
 
-        foreach ($allUsers as $user) {
-            foreach ($allSets['results'] as $key => $set) {
-
-                if (CardSet::where('user_id', $user->id)->where('name', $set['name'])->where('abbreviation', $set['abbreviation'])->where('lang', 'en')->where('game_id', $pokemonGame->id)->exists()) {
-                    continue;
-                }
-
-                CardSet::create([
-                    'user_id' => $user->id,
+            CardSet::updateOrCreate(
+                [
+                    'abbreviation' => $abbreviation,
+                ],
+                [
                     'name' => $set['name'],
                     'card_set_abbreviation' => $set['abbreviation'],
-                    'abbreviation' => explode("-", $set['urlName'])[0],
                     'lang' => 'en',
                     'game_id' => $pokemonGame->id,
                     'release_date' => str_replace("T", " ", $set['releaseDate']),
@@ -66,8 +65,10 @@ class ImportCardSetPokemon extends Command
                     'external_category_id' => $set['categoryId'],
                     'is_supplemental' => $set['isSupplemental'],
                     'is_active' => $set['active'],
-                ]);
-            }
+                ]
+            );
         }
+
+        $this->info("Card Sets imported successfully.");
     }
 }

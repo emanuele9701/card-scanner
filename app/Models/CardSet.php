@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class CardSet extends Model
 {
     protected $fillable = [
-        'user_id',
         'game_id',
         'name',
         'abbreviation',
@@ -26,11 +25,11 @@ class CardSet extends Model
     ];
 
     /**
-     * Get the user that owns this set (if any)
+     * Get the users that follow this set
      */
-    public function user()
+    public function users()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsToMany(User::class, 'card_set_user');
     }
 
     /**
