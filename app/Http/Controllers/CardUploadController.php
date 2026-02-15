@@ -283,7 +283,7 @@ class CardUploadController extends Controller
 
             if (isset($mappedData['set_info']['set_name']) && isset($mappedData['set_number'])) {
                 $number = explode("/", $mappedData['set_number']);
-                $set = CardSet::where('name', $mappedData['set_info']['set_name'])->first();
+                $set = CardSet::where('card_set_abbreviation', $mappedData['set_info']['set_code'])->first();
 
                 if ($set) {
                     $mappedData['card_set_id'] = $set->id;
