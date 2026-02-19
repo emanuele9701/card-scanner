@@ -67,6 +67,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/api/available-games', [CardUploadController::class, 'getAvailableGames'])->name('api.available-games');
         Route::get('/{card}/data', [CardUploadController::class, 'getCardData'])->name('cards.data');
         Route::delete('/{card}', [CardUploadController::class, 'destroy'])->name('cards.destroy');
+        Route::post('/bulk-delete', [CardUploadController::class, 'bulkDestroy'])->name('cards.bulk-delete');
 
         // Card Inventory routes
         Route::get('/{card}/inventory', [CardUploadController::class, 'getCardInventory'])->name('cards.inventory.get');

@@ -352,6 +352,10 @@ const recognizeWithAI = async (card, notify = true) => {
     }
 };
 
+const reanalyze = (card) => {
+    recognizeWithAI(card);
+};
+
 // Edit Modal
 const openEditModal = async (card) => {
     editingCardId.value = card.tempId;
@@ -767,7 +771,7 @@ onBeforeUnmount(() => {
                                 </button>
                              </template>
 
-                             <template v-else-if="card.state === 'cropped'">
+                              <template v-else-if="card.state === 'cropped'">
                                 <button class="btn btn-sm btn-success" @click="recognizeWithAI(card)">
                                     <i class="bi bi-robot"></i> Analizza
                                 </button>
@@ -790,6 +794,9 @@ onBeforeUnmount(() => {
                                 <button class="btn btn-sm btn-success" @click="saveCard(card)">
                                     <i class="bi bi-save"></i> Salva
                                 </button>
+                                <button class="btn btn-sm btn-warning text-white" @click="reanalyze(card)">
+                                    <i class="bi bi-robot"></i> Analizza
+                                </button>
                                 <button class="btn btn-sm btn-info" @click="openEditModal(card)">
                                     <i class="bi bi-pencil"></i> Modifica
                                 </button>
@@ -810,14 +817,14 @@ onBeforeUnmount(() => {
                                     <i class="bi bi-exclamation-triangle"></i>
                                     <small class="d-block text-truncate" style="max-width: 100%;">{{ card.error }}</small>
                                 </div>
-                                <button class="btn btn-sm btn-success" @click="recognizeWithAI(card)">
+                                <button class="btn btn-sm btn-success" @click="reanalyze(card)">
                                     <i class="bi bi-arrow-clockwise"></i> Riprova
                                 </button>
                                 <button class="btn btn-sm btn-warning" @click="openEditModal(card)">
                                     <i class="bi bi-pencil"></i> Manuale
                                 </button>
                                 <button class="btn btn-sm btn-secondary" @click="deleteCard(card)">
-                                    <i class="bi bi-trash"></i> Rimuovi
+                                    <i class="bi bi-trash"></i> Elimina
                                 </button>
                              </template>
                         </div>
@@ -1477,5 +1484,160 @@ onBeforeUnmount(() => {
 .glass-image-container:hover {
     background: rgba(0,0,0,0.3) !important;
     border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Mobile Responsiveness for Upload Page */
+@media (max-width: 768px) {
+    .h-custom-padding {
+        padding-top: 1rem;
+    }
+
+    .page-title {
+        font-size: 1.8rem;
+    }
+    
+    .page-subtitle {
+        font-size: 0.9rem;
+        padding: 0 10px;
+    }
+
+    /* Upload Zone */
+    .upload-zone {
+        padding: 30px 15px;
+    }
+
+    /* Gallery Grid */
+    .gallery-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+    }
+    
+    .card-item {
+        padding: 10px;
+    }
+    
+    .card-image-wrapper {
+        margin-bottom: 8px;
+    }
+
+    /* Tabs */
+    .tabs-nav {
+        flex-wrap: wrap;
+        gap: 5px;
+        justify-content: center;
+    }
+    
+    .tab-item {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        flex: 1 1 auto;
+        text-align: center;
+    }
+
+    /* Controls Header */
+    .d-flex.justify-content-between.align-items-center.mb-3 {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch !important;
+    }
+    
+    .form-check {
+        text-align: center;
+        background: rgba(255,255,255,0.05);
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    .btn-danger-pokemon {
+        width: 100%;
+    }
+
+    /* Floating Action Bar */
+    .floating-action-bar {
+        width: 90%;
+        max-width: 400px;
+        padding: 12px 20px;
+        bottom: 20px;
+        border-radius: 16px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+    
+    .floating-action-bar .d-flex {
+        gap: 8px;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 0.8rem;
+    }
+
+    /* Modals */
+    .card-edit-glass-container {
+        width: 100%;
+        height: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .glass-body {
+        padding: 15px;
+        overflow-y: auto;
+        flex: 1; /* Take remaining space */
+    }
+
+    /* Fix stacking for edit modal columns */
+    .glass-body .row {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .glass-body .col-md-4 {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    
+    .glass-image-container {
+        min-height: 250px !important;
+        margin-bottom: 20px;
+    }
+    
+    .glass-header {
+        padding: 15px;
+        flex-shrink: 0; /* Keep header visible */
+    }
+    
+    .glass-footer {
+        padding: 15px;
+        justify-content: space-between;
+        flex-shrink: 0; /* Keep footer visible */
+        background: #1e233c; /* Ensure solid bg on mobile */
+    }
+    
+    .glass-footer .btn {
+        flex: 1;
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    
+    /* Attacks */
+    .attacks-container {
+        max-height: 200px;
+    }
+    
+    .attack-card .d-flex {
+        flex-wrap: wrap;
+    }
+    
+    .glass-input-sm.w-25 {
+        width: 30% !important;
+        margin-left: auto;
+    }
+    
+    .glass-input-sm.w-50 {
+        width: 60% !important;
+    }
 }
 </style>

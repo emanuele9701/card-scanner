@@ -184,8 +184,8 @@ class GoogleDriveService
                 'pokemon_card_id' => $pokemonCardId,
                 'name' => $fileName,
                 'status' => 'uploading',
-                'drive_id' => 0,
-                'mime_type' => 0,
+                'drive_id' => null,
+                'mime_type' => null,
             ]);
 
             // Get file content from storage (supporta sia 'public' che 'private')
@@ -472,7 +472,7 @@ class GoogleDriveService
                 function () use ($body) {
                     // Stream in chunks to avoid memory issues
                     $chunkSize = 8192; // 8KB chunks
-
+    
                     while (!$body->eof()) {
                         echo $body->read($chunkSize);
                         flush();

@@ -831,6 +831,42 @@ class CardUploadController extends Controller
     }
 
     /**
+     * Delete multiple cards at once
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $request->validate([
+            'card_ids' => 'required|array',
+            'card_ids.*' => 'exists:pokemon_cards,id',
+        ]);
+
+        $cards = PokemonCard::where('user_id', auth()->id())
+            ->whereIn('id', $request->card_ids)
+            ->get();
+
+        $count = $cards->count();
+        $driveService = app(GoogleDriveService::class);
+
+        foreach ($cards as $card) {
+            if ($card->driveFile && $card->driveFile->isUploaded()) {
+                try {
+                    $driveService->deleteFile($card->driveFile->drive_id);
+                } catch (Exception $e) {
+                    Log::error("Failed to delete file from Drive for card #{$card->id}: " . $e->getMessage());
+                }
+            } else if ($card->storage_path && Storage::disk('public')->exists($card->storage_path)) {
+                Storage::disk('public')->delete($card->storage_path);
+            }
+            $card->delete();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$count} carte eliminate con successo!"
+        ]);
+    }
+
+    /**
      * Get inventory items for a specific card
      */
     public function getCardInventory(PokemonCard $card)

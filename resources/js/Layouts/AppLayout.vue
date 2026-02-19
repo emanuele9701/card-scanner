@@ -499,7 +499,7 @@ const logout = () => {
 
 /* Main Content */
 .main-container {
-  padding-top: 130px; /* 100px + 30px adjustments approximately */
+  padding-top: 130px; /* Desktop default */
   padding-bottom: 80px;
   color: #fff;
   flex: 1;
@@ -548,8 +548,25 @@ const logout = () => {
   }
   
   .mobile-menu .nav-link {
-    padding: 12px 0;
+    padding: 12px 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    margin-bottom: 4px;
+  }
+  
+  .mobile-menu .nav-link:active {
+      background: rgba(255, 203, 5, 0.1);
+  }
+
+  .main-container {
+      padding-top: 110px; /* Increased for safety (40px banner + ~60px nav + 10px spacing) */
+      padding-bottom: 100px; /* Extra space for bottom fabs if any */
+      padding-left: 15px;
+      padding-right: 15px;
+  }
+  
+  .container {
+      padding: 0 15px;
   }
 }
 
@@ -562,6 +579,14 @@ const logout = () => {
 @media (max-width: 576px) {
   .footer-content {
     padding: 0 1rem;
+  }
+  
+  .navbar-brand {
+      font-size: 1.2rem;
+  }
+  
+  .brand-text {
+      display: inline-block; /* Ensure it doesn't disappear unless intended */
   }
 }
 </style>

@@ -16,7 +16,7 @@ class ForceHttps
     public function handle(Request $request, Closure $next): Response
     {
         // Force HTTPS redirect only if FORCE_HTTPS is enabled
-        if (env('FORCE_HTTPS', true) && !$request->secure() && app()->environment('production')) {
+        if (config('app.force_https') && !$request->secure() && app()->environment('production')) {
             return redirect()->secure($request->getRequestUri(), 301);
         }
 
