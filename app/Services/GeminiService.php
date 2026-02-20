@@ -36,37 +36,82 @@ class GeminiService
         $allSets = CardSet::where('game_id', $gameId)->pluck('name', 'card_set_abbreviation');
         $jsonSets = json_encode($allSets);
         $prompt = <<<TEXT
-        Sei un sistema OCR rigoroso per l'estrazione dati da carte TCG.
+        Sei un sistema OCR rigoroso per l'estrazione dati da carte Pokémon TCG.
 ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente, restituisci "null". 
 NON unire testi lontani tra loro. NON inventare dati.
-
---- DATABASE SET CONOSCIUTI ---
+--- STEP 0: DETERMINA L'ERA DELLA CARTA ---
+Osserva il layout e il design della carta:
+- CARTA MODERNA (2023+): bordi argentati/bianchi, design pulito, codice testuale di set stampato in basso (es. "PFLit", "sv4pt5it", "OBFit").
+- CARTA VECCHIA (pre-2023): bordi gialli/colorati, design più semplice, NESSUN codice testuale di set, solo simboli grafici.
+Se la carta è VECCHIA → segui il PERCORSO A.
+Se la carta è MODERNA → segui il PERCORSO B.
+========== PERCORSO A: CARTA VECCHIA (pre-2023) ==========
+Estrai SOLO queste informazioni:
+1. NOME DELLA CARTA: Il nome del Pokémon, visibile in alto. La carta potrebbe essere ruotata, cerca il nome in tutte le direzioni.
+2. NUMERO DELLA CARTA:
+   - DOVE: ESCLUSIVAMENTE nel bordo inferiore estremo della carta.
+   - TRABOCCHETTO: Sotto l'illustrazione c'è il numero del Pokédex (es. "N. 0045", "No. 260"). IGNORA TOTALMENTE questo numero.
+   - Cerca SOLO il formato "XX/YYY" o "XXX/YYY" nel bordo inferiore. Trascrivi ESATTAMENTE.
+Restituisci questo JSON:
+{
+    "card_identity": {
+        "pokemon_name": "Testo",
+        "set_number": "Formato XX/YYY o null",
+        "illustrator": null,
+        "anno_carta": "indica l'anno della carta",
+    },
+    "set_details": {
+        "raw_printed_code": null,
+        "set_abbreviation": null,
+        "set_name": null,
+        "is_new_set": false
+    },
+    "is_old_card": true
+}
+========== PERCORSO B: CARTA MODERNA (2023+) ==========
+--- DATABASE SET CONOSCIUTI --- 
 $jsonSets
 
---- REGOLE DI ESTRAZIONE E GESTIONE SPAZIALE ---
+--- REGOLE DI ESTRAZIONE PER CARTE VECCHIE ---
 
-1. NOME DELLA CARTA (Alto Sinistra):
-   - Trascrivi il testo in alto (es. "Vileplume", "Imakuni?").
+⚠️ LAYOUT IMPORTANTE: Le carte vecchie possono avere il testo RUOTATO di 90° o disposto in modo diverso. Analizza l'intera superficie della carta in tutte le direzioni.
+
+1. NOME DELLA CARTA:
+   - Cerca il nome del Pokémon. Può trovarsi in alto a sinistra O in verticale se la carta è ruotata.
+   - Trascrivi esattamente come lo leggi.
 
 2. NUMERO DELLA CARTA (IL TRABOCCHETTO DEL POKÉDEX):
-   - DOVE: ESCLUSIVAMENTE lungo il bordo inferiore estremo (in basso a sinistra o destra).
-   - IL TRABOCCHETTO: Subito sotto l'illustrazione c'è una riga grigia con il numero enciclopedico (es. "N. 0045"). DEVI IGNORARE TOTALMENTE QUESTO NUMERO. Non ha nulla a che fare con il set.
-   - REGOLE DI ESTRAZIONE: Cerca il formato "XXX/YYY" o "XXX" in fondo alla carta. Se leggi "003/094", trascrivi ESATTAMENTE "003/094".
-   - DIVIETO ASSOLUTO: È severamente vietato prendere il numero del Pokédex ("N. XXXX") e unirlo al numero del set in basso.
+   - DOVE: ESCLUSIVAMENTE nella zona del bordo inferiore estremo.
+   - IL TRABOCCHETTO: Sotto l'illustrazione c'è il numero enciclopedico (es. "N. 0045", "No. 260"). IGNORA TOTALMENTE QUESTO NUMERO.
+   - Cerca il formato "XX/YYY" vicino al simbolo del set nel bordo inferiore. Trascrivi ESATTAMENTE.
+   - DIVIETO ASSOLUTO: Non prendere MAI il numero del Pokédex.
 
-3. ILLUSTRATORE (Regola Zero Tolleranza):
-   - Cerca ESPLICITAMENTE il prefisso "Ill." o "Illus." sul bordo inferiore. Estrai solo il nome.
-   - SE NON C'È PREFISSO (es. la carta ha una fotografia), devi OBBLIGATORIAMENTE restituire null.
+3. ILLUSTRATORE:
+   - Cerca ESPLICITAMENTE "Illus." o "Ill." nel bordo della carta (spesso in basso a sinistra o lungo il bordo, anche in verticale).
+   - Estrai SOLO il nome dopo il prefisso.
+   - SE NON C'È PREFISSO, restituisci null.
 
-4. RILEVAZIONE DEL SET (IL PROBLEMA DELLE CARTE VECCHIE):
-   SCENARIO A (Vedi un codice di testo, es. "PFLit", "sv4pt5it"):
-   - Rimuovi la lingua ("it", "en") per trovare la radice ("PFL").
-   - Cerca la radice nel [DATABASE SET CONOSCIUTI].
-   - Compila "set_name" (da DB o null se non trovato), "set_abbreviation" (radice calcolata) e imposta "is_new_set" a true/false di conseguenza.
+4. RILEVAZIONE DEL SET — METODO A DOPPIA VERIFICA:
+   
+   PASSO 1 — Estrai il denominatore dal numero carta:
+   - Se il numero è "27/100", il denominatore è 100. Il set DEVE avere esattamente 100 carte totali.
+   
+   PASSO 2 — Osserva il simbolo grafico:
+   - Cerca il piccolo simbolo/icona nel bordo inferiore accanto al numero.
+   - Descrivi il simbolo nel campo "set_symbol_description".
+   
+   PASSO 3 — CROSS-VALIDAZIONE OBBLIGATORIA:
+   - Filtra dal DATABASE solo i set il cui campo "total" corrisponde ESATTAMENTE al denominatore.
+   - Tra questi candidati, scegli quello il cui simbolo corrisponde meglio alla tua osservazione.
+   - Se solo UN set ha quel totale → è quasi certamente quello.
+   - Se PIÙ set hanno lo stesso totale → usa il simbolo per disambiguare.
+   - Se NESSUN set corrisponde → imposta abbreviation e name a null.
+   
+   Esempio: Numero "27/100" → denominatore 100 → set candidati con total=100: SS (Sandstorm), DR (Dragon), CG (Crystal Guardians), MD (Majestic Dawn). Osservo un cristallo raggiato → è CG (Crystal Guardians).
 
-   SCENARIO B (NON vedi codici testuali, ma solo simboli, es. carte vecchie):
-   - Se in basso non c'è una sigla testuale vicino al numero, FERMATI.
-   - Imposta "raw_printed_code", "set_abbreviation" e "set_name" a null. Imposta "is_new_set" a false.
+   REGOLE FINALI:
+   - "raw_printed_code" è SEMPRE null per carte vecchie.
+   - "is_new_set" è SEMPRE false.
 
 --- FORMATO OUTPUT JSON ---
 Restituisci ESCLUSIVAMENTE questo JSON senza aggiungere altro testo.
@@ -74,16 +119,19 @@ Restituisci ESCLUSIVAMENTE questo JSON senza aggiungere altro testo.
 {
     "card_identity": {
         "pokemon_name": "Testo",
-        "set_number": "Testo estratto DAL BORDO INFERIORE o null",
-        "illustrator": "Nome o null"
+        "set_number": "Testo formato XX/YYY o null",
+        "illustrator": "Nome o null",
+        "anno_carta": "indica l'anno della carta",
     },
     "set_details": {
-        "raw_printed_code": "Codice testuale o null",
-        "set_abbreviation": "Radice calcolata o null",
+        "raw_printed_code": null,
+        "set_symbol_description": "Descrizione del simbolo visivo o null",
+        "set_abbreviation": "Sigla da DB o null",
         "set_name": "Nome da DB o null",
-        "is_new_set": boolean
+        "is_new_set": false
     }
 }
+
 TEXT;
 
         $payload = [
@@ -175,6 +223,7 @@ TEXT;
 
         return [
             'is_valid_card' => true,
+            'is_old_card' => $cardIdentity['anno_carta'] < 2023 ? true : false,
             'card_name' => $cardIdentity['pokemon_name'] ?? null,
             'set_code' => $setDetails['set_abbreviation'] ?? null,
             'set_number' => $cardIdentity['set_number'] ?? null,

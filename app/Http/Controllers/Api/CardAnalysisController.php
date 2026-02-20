@@ -14,7 +14,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use TCGdex\Model\Card;
+use TCGdex\Model\CardResume;
 use TCGdex\Model\SubModel\Attack;
+use TCGdex\Query;
 use TCGdex\TCGdex;
 
 class CardAnalysisController extends Controller
@@ -83,73 +85,48 @@ class CardAnalysisController extends Controller
             $aiResult = $this->geminiService->enhanceCardData($base64Image, '');
 
 
-
-            // 6. Handle Gemini Result
-            if ($aiResult) {
-                // Map new Gemini structured data to legacy format
-                $mappedData = $this->geminiService->mapGeminiToLegacyFormat($aiResult);
-                $number = explode("/", $mappedData['set_number']);
-                $set = CardSet::where('name', $mappedData['set_info']['set_name'])->first();
-                if ($set) {
-                    $tcg = new TCGdex('it');
-                    $a = $tcg->set->getCard($set->abbreviation, intval($number[0]));
-                    // Recupero i dettagli della carta da TCGDex
-                    if ($a instanceof Card) {
-                        $mappedData['hp'] = $a->hp;
-                        $mappedData['type'] = $a->types[0];
-                        $mappedData['evolution_stage'] = $a->stage;
-
-                        $mappedData['attacks'] = array_map(function ($attack) {
-                            /**
-                             * @var Attack $attack
-                             */
-                            return ['costo' => $attack->cost, 'name' => $attack->name, 'effect' => $attack->effect, 'damage' => $attack->damage];
-                        }, $a->attacks);
-
-                        $mappedData['weakness'] = $a->weaknesses;
-                        $mappedData['resistance'] = $a->resistances;
-                        $mappedData['retreat_cost'] = $a->retreat;
-                        $mappedData['rarity'] = $a->rarity;
-                        $mappedData['pricing'] = $a->pricing;
-                    }
-                }
-
-
-                if (isset($mappedData['is_valid_card']) && $mappedData['is_valid_card'] === false) {
-                    $card->update(['status' => PokemonCard::STATUS_FAILED]);
-                    return response()->json([
-                        'success' => false,
-                        'message' => $mappedData['error_message'] ?? 'L\'immagine non sembra essere una carta da gioco valida',
-                        'data' => [
-                            'card_id' => $card->id,
-                            'is_valid_card' => false
-                        ]
-                    ], 422); // Unprocessable Entity
-                }
-
-                // I dati strutturati restituiti dall'IA vengono forniti al client per la validazione da parte dell'utente.
-                // Lo stato della carta viene aggiornato a STATUS_REVIEW per indicare il completamento dell'analisi automatica.
-                $card->update(['status' => PokemonCard::STATUS_REVIEW]);
-
-                // Recupero informazioni carta da API esterne
-
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Analisi completata con successo.',
-                    'data' => [
-                        'card_id' => $card->id,
-                        'image_url' => route('api.image.card', ['card' => $card->id]),
-                        'analysis' => $mappedData
-                    ]
-                ]);
-            } else {
+            // 6. Handle Gemini Result — early return on failure
+            if (!$aiResult) {
                 $card->update(['status' => PokemonCard::STATUS_FAILED]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Impossibile ottenere una risposta valida dall\'AI.'
                 ], 500);
             }
+
+            // Map new Gemini structured data to legacy format
+            $mappedData = $this->geminiService->mapGeminiToLegacyFormat($aiResult);
+
+            // Check validity FIRST — avoid unnecessary API calls for invalid cards
+            if (isset($mappedData['is_valid_card']) && $mappedData['is_valid_card'] === false) {
+                $card->update(['status' => PokemonCard::STATUS_FAILED]);
+                return response()->json([
+                    'success' => false,
+                    'message' => $mappedData['error_message'] ?? 'L\'immagine non sembra essere una carta da gioco valida',
+                    'data' => [
+                        'card_id' => $card->id,
+                        'is_valid_card' => false
+                    ]
+                ], 422);
+            }
+
+            // Enrich mapped data with TCGdex API info
+            $tcgCard = $this->fetchCardFromTCGdex($mappedData);
+            if ($tcgCard instanceof Card) {
+                $mappedData = $this->enrichWithTCGdexData($mappedData, $tcgCard);
+            }
+
+            $card->update(['status' => PokemonCard::STATUS_REVIEW]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Analisi completata con successo.',
+                'data' => [
+                    'card_id' => $card->id,
+                    'image_url' => route('api.image.card', ['card' => $card->id]),
+                    'analysis' => $mappedData
+                ]
+            ]);
         } catch (Exception $e) {
             Log::error('API Analysis Error: ' . $e->getMessage());
             return response()->json([
@@ -157,6 +134,81 @@ class CardAnalysisController extends Controller
                 'message' => 'Si è verificato un errore durante l\'elaborazione.'
             ], 500);
         }
+    }
+
+    /**
+     * Fetch card details from TCGdex API based on mapped analysis data.
+     *
+     * @param array $mappedData The mapped data from Gemini analysis
+     * @return Card|null The TCGdex Card object, or null if not found
+     */
+    private function fetchCardFromTCGdex(array $mappedData): ?Card
+    {
+        $setNumber = $mappedData['set_number'] ?? null;
+        if (!$setNumber) {
+            return null;
+        }
+
+        $number = explode("/", $setNumber)[0];
+
+        if (!empty($mappedData['is_old_card'])) {
+            // Old cards: search by localId + name via TCGdex English API
+            $tcg = new TCGdex('en');
+            $query = Query::create()
+                ->equal('localId', $number)
+                ->contains('name', $mappedData['card_name'] ?? '')
+                ->sort('hp', 'desc')
+                ->paginate(1, 20);
+
+            $results = $tcg->card->list($query);
+
+            return count($results) === 1 ? $results[0]->toCard() : null;
+        }
+
+        // Modern cards: look up set in local DB, then fetch from TCGdex Italian API
+        $setName = $mappedData['set_info']['set_name'] ?? null;
+        if (!$setName) {
+            return null;
+        }
+
+        $set = CardSet::where('name', $setName)->first();
+        if (!$set) {
+            return null;
+        }
+
+        $tcg = new TCGdex('it');
+        return $tcg->set->getCard($set->abbreviation, intval($number));
+    }
+
+    /**
+     * Enrich mapped analysis data with details from a TCGdex Card object.
+     *
+     * @param array $mappedData The base mapped data
+     * @param Card  $card       The TCGdex Card with detailed info
+     * @return array The enriched mapped data
+     */
+    private function enrichWithTCGdexData(array $mappedData, Card $card): array
+    {
+        $mappedData['hp'] = $card->hp;
+        $mappedData['type'] = $card->types[0] ?? null;
+        $mappedData['evolution_stage'] = $card->stage;
+
+        $mappedData['attacks'] = $card->attacks
+            ? array_map(fn(Attack $attack) => [
+                'costo' => $attack->cost,
+                'name' => $attack->name,
+                'effect' => $attack->effect,
+                'damage' => $attack->damage,
+            ], $card->attacks)
+            : [];
+
+        $mappedData['weakness'] = $card->weaknesses;
+        $mappedData['resistance'] = $card->resistances;
+        $mappedData['retreat_cost'] = $card->retreat;
+        $mappedData['rarity'] = $card->rarity;
+        $mappedData['pricing'] = $card->pricing;
+
+        return $mappedData;
     }
 
     /**

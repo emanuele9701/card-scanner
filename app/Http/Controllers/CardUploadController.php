@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
 use Inertia\Inertia;
+use TCGdex\Query;
 use TCGdex\TCGdex;
 use TCGdex\Model\Card;
 use TCGdex\Model\SubModel\Attack;
@@ -277,119 +278,42 @@ class CardUploadController extends Controller
         // Call Gemini AI for card recognition
         $aiResult = $geminiService->enhanceCardData($base64Image, '');
 
-        if ($aiResult) {
-            // Map new Gemini structured data to legacy format
-            $mappedData = $geminiService->mapGeminiToLegacyFormat($aiResult);
-
-            if (isset($mappedData['set_info']['set_name']) && isset($mappedData['set_number'])) {
-                $number = explode("/", $mappedData['set_number']);
-                $set = CardSet::where('card_set_abbreviation', $mappedData['set_code'])->first();
-
-                if ($set) {
-                    $mappedData['card_set_id'] = $set->id;
-                    $tcg = new TCGdex('it');
-                    // Use try-catch or safe call in case SDK fails or set not found in SDK
-                    try {
-                        $a = $tcg->set->getCard($set->abbreviation, $number[0]);
-                        // Recupero i dettagli della carta da TCGDex
-                        if ($a instanceof Card) {
-                            $mappedData['hp'] = $a->hp;
-                            $mappedData['type'] = $a->types[0] ?? null;
-                            $mappedData['evolution_stage'] = $a->stage;
-
-                            if ($a->attacks) {
-                                $mappedData['attacks'] = array_map(function ($attack) {
-                                    /**
-                                     * @var Attack $attack
-                                     */
-                                    return ['cost' => $attack->cost, 'name' => $attack->name, 'text' => $attack->effect, 'damage' => $attack->damage];
-                                }, $a->attacks);
-                            }
-
-                            $mappedData['weakness'] = is_array($a->weaknesses) ? implode(', ', array_map(fn($w) => "{$w->type} {$w->value}", $a->weaknesses)) : $a->weaknesses;
-                            $mappedData['resistance'] = is_array($a->resistances) ? implode(', ', array_map(fn($r) => "{$r->type} {$r->value}", $a->resistances)) : $a->resistances;
-                            $mappedData['retreat_cost'] = is_array($a->retreat) ? count($a->retreat) : (string) $a->retreat;
-                            $mappedData['rarity'] = $this->mapRarity($a->rarity);
-
-                            // Extract pricing from TCGdex pricing object
-                            if (isset($a->pricing) && isset($a->pricing->cardmarket)) {
-                                $cm = $a->pricing->cardmarket;
-                                $mappedData['pricing'] = [
-                                    'avg' => $cm->avg ?? null,
-                                    'low' => $cm->low ?? null,
-                                    'trend' => $cm->trend ?? null,
-                                    'updated' => $cm->updated ?? null,
-                                    'unit' => $cm->unit ?? 'EUR',
-                                    'idProduct' => $cm->idProduct ?? null,
-                                ];
-
-                                // Find or create MarketCard association
-                                // Using withoutGlobalScope because product_id is unique globally
-                                if (isset($cm->idProduct)) {
-                                    // Ensure we have the Game ID for Pokemon
-                                    $gameModel = \App\Models\Game::firstOrCreate(
-                                        [
-                                            'name' => 'Pokemon',
-                                        ]
-                                    );
-
-                                    $marketCard = MarketCard::withoutGlobalScope('user')->firstOrCreate(
-                                        ['product_id' => $cm->idProduct],
-                                        [
-                                            'product_name' => $a->name,
-                                            'card_number' => $a->localId,
-                                            'set_name' => $a->set->name,
-                                            'set_abbreviation' => $a->set->id,
-                                            'rarity' => $a->rarity ?? 'Unknown',
-                                            'type' => $a->types[0] ?? 'Unknown',
-                                            'game' => 'Pokemon',
-                                            'game_id' => $gameModel->id,
-                                        ]
-                                    );
-                                    $mappedData['market_card_id'] = $marketCard->id;
-                                }
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        // Ignore TCGDex errors, proceed with Gemini data
-                        Log::warning("TCGDex error: " . $e->getMessage());
-                    }
-                }
-            }
-
-            // Normalize game name to match database (remove accents, etc.)
-            if (isset($mappedData['game'])) {
-                if (preg_match('/Pokemon/i', $mappedData['game'])) {
-                    $mappedData['game'] = 'Pokemon';
-                }
-            }
-
-            // Check if AI detected this is NOT a valid card
-            if (isset($mappedData['is_valid_card']) && $mappedData['is_valid_card'] === false) {
-                // Update card status to failed
-                $card->update(['status' => PokemonCard::STATUS_FAILED]);
-
-                return response()->json([
-                    'success' => false,
-                    'is_not_card' => true,
-                    'message' => $mappedData['error_message'] ?? 'L\'immagine non sembra essere una carta da gioco collezionabile'
-                ], 422);
-            }
-
-            // Update card status
-            $card->update(['status' => PokemonCard::STATUS_REVIEW]);
-
+        if (!$aiResult) {
             return response()->json([
-                'success' => true,
-                'message' => 'Riconoscimento AI completato!',
-                'data' => $mappedData
-            ]);
+                'success' => false,
+                'message' => 'Impossibile ottenere una risposta valida dall\'AI.'
+            ], 500);
         }
 
+        // Map new Gemini structured data to legacy format
+        $mappedData = $geminiService->mapGeminiToLegacyFormat($aiResult);
+
+        // Check validity FIRST — avoid unnecessary API calls for invalid cards
+        if (isset($mappedData['is_valid_card']) && $mappedData['is_valid_card'] === false) {
+            $card->update(['status' => PokemonCard::STATUS_FAILED]);
+            return response()->json([
+                'success' => false,
+                'is_not_card' => true,
+                'message' => $mappedData['error_message'] ?? 'L\'immagine non sembra essere una carta da gioco collezionabile'
+            ], 422);
+        }
+
+        // Enrich mapped data with TCGdex API info
+        $mappedData = $this->lookupAndEnrichFromTCGdex($mappedData);
+
+        // Normalize game name to match database
+        if (isset($mappedData['game']) && preg_match('/Pokemon/i', $mappedData['game'])) {
+            $mappedData['game'] = 'Pokemon';
+        }
+
+        // Update card status
+        $card->update(['status' => PokemonCard::STATUS_REVIEW]);
+
         return response()->json([
-            'success' => false,
-            'message' => 'Impossibile ottenere una risposta valida dall\'AI.'
-        ], 500);
+            'success' => true,
+            'message' => 'Riconoscimento AI completato!',
+            'data' => $mappedData
+        ]);
     }
 
     /**
@@ -621,7 +545,13 @@ class CardUploadController extends Controller
         }
 
         // Apply sorting
-        if ($sortColumn) {
+        if ($sortColumn === 'set_number') {
+            // Sort numerically by the part before the slash (e.g. "10" from "10/102")
+            // CAST ensures "2" comes before "10"
+            $query->orderByRaw("CAST(SUBSTRING_INDEX(set_number, '/', 1) AS UNSIGNED) " . $sortDirection)
+                // Secondary sort by the full string to handle suffixes or identical numbers
+                ->orderBy('set_number', $sortDirection);
+        } elseif ($sortColumn) {
             $query->orderBy($sortColumn, $sortDirection);
         } else {
             $query->orderBy('card_name');
@@ -1027,6 +957,173 @@ class CardUploadController extends Controller
             // Don't throw - inventory creation failure shouldn't block card save
         }
     }
+
+    /**
+     * Look up card details from TCGdex and enrich the mapped data.
+     *
+     * Handles set lookup, card detail fetching, pricing extraction,
+     * and MarketCard association. Fails gracefully on TCGdex errors.
+     *
+     * @param array $mappedData The mapped data from Gemini analysis
+     * @return array The enriched mapped data
+     */
+    private function lookupAndEnrichFromTCGdex(array $mappedData): array
+    {
+        if (!isset($mappedData['set_info']['set_name']) || !isset($mappedData['set_number'])) {
+            return $mappedData;
+        }
+
+        $number = explode("/", $mappedData['set_number']);
+
+        $tcg = new TCGdex();
+        if (!isset($mappedData['set_info']['set_name']) || !isset($mappedData['set_number'])) {
+            return $mappedData;
+        }
+
+        $number = explode("/", $mappedData['set_number']);
+
+        if ($mappedData['is_old_card']) {
+            // Se la carta è vecchia allora procedo a recuperarmi il set da TCGDex
+            $query = Query::create()
+                ->equal('localId', $number[0])  // Filter by exact match
+                ->contains('name', $mappedData['card_name']) // Filter by partial match
+                ->sort('hp', 'desc')          // Sort by HP descending
+                ->paginate(1, 20);
+
+            $listCards = $tcg->card->list($query);
+
+            if (count($listCards) == 1) {
+                /**
+                 * @var Card
+                 */
+                $tcgCard = $listCards[0]->toCard();
+                $abbreviation = $tcgCard->set->toSet()->tcgOnline;
+                $set = CardSet::where('card_set_abbreviation', $abbreviation)->first();
+                if (!$set) {
+                    return $mappedData;
+                }
+
+                $mappedData['card_set_id'] = $set->id;
+            } else {
+                Log::alert("Molteplici riscontri su TCGDex per la carta: (#{$number[0]}) " . $mappedData['name']);
+                return $mappedData;
+            }
+        } else {
+            $set = CardSet::where('card_set_abbreviation', $mappedData['set_code'])->first();
+
+            if (!$set) {
+                return $mappedData;
+            }
+
+            $mappedData['card_set_id'] = $set->id;
+
+            try {
+                $tcg = new TCGdex('it');
+                $tcgCard = $tcg->set->getCard($set->abbreviation, $number[0]);
+
+                if (!($tcgCard instanceof Card)) {
+                    return $mappedData;
+                }
+
+            } catch (\Exception $e) {
+                // TCGdex errors are non-blocking — proceed with Gemini data only
+                Log::warning("TCGDex error: " . $e->getMessage());
+            }
+        }
+        $mappedData = $this->enrichCardDetails($mappedData, $tcgCard);
+        $mappedData = $this->extractPricingAndMarket($mappedData, $tcgCard);
+        return $mappedData;
+    }
+
+    /**
+     * Enrich mapped data with card details from TCGdex.
+     *
+     * @param array $mappedData The base mapped data
+     * @param Card  $tcgCard    The TCGdex Card object
+     * @return array The enriched data
+     */
+    private function enrichCardDetails(array $mappedData, Card $tcgCard): array
+    {
+        $mappedData['hp'] = $tcgCard->hp;
+        $mappedData['type'] = $tcgCard->types[0] ?? null;
+        $mappedData['evolution_stage'] = $tcgCard->stage;
+
+        $mappedData['attacks'] = $tcgCard->attacks
+            ? array_map(fn(Attack $attack) => [
+                'cost' => $attack->cost,
+                'name' => $attack->name,
+                'text' => $attack->effect,
+                'damage' => $attack->damage,
+            ], $tcgCard->attacks)
+            : [];
+
+        $mappedData['weakness'] = is_array($tcgCard->weaknesses)
+            ? implode(', ', array_map(fn($w) => "{$w->type} {$w->value}", $tcgCard->weaknesses))
+            : $tcgCard->weaknesses;
+
+        $mappedData['resistance'] = is_array($tcgCard->resistances)
+            ? implode(', ', array_map(fn($r) => "{$r->type} {$r->value}", $tcgCard->resistances))
+            : $tcgCard->resistances;
+
+        $mappedData['retreat_cost'] = is_array($tcgCard->retreat)
+            ? count($tcgCard->retreat)
+            : (string) $tcgCard->retreat;
+
+        $mappedData['rarity'] = $this->mapRarity($tcgCard->rarity);
+
+        return $mappedData;
+    }
+
+    /**
+     * Extract pricing info and create/link MarketCard if available.
+     *
+     * @param array $mappedData The base mapped data
+     * @param Card  $tcgCard    The TCGdex Card object
+     * @return array The data with pricing and market_card_id added
+     */
+    private function extractPricingAndMarket(array $mappedData, Card $tcgCard): array
+    {
+        if (!isset($tcgCard->pricing) || !isset($tcgCard->pricing->cardmarket)) {
+            return $mappedData;
+        }
+
+        $cm = $tcgCard->pricing->cardmarket;
+
+        $mappedData['pricing'] = [
+            'avg' => $cm->avg ?? null,
+            'low' => $cm->low ?? null,
+            'trend' => $cm->trend ?? null,
+            'updated' => $cm->updated ?? null,
+            'unit' => $cm->unit ?? 'EUR',
+            'idProduct' => $cm->idProduct ?? null,
+        ];
+
+        // Create MarketCard association if product ID is available
+        if (!isset($cm->idProduct)) {
+            return $mappedData;
+        }
+
+        $gameModel = \App\Models\Game::firstOrCreate(['name' => 'Pokemon']);
+
+        $marketCard = MarketCard::withoutGlobalScope('user')->firstOrCreate(
+            ['product_id' => $cm->idProduct],
+            [
+                'product_name' => $tcgCard->name,
+                'card_number' => $tcgCard->localId,
+                'set_name' => $tcgCard->set->name,
+                'set_abbreviation' => $tcgCard->set->id,
+                'rarity' => $tcgCard->rarity ?? 'Unknown',
+                'type' => $tcgCard->types[0] ?? 'Unknown',
+                'game' => 'Pokemon',
+                'game_id' => $gameModel->id,
+            ]
+        );
+
+        $mappedData['market_card_id'] = $marketCard->id;
+
+        return $mappedData;
+    }
+
     /**
      * Map TCGDex rarity to internal format
      */
