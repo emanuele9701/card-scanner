@@ -162,7 +162,22 @@ class CardAnalysisController extends Controller
 
             $results = $tcg->card->list($query);
 
-            return count($results) === 1 ? $results[0]->toCard() : null;
+            if (count($results) == 1) {
+                return $results[0]->toCard();
+            } else {
+                foreach ($results as $cardResume) {
+                    /**
+                     * @var CardResume $cardResume
+                     */
+                    $localId = $cardResume->localId;
+                    $tcgCard = $cardResume->toCard();
+                    $tcgSetsCard = $tcgCard->set->toSet();
+                    Log::info("API CHECK FOR: " . $tcgCard->name . " nel set " . $tcgSetsCard->name . " con ID: " . $tcgCard->id . " con localId: " . $localId . " con cardCount: " . $tcgSetsCard->cardCount->total);
+                    if ($localId == explode("/", $setNumber)[0] && $tcgSetsCard->cardCount->total == explode("/", $setNumber)[1]) {
+                        return $tcgCard;
+                    }
+                }
+            }
         }
 
         // Modern cards: look up set in local DB, then fetch from TCGdex Italian API

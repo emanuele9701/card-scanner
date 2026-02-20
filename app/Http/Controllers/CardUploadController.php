@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
 use Inertia\Inertia;
+use TCGdex\Model\CardResume;
 use TCGdex\Query;
 use TCGdex\TCGdex;
 use TCGdex\Model\Card;
@@ -969,16 +970,14 @@ class CardUploadController extends Controller
      */
     private function lookupAndEnrichFromTCGdex(array $mappedData): array
     {
-        if (!isset($mappedData['set_info']['set_name']) || !isset($mappedData['set_number'])) {
+        if (!$mappedData['is_old_card'] && (!isset($mappedData['set_info']['set_name']) || !isset($mappedData['set_number']))) {
             return $mappedData;
         }
 
         $number = explode("/", $mappedData['set_number']);
 
         $tcg = new TCGdex();
-        if (!isset($mappedData['set_info']['set_name']) || !isset($mappedData['set_number'])) {
-            return $mappedData;
-        }
+
 
         $number = explode("/", $mappedData['set_number']);
 
@@ -1005,8 +1004,31 @@ class CardUploadController extends Controller
 
                 $mappedData['card_set_id'] = $set->id;
             } else {
-                Log::alert("Molteplici riscontri su TCGDex per la carta: (#{$number[0]}) " . $mappedData['name']);
-                return $mappedData;
+                Log::alert("Molteplici riscontri su TCGDex per la carta: (#{$number[0]}) " . $mappedData['card_name']);
+
+                foreach ($listCards as $cardResume) {
+                    /**
+                     * @var CardResume $cardResume
+                     */
+                    $localId = $cardResume->localId;
+                    $tcgCard = $cardResume->toCard();
+                    $tcgSetsCard = $tcgCard->set->toSet();
+                    Log::info("Check per carta: " . $tcgCard->name . " nel set " . $tcgSetsCard->name . " con ID: " . $tcgCard->id . " con localId: " . $localId . " con cardCount: " . $tcgSetsCard->cardCount->total);
+                    if ($localId == $number[0] && $tcgSetsCard->cardCount->total == $number[1]) {
+                        Log::info("Trovata carta: " . $tcgCard->name . " nel set " . $tcgSetsCard->name . " con ID: " . $tcgCard->id);
+                        $abbreviation = $tcgSetsCard->tcgOnline;
+                        Log::info("Abbreviazione: " . $abbreviation);
+
+                        $set = CardSet::where('card_set_abbreviation', $abbreviation)->first();
+                        Log::info("Find set db: " . ($set->id ?? 'NO'));
+                        if (!$set) {
+                            return $mappedData;
+                        }
+
+                        $mappedData['card_set_id'] = $set->id;
+                        break;
+                    }
+                }
             }
         } else {
             $set = CardSet::where('card_set_abbreviation', $mappedData['set_code'])->first();
