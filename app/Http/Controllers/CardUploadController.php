@@ -299,6 +299,7 @@ class CardUploadController extends Controller
             ], 422);
         }
 
+        Log::info("Card valida");
         // Enrich mapped data with TCGdex API info
         $mappedData = $this->lookupAndEnrichFromTCGdex($mappedData);
 
@@ -971,6 +972,7 @@ class CardUploadController extends Controller
     private function lookupAndEnrichFromTCGdex(array $mappedData): array
     {
         if (!$mappedData['is_old_card'] && (!isset($mappedData['set_info']['set_name']) || !isset($mappedData['set_number']))) {
+            Log::info('Non posso recuperare il set da TCGDex');
             return $mappedData;
         }
 
@@ -982,6 +984,7 @@ class CardUploadController extends Controller
         $number = explode("/", $mappedData['set_number']);
 
         if ($mappedData['is_old_card']) {
+            Log::info("Carta vecchia");
             // Se la carta è vecchia allora procedo a recuperarmi il set da TCGDex
             $query = Query::create()
                 ->equal('localId', $number[0])  // Filter by exact match
@@ -1005,7 +1008,7 @@ class CardUploadController extends Controller
                 $mappedData['card_set_id'] = $set->id;
             } else {
                 Log::alert("Molteplici riscontri su TCGDex per la carta: (#{$number[0]}) " . $mappedData['card_name']);
-
+                // dd($listCards);
                 foreach ($listCards as $cardResume) {
                     /**
                      * @var CardResume $cardResume
@@ -1031,18 +1034,21 @@ class CardUploadController extends Controller
                 }
             }
         } else {
+            Log::info("Non è carta vecchia");
             $set = CardSet::where('card_set_abbreviation', $mappedData['set_code'])->first();
 
             if (!$set) {
+                Log::info("Set non trovato");
                 return $mappedData;
             }
 
+            Log::info("Set trovato");
             $mappedData['card_set_id'] = $set->id;
 
             try {
                 $tcg = new TCGdex('it');
                 $tcgCard = $tcg->set->getCard($set->abbreviation, $number[0]);
-
+                // dd($tcgCard);
                 if (!($tcgCard instanceof Card)) {
                     return $mappedData;
                 }
