@@ -27,6 +27,7 @@ class CardInventory extends Model
         'Standard',
         'Reverse Holo',
         'Holo',
+        'Illustrazione',
         'First Edition',
         'Shadowless',
         'Error Card',

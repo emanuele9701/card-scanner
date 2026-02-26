@@ -967,15 +967,15 @@ onBeforeUnmount(() => {
                                 <div class="col-6">
                                      <div class="form-floating-custom">
                                         <select v-model="editForm.rarity" id="rarity" class="glass-select">
-                                            <option value="">Seleziona Rarità...</option>
-                                            <option value="Common">Common</option>
-                                            <option value="Uncommon">Uncommon</option>
-                                            <option value="Rare">Rare</option>
-                                            <option value="Holo Rare">Holo Rare</option>
-                                            <option value="Double Rare">Double Rare</option>
-                                            <option value="Illustration Rare">Illustration Rare</option>
-                                            <option value="Ultra Rare">Ultra Rare</option>
-                                            <option value="Secret Rare">Secret Rare</option>
+                                            <option value="">Seleziona...</option>
+                                            <option value="Comune">Comune</option>
+                                            <option value="Non Comune">Non Comune</option>
+                                            <option value="Rara">Rara</option>
+                                            <option value="Rara Holo">Rara Holo</option>
+                                            <option value="Double Rare">Double Rare (ex/V/GX)</option>
+                                            <option value="Rara Illustrazione">Rara Illustrazione (AR/IR)</option>
+                                            <option value="Ultra Rara">Ultra Rara</option>
+                                            <option value="Segreta">Segreta</option>
                                         </select>
                                         <label for="rarity">Rarità</label>
                                     </div>
