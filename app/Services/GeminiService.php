@@ -36,7 +36,7 @@ class GeminiService
         $allSets = CardSet::where('game_id', $gameId)->pluck('name', 'card_set_abbreviation');
         $jsonSets = json_encode($allSets);
         $prompt = <<<TEXT
-       Sei un sistema OCR rigoroso per l'estrazione dati da carte Pokémon TCG.
+      Sei un sistema OCR rigoroso per l'estrazione dati da carte Pokémon TCG.
 ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente, restituisci "null".
 NON unire testi lontani tra loro. NON inventare dati.
 

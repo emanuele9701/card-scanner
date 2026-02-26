@@ -37,7 +37,7 @@ class ImportCardSetPokemon extends Command
         );
 
         $sets = file_get_contents('https://mpapi.tcgplayer.com/v2/Catalog/SetNames?categoryId=3&active=true');
-
+        // Log::info($sets);
         if (!($allSets = json_decode($sets, true))) {
             Log::alert("Errore riconoscimento json: $sets -> " . json_last_error_msg());
             die;
@@ -49,9 +49,10 @@ class ImportCardSetPokemon extends Command
         }
 
         foreach ($allSets['results'] as $key => $set) {
+            $this->info("Set name: " . $set['name']);
             $abbreviation = explode("-", $set['urlName'])[0];
 
-            CardSet::updateOrCreate(
+            $setCard = CardSet::updateOrCreate(
                 [
                     'abbreviation' => $abbreviation,
                 ],

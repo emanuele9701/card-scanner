@@ -994,18 +994,22 @@ class CardUploadController extends Controller
 
             $listCards = $tcg->card->list($query);
 
+            Log::alert("Riscontri su TCGDex per la carta: (#{$number[0]}) " . $mappedData['card_name'] . " -> " . count($listCards));
             if (count($listCards) == 1) {
                 /**
                  * @var Card
                  */
                 $tcgCard = $listCards[0]->toCard();
                 $abbreviation = $tcgCard->set->toSet()->tcgOnline;
+                Log::info("Set identificato: " . $abbreviation);
                 $set = CardSet::where('card_set_abbreviation', $abbreviation)->first();
                 if (!$set) {
+                    Log::alert("Set non trovato");
                     return $mappedData;
                 }
 
                 $mappedData['card_set_id'] = $set->id;
+                Log::info("Set trovato in db");
             } else {
                 Log::alert("Molteplici riscontri su TCGDex per la carta: (#{$number[0]}) " . $mappedData['card_name']);
                 // dd($listCards);
