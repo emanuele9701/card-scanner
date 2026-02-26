@@ -1109,6 +1109,8 @@ onMounted(async () => {
                                     <option value="Non Comune">Non Comune</option>
                                     <option value="Rara">Rara</option>
                                     <option value="Rara Holo">Rara Holo</option>
+                                    <option value="Double Rare">Double Rare (ex/V/GX)</option>
+                                    <option value="Rara Illustrazione">Rara Illustrazione (AR/IR)</option>
                                     <option value="Ultra Rara">Ultra Rara</option>
                                     <option value="Segreta">Segreta</option>
                                 </select>

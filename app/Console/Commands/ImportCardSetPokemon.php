@@ -6,6 +6,7 @@ use App\Models\CardSet;
 use App\Models\Game;
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log as FacadesLog;
 use Log;
 use TCGdex\Model\Set;
 use TCGdex\TCGdex;
@@ -49,10 +50,13 @@ class ImportCardSetPokemon extends Command
         }
 
         foreach ($allSets['results'] as $key => $set) {
+            FacadesLog::info($set['name']);
+            $this->info($set['name']);
             $abbreviation = explode("-", $set['urlName'])[0];
 
             CardSet::updateOrCreate(
                 [
+                    'name' => $set['name'],
                     'abbreviation' => $abbreviation,
                 ],
                 [
