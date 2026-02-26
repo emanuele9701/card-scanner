@@ -991,11 +991,17 @@ onMounted(async () => {
                                     <div v-if="showInventoryForm" class="inventory-form-wrapper mb-3">
                                         <h6 class="form-title">{{ editingInventoryId ? 'Modifica Copia' : 'Nuova Copia' }}</h6>
                                         <div class="row g-2">
-                                            <div class="col-4">
+                                            <div class="col-3">
                                                 <label>Quantità</label>
                                                 <input type="number" min="1" class="form-control form-control-sm" v-model.number="inventoryForm.quantity">
                                             </div>
-                                            <div class="col-8">
+                                            <div class="col-5">
+                                                <label>Variante</label>
+                                                <select class="form-select form-select-sm" v-model="inventoryForm.rarity_variant">
+                                                    <option v-for="variant in inventoryOptions.rarity_variants" :key="variant" :value="variant">{{ variant }}</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-4">
                                                 <label>Condizione</label>
                                                 <select class="form-select form-select-sm" v-model="inventoryForm.condition">
                                                     <option v-for="cond in inventoryOptions.conditions" :key="cond" :value="cond">{{ cond }}</option>
@@ -1018,7 +1024,7 @@ onMounted(async () => {
                                             <div class="d-flex align-items-center gap-3">
                                                 <span class="badge bg-warning text-dark rounded-pill">{{ item.quantity }}x</span>
                                                 <div>
-                                                    <div class="small fw-bold">{{ item.condition }}</div>
+                                                    <div class="small fw-bold">{{ item.rarity_variant }} <span class="text-white-50 ms-1 opacity-50">·</span> {{ item.condition }}</div>
                                                     <div class="smaller text-white-50" v-if="item.notes">{{ item.notes }}</div>
                                                 </div>
                                             </div>
