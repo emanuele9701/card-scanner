@@ -620,6 +620,8 @@ class CardUploadController extends Controller
             'set_number' => 'nullable|string',
             'illustrator' => 'nullable|string',
             'card_set_id' => 'nullable|exists:card_sets,id',
+            "weakness" => "nullable|string",
+            "resistance" => "nullable|string",
             'game' => 'nullable|string',
         ]);
 
@@ -632,6 +634,9 @@ class CardUploadController extends Controller
             'set_number',
             'illustrator',
             'card_set_id',
+            'retreat_cost',
+            'weakness',
+            'resistance',
             'game'
         ]);
 
