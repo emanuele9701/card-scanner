@@ -179,60 +179,64 @@ onBeforeUnmount(() => {
                             <tbody>
 
                                 <tr v-for="row in results" :key="row._id" :class="['result-row', row.status]">
-
-                                    <!-- Preview -->
-                                    <td class="col-img">
-                                        <div class="card-thumb-wrapper">
-                                            <img :src="row.image_url" :alt="row.filename" class="card-thumb" />
-                                            <div v-if="row.status === 'loading'" class="thumb-overlay">
-                                                <div class="spinner-sm"></div>
+                                    <form>
+                                        <!-- Preview -->
+                                        <td class="col-img">
+                                            <div class="card-thumb-wrapper">
+                                                <img :src="row.image_url" :alt="row.filename" class="card-thumb" />
+                                                <div v-if="row.status === 'loading'" class="thumb-overlay">
+                                                    <div class="spinner-sm"></div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
+                                        </td>
 
-                                    <!-- Name -->
-                                    <td>
-                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
-                                        <span v-else-if="row.status === 'error'" class="text-muted">—</span>
-                                        <span v-else class="card-name">{{ row.name ?? '—' }}</span>
-                                    </td>
+                                        <!-- Name -->
+                                        <td>
+                                            <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
+                                            <span v-else-if="row.status === 'error'" class="text-muted">—</span>
+                                            <span v-else class="card-name">{{ row.name ?? '—' }}</span>
+                                        </td>
 
-                                    <!-- Type -->
-                                    <td>
-                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-chip"></span>
-                                        <span v-else-if="row.type" class="type-chip"
-                                            :style="{ background: typeColor(row.type) }">
-                                            {{ row.type }}
-                                        </span>
-                                        <span v-else class="text-muted">—</span>
-                                    </td>
+                                        <!-- Type -->
+                                        <td>
+                                            <span v-if="row.status === 'loading'" class="skeleton skeleton-chip"></span>
+                                            <span v-else-if="row.type" class="type-chip"
+                                                :style="{ background: typeColor(row.type) }">
+                                                {{ row.type }}
+                                            </span>
+                                            <span v-else class="text-muted">—</span>
+                                        </td>
 
-                                    <!-- Set -->
-                                    <td>
-                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
-                                        <span v-else class="set-name">{{ row.set ?? '—' }}</span>
-                                    </td>
+                                        <!-- Set -->
+                                        <td>
+                                            <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
+                                            <span v-else class="set-name">{{ row.set ?? '—' }}</span>
+                                        </td>
 
-                                    <!-- Card number -->
-                                    <td>
-                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-short"></span>
-                                        <code v-else class="card-number">{{ row.card_number ?? '—' }}</code>
-                                    </td>
+                                        <!-- Card number -->
+                                        <td>
+                                            <span v-if="row.status === 'loading'"
+                                                class="skeleton skeleton-short"></span>
+                                            <code v-else class="card-number">{{ row.card_number ?? '—' }}</code>
+                                        </td>
 
-                                    <!-- Illustrator -->
-                                    <td>
-                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
-                                        <span v-else class="illustrator">{{ row.illustrator ?? '—' }}</span>
-                                    </td>
+                                        <!-- Illustrator -->
+                                        <td>
+                                            <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
+                                            <span v-else class="illustrator">{{ row.illustrator ?? '—' }}</span>
+                                        </td>
 
-                                    <!-- Status -->
-                                    <td class="col-status">
-                                        <span v-if="row.status === 'loading'" class="status-pill loading">
-                                            <div class="spinner-xs"></div> Analisi…
-                                        </span>
-                                        <span v-else-if="row.status === 'done'" class="status-pill done">✓ Fatto</span>
-                                        <span v-else class="status-pill error" :title="row.error">✕ Errore</span>
-                                    </td>
+                                        <!-- Status -->
+                                        <td class="col-status">
+                                            <span v-if="row.status === 'loading'" class="status-pill loading">
+                                                <div class="spinner-xs"></div> Analisi…
+                                            </span>
+                                            <span v-else-if="row.status === 'done'" class="status-pill done">✓
+                                                Fatto</span>
+                                            <span v-else class="status-pill error" :title="row.error">✕ Errore</span>
+                                        </td>
+                                    </form>
+
 
                                 </tr>
                             </tbody>
