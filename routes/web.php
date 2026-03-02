@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CardUploadController;
+use App\Http\Controllers\CardController;
+use App\Http\Controllers\CardInventoryController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MarketDataController;
@@ -54,28 +56,31 @@ Route::middleware('auth')->group(function () {
 
     // Card Upload & Management routes
     Route::prefix('cards')->group(function () {
+        // Upload flow (CardUploadController)
         Route::get('/upload', [CardUploadController::class, 'showUploadForm'])->name('cards.upload');
-        Route::post('/upload-image', [CardUploadController::class, 'uploadRawImage'])->name('cards.upload-image'); // Updated to use raw upload
+        Route::post('/upload-image', [CardUploadController::class, 'uploadRawImage'])->name('cards.upload-image');
         Route::post('/save-crop', [CardUploadController::class, 'saveCroppedImage'])->name('cards.save-crop');
         Route::post('/skip-crop', [CardUploadController::class, 'skipCrop'])->name('cards.skip-crop');
         Route::post('/enhance', [CardUploadController::class, 'enhanceWithAI'])->name('cards.enhance');
         Route::post('/save', [CardUploadController::class, 'saveCard'])->name('cards.save');
         Route::post('/discard', [CardUploadController::class, 'discard'])->name('cards.discard');
-        Route::get('/', [CardUploadController::class, 'index'])->name('cards.index');
-        Route::put('/{card}/update', [CardUploadController::class, 'updateCard'])->name('cards.update');
-        Route::post('/assign-set', [CardUploadController::class, 'assignSet'])->name('cards.assign-set');
-        Route::get('/api/card-sets', [CardUploadController::class, 'getCardSets'])->name('api.card-sets');
-        Route::get('/api/available-games', [CardUploadController::class, 'getAvailableGames'])->name('api.available-games');
-        Route::get('/{card}/data', [CardUploadController::class, 'getCardData'])->name('cards.data');
-        Route::delete('/{card}', [CardUploadController::class, 'destroy'])->name('cards.destroy');
-        Route::post('/bulk-delete', [CardUploadController::class, 'bulkDestroy'])->name('cards.bulk-delete');
 
-        // Card Inventory routes
-        Route::get('/{card}/inventory', [CardUploadController::class, 'getCardInventory'])->name('cards.inventory.get');
-        Route::post('/{card}/inventory', [CardUploadController::class, 'storeInventory'])->name('cards.inventory.store');
-        Route::put('/inventory/{inventory}', [CardUploadController::class, 'updateInventory'])->name('cards.inventory.update');
-        Route::delete('/inventory/{inventory}', [CardUploadController::class, 'destroyInventory'])->name('cards.inventory.destroy');
-        Route::get('/api/inventory-options', [CardUploadController::class, 'getInventoryOptions'])->name('api.inventory-options');
+        // Card CRUD (CardController)
+        Route::get('/', [CardController::class, 'index'])->name('cards.index');
+        Route::put('/{card}/update', [CardController::class, 'update'])->name('cards.update');
+        Route::post('/assign-set', [CardController::class, 'assignSet'])->name('cards.assign-set');
+        Route::get('/api/card-sets', [CardController::class, 'getCardSets'])->name('api.card-sets');
+        Route::get('/api/available-games', [CardController::class, 'getAvailableGames'])->name('api.available-games');
+        Route::get('/{card}/data', [CardController::class, 'show'])->name('cards.data');
+        Route::delete('/{card}', [CardController::class, 'destroy'])->name('cards.destroy');
+        Route::post('/bulk-delete', [CardController::class, 'bulkDestroy'])->name('cards.bulk-delete');
+
+        // Card Inventory (CardInventoryController)
+        Route::get('/{card}/inventory', [CardInventoryController::class, 'index'])->name('cards.inventory.get');
+        Route::post('/{card}/inventory', [CardInventoryController::class, 'store'])->name('cards.inventory.store');
+        Route::put('/inventory/{inventory}', [CardInventoryController::class, 'update'])->name('cards.inventory.update');
+        Route::delete('/inventory/{inventory}', [CardInventoryController::class, 'destroy'])->name('cards.inventory.destroy');
+        Route::get('/api/inventory-options', [CardInventoryController::class, 'options'])->name('api.inventory-options');
     });
 
     // Pokemon Cards management
@@ -104,70 +109,71 @@ Route::middleware('auth')->group(function () {
     });
 
     // API Test Page
-});
-Route::get('/test/api', function () {
-    return inertia('Test/ApiTest');
-})->name('test.api');
+    Route::get('/test/api', function () {
+        return inertia('Test/ApiTest');
+    })->name('test.api');
 
-Route::get('/logs', function () {
-    $logPath = storage_path('logs/laravel.log');
+    // Log viewer
+    Route::get('/logs', function () {
+        $logPath = storage_path('logs/laravel.log');
 
-    if (! file_exists($logPath)) {
-        abort(404, 'File di log non trovato.');
-    }
-
-    return new StreamedResponse(function () use ($logPath) {
-        $handle = fopen($logPath, 'rb');
-
-        if ($handle === false) {
-            abort(500, 'Impossibile aprire il file di log.');
+        if (! file_exists($logPath)) {
+            abort(404, 'File di log non trovato.');
         }
 
-        echo '<html><head>';
-        echo '<meta charset="UTF-8">';
-        echo '<title>Laravel Log</title>';
-        echo '<style>
-            body { background: #1e1e1e; color: #d4d4d4; font-family: monospace; font-size: 13px; padding: 20px; margin: 0; }
-            pre { white-space: pre-wrap; word-break: break-all; margin: 0; }
-            .error   { color: #f48771; }
-            .warning { color: #dcdcaa; }
-            .info    { color: #9cdcfe; }
-            .debug   { color: #888; }
-        </style>';
-        echo '</head><body><pre>';
+        return new StreamedResponse(function () use ($logPath) {
+            $handle = fopen($logPath, 'rb');
 
-        ob_flush();
-        flush();
+            if ($handle === false) {
+                abort(500, 'Impossibile aprire il file di log.');
+            }
 
-        $chunkSize = 8192; // 8 KB per chunk
-
-        while (! feof($handle)) {
-            $chunk = fread($handle, $chunkSize);
-
-            // Escape HTML per sicurezza
-            $chunk = htmlspecialchars($chunk, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-
-            // Colorazione per livello di log
-            $chunk = preg_replace('/(\[.*?\] \w+\.ERROR.*)/m',   '<span class="error">$1</span>',   $chunk);
-            $chunk = preg_replace('/(\[.*?\] \w+\.WARNING.*)/m', '<span class="warning">$1</span>', $chunk);
-            $chunk = preg_replace('/(\[.*?\] \w+\.INFO.*)/m',    '<span class="info">$1</span>',    $chunk);
-            $chunk = preg_replace('/(\[.*?\] \w+\.DEBUG.*)/m',   '<span class="debug">$1</span>',   $chunk);
-
-            echo $chunk;
+            echo '<html><head>';
+            echo '<meta charset="UTF-8">';
+            echo '<title>Laravel Log</title>';
+            echo '<style>
+                body { background: #1e1e1e; color: #d4d4d4; font-family: monospace; font-size: 13px; padding: 20px; margin: 0; }
+                pre { white-space: pre-wrap; word-break: break-all; margin: 0; }
+                .error   { color: #f48771; }
+                .warning { color: #dcdcaa; }
+                .info    { color: #9cdcfe; }
+                .debug   { color: #888; }
+            </style>';
+            echo '</head><body><pre>';
 
             ob_flush();
             flush();
-        }
 
-        fclose($handle);
+            $chunkSize = 8192; // 8 KB per chunk
 
-        echo '</pre></body></html>';
-    }, 200, [
-        'Content-Type'      => 'text/html; charset=UTF-8',
-        'X-Accel-Buffering' => 'no', // Disabilita il buffering su Nginx
-        'Cache-Control'     => 'no-store, no-cache',
-    ]);
+            while (! feof($handle)) {
+                $chunk = fread($handle, $chunkSize);
+
+                // Escape HTML per sicurezza
+                $chunk = htmlspecialchars($chunk, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+                // Colorazione per livello di log
+                $chunk = preg_replace('/(\[.*?\] \w+\.ERROR.*)/m',   '<span class="error">$1</span>',   $chunk);
+                $chunk = preg_replace('/(\[.*?\] \w+\.WARNING.*)/m', '<span class="warning">$1</span>', $chunk);
+                $chunk = preg_replace('/(\[.*?\] \w+\.INFO.*)/m',    '<span class="info">$1</span>',    $chunk);
+                $chunk = preg_replace('/(\[.*?\] \w+\.DEBUG.*)/m',   '<span class="debug">$1</span>',   $chunk);
+
+                echo $chunk;
+
+                ob_flush();
+                flush();
+            }
+
+            fclose($handle);
+
+            echo '</pre></body></html>';
+        }, 200, [
+            'Content-Type'      => 'text/html; charset=UTF-8',
+            'X-Accel-Buffering' => 'no', // Disabilita il buffering su Nginx
+            'Cache-Control'     => 'no-store, no-cache',
+        ]);
+    });
+
+    // Admin / Utility Routes
+    Route::get('/admin/reset-database', [AdminController::class, 'resetDatabase'])->name('admin.reset-database');
 });
-
-// Admin / Utility Routes
-Route::get('/admin/reset-database', [AdminController::class, 'resetDatabase'])->name('admin.reset-database');

@@ -4,38 +4,114 @@ namespace App\Services;
 
 use App\Models\CardSet;
 use App\Models\Game;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class GeminiService
 {
     protected string $apiKey;
-    protected string $baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent';
+    protected string $baseUrl;
 
     public function __construct()
     {
-        // Fallback to the provided key if not in .env for now, as requested.
-        //Ideally this should be: config('services.gemini.api_key');
-        $this->apiKey = env('GEMINI_API_KEY', 'default_key_if_needed');
+        $this->apiKey = config('services.gemini.api_key', '');
+        $this->baseUrl = config(
+            'services.gemini.base_url',
+            'https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent'
+        );
     }
 
     /**
      * Enhance card data using Gemini AI
-     * 
+     *
      * @param string $base64Image Base64 encoded image string (without prefix)
-     * @param string $ocrText Text extracted by Tesseract
      * @return array|null Structured data or null on failure
      */
-    public function enhanceCardData(string $base64Image, string $ocrText): ?array
+    public function enhanceCardData(string $base64Image): ?array
     {
-        // Hardcoded key from user request for this specific implementation as per instructions
-        // In a real app, I'd rely solely on env.
-        $apiKey = $this->apiKey;
+        $prompt = $this->buildOcrPrompt();
 
-        $gameId = Game::where('name', 'Pokemon')->first()->id;
-        $allSets = CardSet::where('game_id', $gameId)->pluck('name', 'card_set_abbreviation');
-        $jsonSets = json_encode($allSets);
-        $prompt = <<<TEXT
+        $payload = [
+            "contents" => [
+                [
+                    "parts" => [
+                        [
+                            "inline_data" => [
+                                "mime_type" => "image/jpeg",
+                                "data" => $base64Image
+                            ]
+                        ],
+                        [
+                            "text" => $prompt
+                        ]
+                    ]
+                ]
+            ],
+            "generationConfig" => [
+                "temperature" => 0.1,
+                "topP" => 0.8,
+                "topK" => 10,
+            ]
+        ];
+
+        Log::info('Gemini Service - Sending request to: ' . $this->baseUrl);
+
+        try {
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'x-goog-api-key' => $this->apiKey
+            ])->post($this->baseUrl, $payload);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                // Extract text from Gemini response structure
+                $generatedText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+
+                // Clean up potential markdown code blocks
+                $jsonString = str_replace(['```json', '```'], '', $generatedText);
+                $jsonString = trim($jsonString);
+                $result = json_decode($jsonString, true);
+                Log::info("Response: " . json_encode($result, JSON_PRETTY_PRINT));
+
+                // Check if it's a valid card
+                if ($result && isset($result['is_valid_card']) && $result['is_valid_card'] === false) {
+                    Log::info('Image rejected: not a valid trading card');
+                    return [
+                        'is_valid_card' => false,
+                        'error_message' => $result['error_message'] ?? 'L\'immagine non è una carta da gioco valida'
+                    ];
+                }
+
+                return $result;
+            } else {
+                Log::error('Gemini API Error: ' . $response->body());
+                return null;
+            }
+        } catch (\Exception $e) {
+            Log::error('Gemini Service Exception: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Build the OCR prompt for Gemini AI card recognition.
+     * Caches the known sets list to avoid DB queries on each call.
+     *
+     * @return string The complete prompt text
+     */
+    private function buildOcrPrompt(): string
+    {
+        $jsonSets = Cache::remember('pokemon_sets_for_prompt', 3600, function () {
+            $gameId = Game::where('name', 'Pokemon')->first()?->id;
+            if (!$gameId) {
+                return '{}';
+            }
+            return json_encode(CardSet::where('game_id', $gameId)->pluck('name', 'card_set_abbreviation'));
+        });
+
+        return <<<TEXT
       Sei un sistema OCR rigoroso per l'estrazione dati da carte Pokémon TCG.
 ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente, restituisci `"null"`.
 NON unire testi lontani tra loro. NON dedurre. NON interpretare. NON inventare dati.
@@ -49,14 +125,14 @@ Osserva ESCLUSIVAMENTE l'angolo in basso a sinistra della carta.
 ### CARTA MODERNA (2023+)
 
 Se è presente un piccolo riquadro nero o grigio contenente una sigla (es. "MEG IT", "OBFit", "PFLit", ecc.)
-E l’anno di copyright in basso riporta **2023 o superiore**,
+E l'anno di copyright in basso riporta **2023 o superiore**,
 → È TASSATIVAMENTE una carta moderna.
 → Segui il **PERCORSO B**.
 
 ### CARTA VECCHIA (pre-2023)
 
-Se NON è presente il riquadro con sigla nell’angolo in basso a sinistra
-E l’anno di copyright è precedente al 2023
+Se NON è presente il riquadro con sigla nell'angolo in basso a sinistra
+E l'anno di copyright è precedente al 2023
 → È una carta vecchia.
 → Segui il **PERCORSO A**.
 
@@ -76,8 +152,8 @@ Se la carta è ruotata, analizza tutte le direzioni.
 ## 2. NUMERO DELLA CARTA
 
 **DOVE:**
-Cerca ESCLUSIVAMENTE nell’angolo in basso a sinistra,
-sulla stessa riga o immediatamente accanto al simbolo dell'espansione e al nome dell’illustratore.
+Cerca ESCLUSIVAMENTE nell'angolo in basso a sinistra,
+sulla stessa riga o immediatamente accanto al simbolo dell'espansione e al nome dell'illustratore.
 
 Deve essere un blocco unico nel formato:
 
@@ -89,10 +165,10 @@ Esempio valido: `105/132`
 Non prendere MAI numeri:
 
 * al centro della carta
-* sotto l’illustrazione del Pokémon
-* preceduti da “No.” o “N.”
+* sotto l'illustrazione del Pokémon
+* preceduti da "No." o "N."
 
-Se non presente in quell’area precisa → `"null"`
+Se non presente in quell'area precisa → `"null"`
 
 ---
 
@@ -136,11 +212,11 @@ Trascrivi esattamente come appare.
 ## 2. NUMERO DELLA CARTA
 
 **DOVE:**
-Cerca ESCLUSIVAMENTE nell’angolo in basso a sinistra,
+Cerca ESCLUSIVAMENTE nell'angolo in basso a sinistra,
 sulla stessa riga o immediatamente accanto:
 
 * al simbolo dell'espansione
-* al nome dell’illustratore
+* al nome dell'illustratore
 
 Deve essere un blocco unico nel formato:
 
@@ -153,15 +229,15 @@ Non prendere MAI numeri:
 
 * al centro della carta
 * sotto il disegno del Pokémon
-* preceduti da “No.” o “N.”
+* preceduti da "No." o "N."
 
-Se non presente in quell’area precisa → `"null"`
+Se non presente in quell'area precisa → `"null"`
 
 ---
 
 ## 3. ILLUSTRATORE
 
-Cerca “Illus.” o “Ill.” nella stessa fascia inferiore.
+Cerca "Illus." o "Ill." nella stessa fascia inferiore.
 Estrai il nome subito dopo.
 Se assente → `"null"`.
 
@@ -212,78 +288,12 @@ Se il codice stampato è ad esempio `"PFLit"`:
 }
 ```
 TEXT;
-
-        $payload = [
-            "contents" => [
-                [
-                    "parts" => [
-                        [
-                            "inline_data" => [
-                                "mime_type" => "image/jpeg",
-                                "data" => $base64Image
-                            ]
-                        ],
-                        [
-                            "text" => $prompt
-                        ]
-                    ]
-                ]
-            ],
-            "generationConfig" => [
-                "temperature" => 0.1,
-                "topP" => 0.8,
-                "topK" => 10,
-            ]
-        ];
-        Log::info('Gemini Service - ' . $this->baseUrl);
-        Log::info('Gemini Service - Headers: ' . json_encode([
-            'Content-Type' => 'application/json',
-            'x-goog-api-key' => $apiKey
-        ], JSON_PRETTY_PRINT));
-        // Log::info('Gemini Service: ' . json_encode($payload, JSON_PRETTY_PRINT));
-        try {
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'x-goog-api-key' => $apiKey
-            ])->post($this->baseUrl, $payload);
-
-            if ($response->successful()) {
-                $data = $response->json();
-
-                // Extract text from Gemini response structure
-                $generatedText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-
-                // Clean up potential markdown code blocks
-                $jsonString = str_replace(['```json', '```'], '', $generatedText);
-                $jsonString = trim($jsonString);
-                $result = json_decode($jsonString, true);
-                Log::info("Response: " . json_encode($result, JSON_PRETTY_PRINT));
-
-                // Check if it's a valid card
-                if ($result && isset($result['is_valid_card']) && $result['is_valid_card'] === false) {
-                    Log::info('Image rejected: not a valid trading card');
-                    return [
-                        'is_valid_card' => false,
-                        'error_message' => $result['error_message'] ?? 'L\'immagine non è una carta da gioco valida'
-                    ];
-                }
-
-                return $result;
-            } else {
-                Log::error('Gemini API Error: ' . $response->body());
-                return null;
-            }
-        } catch (\Exception $e) {
-            Log::error('Gemini Service Exception: ' . $e->getMessage());
-            return null;
-        }
     }
-
 
     /**
      * Map new Gemini AI structured data to legacy database format
      * This allows backward compatibility without database schema changes
-     * 
+     *
      * @param array $geminiData New structured data from Gemini AI
      * @return array Legacy format data ready for database insertion
      */
@@ -302,7 +312,7 @@ TEXT;
 
         return [
             'is_valid_card' => true,
-            'is_old_card' => $cardIdentity['anno_carta'] < 2023 ? true : false,
+            'is_old_card' => ((int)($cardIdentity['anno_carta'] ?? 0)) < 2023,
             'card_name' => $cardIdentity['pokemon_name'] ?? null,
             'set_code' => $setDetails['set_abbreviation'] ?? null,
             'set_number' => $cardIdentity['set_number'] ?? null,
