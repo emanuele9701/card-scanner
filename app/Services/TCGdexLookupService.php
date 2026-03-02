@@ -106,6 +106,10 @@ class TCGdexLookupService
      */
     private function searchAndMatch(string $localId, string $cardName, string $totalCards, bool $isOldCard): ?array
     {
+        // Converto il card name in un formato utf8
+
+        $cardName = str_replace("’", "'", $cardName);
+        // $cardName = mb_convert_encoding($cardName, 'UTF-8', mb_detect_encoding($cardName, 'UTF-8, ISO-8859-1', true));
         $tcg = new TCGdex();
         $query = Query::create()
             ->equal('localId', $localId)
@@ -119,10 +123,11 @@ class TCGdexLookupService
         if (count($listCards) === 0) {
             return null;
         }
-
+        Log::info("Lista cards: " . json_encode($listCards));
         if (count($listCards) === 1) {
             /** @var Card $tcgCard */
             $tcgCard = $listCards[0]->toCard();
+            Log::info("Card: " . json_encode($tcgCard));
             $abbreviation = $tcgCard->set->toSet()->abbreviation->official;
             Log::info("Set identificato: " . $abbreviation);
 
@@ -142,6 +147,8 @@ class TCGdexLookupService
         foreach ($listCards as $cardResume) {
             /** @var CardResume $cardResume */
             $resumeLocalId = $cardResume->localId;
+
+            /** @var Card $tcgCard */
             $tcgCard = $cardResume->toCard();
             $tcgSetData = $tcgCard->set->toSet();
 

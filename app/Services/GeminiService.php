@@ -145,9 +145,9 @@ Non usare il colore dei bordi come criterio decisionale.
 Estrai SOLO queste informazioni:
 
 ## 1. NOME DELLA CARTA
-
 Il nome del Pokémon visibile in alto.
 Se la carta è ruotata, analizza tutte le direzioni.
+ECCEZIONE ALLA REGOLA "NON DEDURRE": Se il font presenta spaziature anomale che spezzano il nome di un Pokémon noto (es. "Magne mite", "Pika chu"), unisci le lettere per formare il nome corretto del Pokémon (es. "Magnemite", "Pikachu").
 
 ## 2. NUMERO DELLA CARTA
 
@@ -203,9 +203,9 @@ $jsonSets
 ---
 
 ## 1. NOME DELLA CARTA
-
-Il nome del Pokémon visibile in alto (o verticalmente se ruotata).
-Trascrivi esattamente come appare.
+Il nome del Pokémon visibile in alto.
+Se la carta è ruotata, analizza tutte le direzioni.
+ECCEZIONE ALLA REGOLA "NON DEDURRE": Se il font presenta spaziature anomale che spezzano il nome di un Pokémon noto (es. "Magne mite", "Pika chu"), unisci le lettere per formare il nome corretto del Pokémon (es. "Magnemite", "Pikachu").
 
 ---
 
