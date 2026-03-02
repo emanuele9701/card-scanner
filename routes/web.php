@@ -142,6 +142,69 @@ Route::get('/pippo', function () {
 
     dd($tcg->set->list()[167]);
 });
+Ecco una route ottimizzata per web.php che legge il file di log in modo efficiente tramite streaming con chunk, senza caricare tutto in memoria:
+phpuse Symfony\Component\HttpFoundation\StreamedResponse;
+
+Route::get('/logs', function () {
+    $logPath = storage_path('logs/laravel.log');
+
+    if (! file_exists($logPath)) {
+        abort(404, 'File di log non trovato.');
+    }
+
+    return new StreamedResponse(function () use ($logPath) {
+        $handle = fopen($logPath, 'rb');
+
+        if ($handle === false) {
+            abort(500, 'Impossibile aprire il file di log.');
+        }
+
+        echo '<html><head>';
+        echo '<meta charset="UTF-8">';
+        echo '<title>Laravel Log</title>';
+        echo '<style>
+            body { background: #1e1e1e; color: #d4d4d4; font-family: monospace; font-size: 13px; padding: 20px; margin: 0; }
+            pre { white-space: pre-wrap; word-break: break-all; margin: 0; }
+            .error   { color: #f48771; }
+            .warning { color: #dcdcaa; }
+            .info    { color: #9cdcfe; }
+            .debug   { color: #888; }
+        </style>';
+        echo '</head><body><pre>';
+
+        ob_flush();
+        flush();
+
+        $chunkSize = 8192; // 8 KB per chunk
+
+        while (! feof($handle)) {
+            $chunk = fread($handle, $chunkSize);
+
+            // Escape HTML per sicurezza
+            $chunk = htmlspecialchars($chunk, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+            // Colorazione per livello di log
+            $chunk = preg_replace('/(\[.*?\] \w+\.ERROR.*)/m',   '<span class="error">$1</span>',   $chunk);
+            $chunk = preg_replace('/(\[.*?\] \w+\.WARNING.*)/m', '<span class="warning">$1</span>', $chunk);
+            $chunk = preg_replace('/(\[.*?\] \w+\.INFO.*)/m',    '<span class="info">$1</span>',    $chunk);
+            $chunk = preg_replace('/(\[.*?\] \w+\.DEBUG.*)/m',   '<span class="debug">$1</span>',   $chunk);
+
+            echo $chunk;
+
+            ob_flush();
+            flush();
+        }
+
+        fclose($handle);
+
+        echo '</pre></body></html>';
+
+    }, 200, [
+        'Content-Type'      => 'text/html; charset=UTF-8',
+        'X-Accel-Buffering' => 'no', // Disabilita il buffering su Nginx
+        'Cache-Control'     => 'no-store, no-cache',
+    ]);
+});
 
 // Admin / Utility Routes
 Route::get('/admin/reset-database', [AdminController::class, 'resetDatabase'])->name('admin.reset-database');

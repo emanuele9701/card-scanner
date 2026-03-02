@@ -976,11 +976,8 @@ class CardUploadController extends Controller
             return $mappedData;
         }
 
-        $number = explode("/", $mappedData['set_number']);
-
-        $tcg = new TCGdex();
-
-
+        $tcg = new TCGdex('it');
+        $tcgCard = null;
         $number = explode("/", $mappedData['set_number']);
 
         if ($mappedData['is_old_card']) {
@@ -1000,7 +997,7 @@ class CardUploadController extends Controller
                  * @var Card
                  */
                 $tcgCard = $listCards[0]->toCard();
-                $abbreviation = $tcgCard->set->toSet()->tcgOnline;
+                $abbreviation = $tcgCard->set->toSet()->abbreviation->official;
                 Log::info("Set identificato: " . $abbreviation);
                 $set = CardSet::where('card_set_abbreviation', $abbreviation)->first();
                 if (!$set) {
@@ -1056,8 +1053,9 @@ class CardUploadController extends Controller
                      * @var Card
                      */
                     $tcgCard = $listCards[0]->toCard();
-                    $abbreviation = $tcgCard->set->toSet()->tcgOnline;
+                    $abbreviation = $tcgCard->set->toSet()->abbreviation->official;
                     Log::info("Set identificato: " . $abbreviation);
+                    // Log::info("Riscontro tcgdex: " . json_encode($tcgCard->set->toSet()));
                     $set = CardSet::where('card_set_abbreviation', $abbreviation)->first();
                     if (!$set) {
                         Log::alert("Set non trovato");
@@ -1099,30 +1097,33 @@ class CardUploadController extends Controller
 
                     if (!isset($mappedData['card_set_id'])) {
                         Log::info("Set non trovato");
-                        die;
                         return $mappedData;
                     }
                 }
-
+            } else {
                 Log::info("Set trovato");
                 $mappedData['card_set_id'] = $set->id;
 
+
                 try {
                     $tcg = new TCGdex('it');
-                    $tcgCard = $tcg->set->getCard($set->abbreviation, $number[0]);
-                    // dd($tcgCard);
-                    if (!($tcgCard instanceof Card)) {
-                        return $mappedData;
-                    }
+                    $tcgCardData = $tcg->set->getCard($set->abbreviation, $number[0]);
 
+                    if ($tcgCardData instanceof Card) {
+                        $tcgCard = $tcgCardData;
+                    } else {
+                        Log::warning("Nessun riscontro per: " . ($set->card_set_abbreviation ?? $set->abbreviation) . "Nr° " . $number[0]);
+                    }
                 } catch (\Exception $e) {
                     // TCGdex errors are non-blocking — proceed with Gemini data only
                     Log::warning("TCGDex error: " . $e->getMessage());
                 }
             }
         }
-        $mappedData = $this->enrichCardDetails($mappedData, $tcgCard);
-        $mappedData = $this->extractPricingAndMarket($mappedData, $tcgCard);
+        if ($tcgCard) {
+            $mappedData = $this->enrichCardDetails($mappedData, $tcgCard);
+            $mappedData = $this->extractPricingAndMarket($mappedData, $tcgCard);
+        }
         return $mappedData;
     }
 

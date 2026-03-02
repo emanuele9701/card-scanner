@@ -37,42 +37,74 @@ class GeminiService
         $jsonSets = json_encode($allSets);
         $prompt = <<<TEXT
       Sei un sistema OCR rigoroso per l'estrazione dati da carte Pokémon TCG.
-ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente, restituisci "null".
-NON unire testi lontani tra loro. NON inventare dati.
+ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente, restituisci `"null"`.
+NON unire testi lontani tra loro. NON dedurre. NON interpretare. NON inventare dati.
 
---- STEP 0: DETERMINA L'ERA DELLA CARTA ---
-Osserva il layout e il design della carta:
+---
 
-CARTA MODERNA (2023+) → bordi argentati/bianchi, design pulito, codice testuale di set stampato in basso (es. "PFLit", "sv4pt5it", "OBFit").
+# --- STEP 0: DETERMINA L'ERA DELLA CARTA (REGOLA VINCOLANTE) ---
 
-CARTA VECCHIA (pre-2023) → bordi gialli/colorati, design più semplice, NESSUN codice testuale di set, solo simboli grafici.
+Osserva ESCLUSIVAMENTE l'angolo in basso a sinistra della carta.
 
-Se la carta è VECCHIA → segui il PERCORSO A.
-Se la carta è MODERNA → segui il PERCORSO B.
+### CARTA MODERNA (2023+)
 
-========== PERCORSO A: CARTA VECCHIA (pre-2023) ==========
+Se è presente un piccolo riquadro nero o grigio contenente una sigla (es. "MEG IT", "OBFit", "PFLit", ecc.)
+E l’anno di copyright in basso riporta **2023 o superiore**,
+→ È TASSATIVAMENTE una carta moderna.
+→ Segui il **PERCORSO B**.
+
+### CARTA VECCHIA (pre-2023)
+
+Se NON è presente il riquadro con sigla nell’angolo in basso a sinistra
+E l’anno di copyright è precedente al 2023
+→ È una carta vecchia.
+→ Segui il **PERCORSO A**.
+
+Non usare il colore dei bordi come criterio decisionale.
+
+---
+
+# ========== PERCORSO A: CARTA VECCHIA (pre-2023) ==========
+
 Estrai SOLO queste informazioni:
 
-NOME DELLA CARTA:
-Il nome del Pokémon, visibile in alto. La carta potrebbe essere ruotata, cerca il nome in tutte le direzioni.
+## 1. NOME DELLA CARTA
 
-NUMERO DELLA CARTA:
+Il nome del Pokémon visibile in alto.
+Se la carta è ruotata, analizza tutte le direzioni.
 
-DOVE: ESCLUSIVAMENTE nel bordo inferiore estremo della carta.
+## 2. NUMERO DELLA CARTA
 
-TRABOCCHETTO: sotto l’illustrazione c’è il numero del Pokédex (es. "N. 0045", "No. 260"). IGNORALO TOTALMENTE.
+**DOVE:**
+Cerca ESCLUSIVAMENTE nell’angolo in basso a sinistra,
+sulla stessa riga o immediatamente accanto al simbolo dell'espansione e al nome dell’illustratore.
 
-Cerca SOLO il formato “XX/YYY” o “XXX/YYY” nel bordo inferiore e trascrivi esattamente.
+Deve essere un blocco unico nel formato:
 
-Restituisci questo JSON:
+* "XX/YYY"
+* "XXX/YYY"
 
-json
+Esempio valido: `105/132`
+
+Non prendere MAI numeri:
+
+* al centro della carta
+* sotto l’illustrazione del Pokémon
+* preceduti da “No.” o “N.”
+
+Se non presente in quell’area precisa → `"null"`
+
+---
+
+## OUTPUT JSON (Carta Vecchia)
+
+```json
 {
   "card_identity": {
     "pokemon_name": "Testo",
     "set_number": "Formato XX/YYY o null",
     "illustrator": null,
-    "anno_carta": "indica l’anno della carta"
+    "anno_carta": "anno visibile in basso"
   },
   "set_details": {
     "raw_printed_code": null,
@@ -82,63 +114,103 @@ json
   },
   "is_old_card": true
 }
-========== PERCORSO B: CARTA MODERNA (2023+) ==========
---- DATABASE SET CONOSCIUTI ---
+```
+
+---
+
+# ========== PERCORSO B: CARTA MODERNA (2023+) ==========
+
+## --- DATABASE SET CONOSCIUTI ---
+
 $jsonSets
 
-1. NOME DELLA CARTA
-Cerca il nome del Pokémon (in alto o in verticale se ruotata). Trascrivi esattamente come appare.
+---
 
-2. NUMERO DELLA CARTA (IGNORA IL POKÉDEX)
-DOVE: Solo sul bordo inferiore estremo.
+## 1. NOME DELLA CARTA
 
-IGNORA qualsiasi “No.” o “N.” sotto l’illustrazione.
+Il nome del Pokémon visibile in alto (o verticalmente se ruotata).
+Trascrivi esattamente come appare.
 
-Cerca il formato “XX/YYY”, vicino al simbolo del set.
+---
 
-3. ILLUSTRATORE
-Cerca “Illus.” o “Ill.” nel bordo.
+## 2. NUMERO DELLA CARTA
 
-Estrai il nome subito dopo; se assente, restituisci "null".
+**DOVE:**
+Cerca ESCLUSIVAMENTE nell’angolo in basso a sinistra,
+sulla stessa riga o immediatamente accanto:
 
-4. RILEVAZIONE DEL SET — METODO A DOPPIA VERIFICA
-PASSO 1: Estrai il denominatore dal numero carta (es. “27/100” → 100).
+* al simbolo dell'espansione
+* al nome dell’illustratore
 
-PASSO 2: Osserva il simbolo vicino al numero e descrivilo brevemente in "set_symbol_description".
+Deve essere un blocco unico nel formato:
 
-PASSO 3:
+* "XX/YYY"
+* "XXX/YYY"
 
-Filtra dal database i set con total = denominatore.
+Esempio valido: `27/100`
 
-Se più set hanno lo stesso totale, usa la descrizione del simbolo per disambiguare.
+Non prendere MAI numeri:
 
-Se nessun set corrisponde, imposta "set_abbreviation" e "set_name" a null.
+* al centro della carta
+* sotto il disegno del Pokémon
+* preceduti da “No.” o “N.”
 
-5. REGOLA SULLA SIGLA DEL SET
-Quando estrai set_abbreviation da un codice come "PFLit", rimuovi sempre il suffisso linguistico (it, en, es, ecc.).
+Se non presente in quell’area precisa → `"null"`
 
-La set_abbreviation deve contenere solo la sigla del set base (es. "PFL").
+---
 
-Mantieni set_name completo (“Phantasmal Flames”) e raw_printed_code come appare originariamente.
+## 3. ILLUSTRATORE
 
-FORMATO OUTPUT JSON
-json
+Cerca “Illus.” o “Ill.” nella stessa fascia inferiore.
+Estrai il nome subito dopo.
+Se assente → `"null"`.
+
+---
+
+# 4. RILEVAZIONE DEL SET — METODO A DOPPIA VERIFICA
+
+### PASSO 1
+
+Estrai il denominatore dal numero carta.
+Esempio: `27/100` → totale = 100
+
+### PASSO 2
+
+Osserva il simbolo accanto al numero carta.
+Descrivilo brevemente in `"set_symbol_description"`.
+
+---
+
+# 5. REGOLA SULLA SIGLA DEL SET
+
+Se il codice stampato è ad esempio `"PFLit"`:
+
+* `"raw_printed_code"` = `"PFLit"`
+* `"set_abbreviation"` = `"PFL"` (rimuovi sempre suffisso lingua: it, en, es, ecc.)
+* `"set_name"` = nome completo del set
+* `"is_new_set"` = false
+
+---
+
+# OUTPUT JSON (Carta Moderna)
+
+```json
 {
   "card_identity": {
     "pokemon_name": "Testo",
-    "set_number": "Testo formato XX/YYY o null",
+    "set_number": "Formato XX/YYY o null",
     "illustrator": "Nome o null",
-    "anno_carta": "indica l’anno della carta"
+    "anno_carta": "anno visibile in basso"
   },
   "set_details": {
-    "raw_printed_code": "Codice completo stampato (es. 'PFLit') o null",
+    "raw_printed_code": "Codice completo stampato o null",
     "set_symbol_description": "Descrizione visiva del simbolo o null",
-    "set_abbreviation": "Sigla base del set senza suffisso lingua (es. 'PFL') o null",
+    "set_abbreviation": "Sigla base del set senza suffisso lingua o null",
     "set_name": "Nome completo del set o null",
     "is_new_set": false
   }
 }
-
+```
 TEXT;
 
         $payload = [
