@@ -161,6 +161,7 @@ class TCGdexLookupService
                     ? $tcgSetData->tcgOnline
                     : $tcgSetData->abbreviation->official;
 
+                Log::info("Abbreviazione set: $abbreviation");
                 $set = CardSet::where('card_set_abbreviation', $abbreviation)->first();
                 if (!$set) {
                     return null;

@@ -6,6 +6,7 @@ use App\Http\Requests\SaveCardRequest;
 use App\Http\Requests\UploadRawImageRequest;
 use App\Http\Requests\SaveCroppedImageRequest;
 use App\Http\Requests\ProcessCardRequest;
+use App\Models\CardSet;
 use App\Models\PokemonCard;
 use App\Models\MarketPrice;
 use App\Services\GeminiService;
@@ -143,6 +144,90 @@ class CardUploadController extends Controller
                 'status' => PokemonCard::STATUS_READY_FOR_AI
             ]
         ]);
+    }
+
+    /**
+     * Upload an image and immediately run AI recognition — for the Dropzone UI.
+     * Returns only the fields shown in the Upload page table (name, type, set, card number, illustrator).
+     */
+    public function uploadAndEnhance(UploadRawImageRequest $request, GeminiService $geminiService, TCGdexLookupService $tcgdexService)
+    {
+        try {
+            $file = $request->file('image');
+            $originalFilename = $file->getClientOriginalName();
+
+            $path = $file->store('pokemon_cards', 'public');
+
+            $imageResizeService = app(ImageResizeService::class);
+            $imageResizeService->resizeIfNeeded($path, 'public');
+
+            $card = PokemonCard::create([
+                'user_id'           => auth()->id(),
+                'original_filename' => $originalFilename,
+                'storage_path'      => $path,
+                'status'            => PokemonCard::STATUS_READY_FOR_AI,
+            ]);
+
+            // --- AI recognition ---
+            $imagePath = Storage::disk('public')->path($path);
+            if (!file_exists($imagePath)) {
+                return response()->json(['success' => false, 'message' => 'File non trovato dopo il salvataggio.'], 500);
+            }
+
+            $base64Image = base64_encode(file_get_contents($imagePath));
+            $aiResult    = $geminiService->enhanceCardData($base64Image);
+
+            if (!$aiResult) {
+                return response()->json(['success' => false, 'message' => "L'AI non ha restituito una risposta valida."], 500);
+            }
+
+            $mappedData = $geminiService->mapGeminiToLegacyFormat($aiResult);
+
+            if (isset($mappedData['is_valid_card']) && $mappedData['is_valid_card'] === false) {
+                $card->update(['status' => PokemonCard::STATUS_FAILED]);
+                return response()->json([
+                    'success'    => false,
+                    'is_not_card' => true,
+                    'message'    => $mappedData['error_message'] ?? "L'immagine non sembra una carta Pokémon.",
+                ], 422);
+            }
+
+            $mappedData = $tcgdexService->lookupAndEnrich($mappedData);
+            if (isset($mappedData['game']) && preg_match('/Pokemon/i', $mappedData['game'])) {
+                $mappedData['game'] = 'Pokemon';
+            }
+            if ($mappedData['card_set_id']) {
+                $setCard = CardSet::findOrFail($mappedData['card_set_id']);
+                $mappedData['set_code']             = $setCard->card_set_abbreviation;
+                $mappedData['set_info']['set_name'] = $setCard->name;
+                $mappedData['set_info']['set_id']   = $setCard->id;
+            }
+
+            $card->update(['status' => PokemonCard::STATUS_REVIEW]);
+
+            // Return only the fields needed by the Upload page table
+            return response()->json([
+                'success' => true,
+                'message' => 'Riconoscimento completato!',
+                'data'    => [
+                    'card_id'           => $card->id,
+                    'image_url'         => $card->getImageUrl(),
+                    'name'              => $mappedData['card_name']             ?? null,
+                    'type'              => $mappedData['type']                  ?? null,
+                    'set'               => $mappedData['set_info']['set_name']  ?? ($mappedData['set_code'] ?? null),
+                    'set_id'            => $mappedData['set_info']['set_id']    ?? null,
+                    'set_code'          => $mappedData['set_code']              ?? null,
+                    'card_number'       => $mappedData['set_number']            ?? null,
+                    'illustrator'       => $mappedData['illustrator']           ?? null,
+                ],
+            ]);
+        } catch (Exception $e) {
+            Log::error('uploadAndEnhance error', [
+                'message' => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
+            return response()->json(['success' => false, 'message' => 'Errore interno del server.'], 500);
+        }
     }
 
     /**

@@ -59,6 +59,7 @@ Route::middleware('auth')->group(function () {
         // Upload flow (CardUploadController)
         Route::get('/upload', [CardUploadController::class, 'showUploadForm'])->name('cards.upload');
         Route::post('/upload-image', [CardUploadController::class, 'uploadRawImage'])->name('cards.upload-image');
+        Route::post('/upload-and-enhance', [CardUploadController::class, 'uploadAndEnhance'])->name('cards.upload-and-enhance');
         Route::post('/save-crop', [CardUploadController::class, 'saveCroppedImage'])->name('cards.save-crop');
         Route::post('/skip-crop', [CardUploadController::class, 'skipCrop'])->name('cards.skip-crop');
         Route::post('/enhance', [CardUploadController::class, 'enhanceWithAI'])->name('cards.enhance');
