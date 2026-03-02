@@ -10,6 +10,7 @@ use App\Http\Controllers\CardMatchingController;
 use App\Http\Controllers\PokemonCardController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\AdminController;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use TCGdex\Model\Card;
 use TCGdex\Query;
 use TCGdex\TCGdex;
@@ -108,43 +109,6 @@ Route::get('/test/api', function () {
     return inertia('Test/ApiTest');
 })->name('test.api');
 
-
-Route::get('/pippo', function () {
-    $json = <<<JSON
-    {
-      "card_id": 108,
-      "image_url": "http://127.0.0.1:8000/api/image/card/108",
-      "analysis": {
-        "is_valid_card": true,
-        "card_name": "Imakumi",
-        "set_code": null,
-        "set_number": "63/83",
-        "illustrator": null,
-        "hp": null,
-        "type": null,
-        "evolution_stage": null,
-        "attacks": [],
-        "weakness": null,
-        "resistance": null,
-        "retreat_cost": null,
-        "rarity": null,
-        "flavor_text": null,
-        "game": "Pokémon",
-        "card_language": null
-      }
-    }
-    JSON;
-    $data = json_decode($json, true);
-    $tcg = new TCGdex('it');
-    $number = explode("/", $data['analysis']['set_number'])[0];
-    $query = Query::create()->equal('name', $data['analysis']['card_name']);
-    $card = $tcg->card->list($query);
-
-    dd($tcg->set->list()[167]);
-});
-Ecco una route ottimizzata per web.php che legge il file di log in modo efficiente tramite streaming con chunk, senza caricare tutto in memoria:
-phpuse Symfony\Component\HttpFoundation\StreamedResponse;
-
 Route::get('/logs', function () {
     $logPath = storage_path('logs/laravel.log');
 
@@ -198,7 +162,6 @@ Route::get('/logs', function () {
         fclose($handle);
 
         echo '</pre></body></html>';
-
     }, 200, [
         'Content-Type'      => 'text/html; charset=UTF-8',
         'X-Accel-Buffering' => 'no', // Disabilita il buffering su Nginx

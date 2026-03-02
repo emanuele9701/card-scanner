@@ -375,7 +375,7 @@ const openEditModal = async (card) => {
             if (key === 'attacks' && card.data.attacks) {
                 // Deep copy attacks array to avoid mutations
                 editForm.attacks = JSON.parse(JSON.stringify(card.data.attacks));
-            } else if (card.data[key]) {
+            } else if (card.data[key] !== undefined && card.data[key] !== null) {
                 editForm[key] = card.data[key];
             }
         });
