@@ -52,7 +52,9 @@ class ImportCardSetPokemon extends Command
         foreach ($allSets['results'] as $key => $set) {
             FacadesLog::info($set['name']);
             $this->info($set['name']);
-            $abbreviation = explode("-", $set['urlName'])[0];
+
+            $abbreviation = $set['abbreviation'];
+            dump($set);
 
             $setCard = CardSet::updateOrCreate(
                 [
@@ -71,6 +73,8 @@ class ImportCardSetPokemon extends Command
                     'is_active' => $set['active'],
                 ]
             );
+
+            $this->info($set['name'] . " -> " . $setCard->id);
         }
 
         $this->info("Card Sets imported successfully.");

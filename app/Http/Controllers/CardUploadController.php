@@ -984,9 +984,7 @@ class CardUploadController extends Controller
         $number = explode("/", $mappedData['set_number']);
 
         $tcg = new TCGdex();
-
-
-        $number = explode("/", $mappedData['set_number']);
+        $tcgCard = null;
 
         if ($mappedData['is_old_card']) {
             Log::info("Carta vecchia");
@@ -1040,6 +1038,12 @@ class CardUploadController extends Controller
                         $mappedData['card_set_id'] = $set->id;
                         break;
                     }
+                }
+
+                // Se nessuna carta corrisponde nel foreach, non possiamo procedere
+                if (!isset($mappedData['card_set_id'])) {
+                    Log::info('Nessun match trovato nel foreach per carta vecchia');
+                    return $mappedData;
                 }
             }
         } else {
@@ -1104,30 +1108,34 @@ class CardUploadController extends Controller
 
                     if (!isset($mappedData['card_set_id'])) {
                         Log::info("Set non trovato");
-                        die;
                         return $mappedData;
                     }
                 }
 
                 Log::info("Set trovato");
                 $mappedData['card_set_id'] = $set->id;
-
-                try {
-                    $tcg = new TCGdex('it');
-                    $tcgCard = $tcg->set->getCard($set->abbreviation, $number[0]);
-                    // dd($tcgCard);
-                    if (!($tcgCard instanceof Card)) {
-                        return $mappedData;
-                    }
-
-                } catch (\Exception $e) {
-                    // TCGdex errors are non-blocking — proceed with Gemini data only
-                    Log::warning("TCGDex error: " . $e->getMessage());
+            }
+            try {
+                $tcg = new TCGdex('it');
+                $tcgCard = $tcg->set->getCard($set->abbreviation, $number[0]);
+                // dd($tcgCard);
+                if (!($tcgCard instanceof Card)) {
+                    return $mappedData;
                 }
+
+            } catch (\Exception $e) {
+                // TCGdex errors are non-blocking — proceed with Gemini data only
+                Log::warning("TCGDex error: " . $e->getMessage());
+                return $mappedData;
             }
         }
-        $mappedData = $this->enrichCardDetails($mappedData, $tcgCard);
-        $mappedData = $this->extractPricingAndMarket($mappedData, $tcgCard);
+        if ($tcgCard instanceof Card) {
+            $mappedData = $this->enrichCardDetails($mappedData, $tcgCard);
+            $mappedData = $this->extractPricingAndMarket($mappedData, $tcgCard);
+        } else {
+            Log::warning('tcgCard non disponibile, skip enrichment');
+        }
+
         return $mappedData;
     }
 

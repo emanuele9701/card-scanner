@@ -11,6 +11,7 @@ class CardSet extends Model
         'game_id',
         'name',
         'abbreviation',
+        'lang',
         'card_set_abbreviation',
         'release_date',
         'total_cards',
