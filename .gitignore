@@ -25,3 +25,5 @@ Thumbs.db
 composer.lock
 composer.lock
 package-lock.json
+composer.lock
+package-lock.json
