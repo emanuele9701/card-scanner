@@ -174,12 +174,13 @@ onBeforeUnmount(() => {
                                     <th>N° Carta</th>
                                     <th>Illustratore</th>
                                     <th class="col-status">Stato</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody>
 
                                 <tr v-for="row in results" :key="row._id" :class="['result-row', row.status]">
-                                    <form>
+                             
                                         <!-- Preview -->
                                         <td class="col-img">
                                             <div class="card-thumb-wrapper">
@@ -235,7 +236,10 @@ onBeforeUnmount(() => {
                                                 Fatto</span>
                                             <span v-else class="status-pill error" :title="row.error">✕ Errore</span>
                                         </td>
-                                    </form>
+
+                                        <td class="col-action">
+                                            <font-awesome-icon :icon="['fad', 'save']"  v-if="row.status === 'done'" @click=""/>
+                                        </td>
 
 
                                 </tr>
