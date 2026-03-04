@@ -3,35 +3,139 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import Dropzone from 'dropzone';
+import axios from 'axios';
 import 'dropzone/dist/dropzone.css';
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap";
+import { route } from 'ziggy-js';
+import { Ziggy } from '../../ziggy.js';
 
 // Prevent Dropzone from auto-discovering all elements
 Dropzone.autoDiscover = false;
+let headersCalls;
+
+const props = defineProps({
+    sets: Object
+});
 
 // ---- State ----
 const dropzoneRef = ref(null);
 const results = ref([]);    // array of { image_url, name, type, set, card_number, illustrator, status, error }
+const localChangeRow = {};
 const isProcessing = ref(false);
-let dz = null;
 
+const typeOptions = [
+    { label: 'Normale', value: 'Normal', color: '#A8A77A' },
+    { label: 'Fuoco', value: 'Fire', color: '#EE8130' },
+    { label: 'Acqua', value: 'Water', color: '#6390F0' },
+    { label: 'Erba', value: 'Grass', color: '#7AC74C' },
+    { label: 'Elettro', value: 'Electric', color: '#F7D02C' },
+    { label: 'Ghiaccio', value: 'Ice', color: '#96D9D6' },
+    { label: 'Lotta', value: 'Fighting', color: '#C22E28' },
+    { label: 'Veleno', value: 'Poison', color: '#A33EA1' },
+    { label: 'Terra', value: 'Ground', color: '#E2BF65' },
+    { label: 'Volante', value: 'Flying', color: '#A98FF3' },
+    { label: 'Psico', value: 'Psychic', color: '#F95587' },
+    { label: 'Coleottero', value: 'Bug', color: '#A6B91A' },
+    { label: 'Roccia', value: 'Rock', color: '#B6A136' },
+    { label: 'Spettro', value: 'Ghost', color: '#735797' },
+    { label: 'Drago', value: 'Dragon', color: '#6F35FC' },
+    { label: 'Buio', value: 'Dark', color: '#705746' },
+    { label: 'Acciaio', value: 'Steel', color: '#B7B7CE' },
+    { label: 'Folletto', value: 'Fairy', color: '#D685AD' },
+]
+
+const setOptions = props.sets;
+const selectedCards = ref([]);
+let dz = null;
 // ---- Helpers ----
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 }
 
 function typeColor(type) {
-    const map = {
-        Fire: '#ef4444', Water: '#3b82f6', Grass: '#22c55e', Lightning: '#eab308',
-        Psychic: '#a855f7', Fighting: '#f97316', Darkness: '#6b7280', Metal: '#94a3b8',
-        Dragon: '#06b6d4', Colorless: '#d1d5db', Fairy: '#ec4899',
-    };
-    return map[type] || '#6366f1';
+    return typeOptions.find(t => t.value === type)?.color || '#6366f1';
+}
+
+function saveLocalCard(row, index) {
+    row.isEditing = false;
+    localChangeRow[row.card_id] = JSON.parse(JSON.stringify(row));
+
+}
+
+function deleteChangesCard(row, index) {
+    row = localChangeRow[row.card_id];
+    row.isEditing = false;
+    results.value[index] = row;
+    localChangeRow[row.card_id] = JSON.parse(JSON.stringify(results.value[index]));
+}
+
+async function saveCard(cardRow, index) {
+    localChangeRow[cardRow.card_id] = JSON.parse(JSON.stringify(results.value[index]));
+    cardRow.isSaving = true;
+    try {
+        // Costruire l'array conforme a SaveCardRequest
+        const postData = {
+            card_id: cardRow.card_id,
+            card_name: cardRow.name,
+            type: cardRow.type,
+            set_number: cardRow.card_number,
+            illustrator: cardRow.illustrator,
+            card_set_id: cardRow.set_id, // Preso dalla risposta dell'upload
+            game: 'pokemon',            // Richiesto dalla Form Request
+            // Altri campi opzionali se presenti nella riga
+            rarity: cardRow.rarity || null,
+        };
+        const response = await axios.post(route('cards.save', {}, true, Ziggy), postData, headersCalls);
+
+        if (response.data.success) {
+            // Successo: Salvataggio confermato dal server
+            cardRow.isEditing = false;
+            cardRow.status = 'done';
+            cardRow.isSave = true;
+            cardRow.isSaving = false;
+        } else {
+            // Caso in cui il server risponde con success: false
+            cardRow.status = 'error';
+            cardRow.isSave = false;
+            cardRow.isSaving = false;
+            cardRow.error = response.data.message || "Errore durante il salvataggio";
+        }
+
+    } catch (e) {
+        console.error("Errore durante il salvataggio:", e);
+        cardRow.status = 'error';
+        cardRow.error = e.response?.data?.message || "Errore nel salvataggio finale";
+    }
+}
+
+function editRow(cardRow, index) {
+    cardRow.isEditing = true;
+    localChangeRow[cardRow.card_id] = JSON.parse(JSON.stringify(results.value[index]));
+}
+
+async function deleteRow(row) {
+    try {
+        await axios.post(route('cards.discard', {}, true, Ziggy), {
+            card_id: row.card_id
+        }, headersCalls);
+
+        // Rimuovi la riga dal frontend dopo il successo
+        results.value = results.value.filter(r => r.card_id !== row.card_id);
+    } catch (e) {
+        console.error('Errore durante l\'eliminazione della carta', e);
+    }
 }
 
 // ---- Dropzone init ----
 onMounted(() => {
+    headersCalls = {
+        headers: {
+            'X-CSRF-TOKEN': csrfToken(), // ⚠️ chiamato subito, prima del mount del DOM
+        }
+    };
     dz = new Dropzone(dropzoneRef.value, {
-        url: '/cards/upload-and-enhance',
+        url: route('cards.upload-and-enhance', {}, true, Ziggy),
         method: 'POST',
         paramName: 'image',
         maxFilesize: 25,   // MB
@@ -51,8 +155,10 @@ onMounted(() => {
             // Push a "loading" row immediately with a local preview
             const reader = new FileReader();
             reader.onload = (e) => {
+                // ✅ Soluzione sicura
+
                 results.value.unshift({
-                    _id: Date.now(),
+                    _id: crypto.randomUUID(),
                     image_url: e.target.result,
                     name: null,
                     type: null,
@@ -62,6 +168,10 @@ onMounted(() => {
                     status: 'loading',
                     error: null,
                     filename: file.name,
+                    isEditing: false,
+                    isSave: false,
+                    isSaving: false,
+                    isSelected: false,
                 });
                 file._resultId = results.value[0]._id;
             };
@@ -83,6 +193,10 @@ onMounted(() => {
                     card_id: response.data.card_id,
                     illustrator: response.data.illustrator,
                     status: 'done',
+                    isEditing: false,
+                    isSave: false,
+                    isSaving: false,
+                    isSelected: false,
                 });
             } else if (row) {
                 row.status = 'error';
@@ -108,6 +222,17 @@ onMounted(() => {
 onBeforeUnmount(() => {
     if (dz) dz.destroy();
 });
+
+function toggleCheckbox(index) {
+    results.value[index].isSelected = !results.value[index].isSelected;
+
+    if (results.value[index].isSelected) {
+        selectedCards.value.push(results.value[index].card_id);
+    } else {
+        const pos = selectedCards.value.indexOf(results.value[index].card_id);
+        if (pos !== -1) selectedCards.value.splice(pos, 1);
+    }
+}
 </script>
 
 <template>
@@ -161,12 +286,21 @@ onBeforeUnmount(() => {
                             Carte riconosciute
                             <span class="badge">{{results.filter(r => r.status === 'done').length}}</span>
                         </h2>
+                        <div class="d-flex gap-2 mt-2" v-if="selectedCards.length > 0">
+                            <button class="btn btn-success btn-sm" @click="saveSelectedCards()">
+                                <font-awesome-icon :icon="['fad', 'save']" /> Salva selezione
+                            </button>
+                            <button class="btn btn-danger btn-sm" @click="deleteSelectedCards()">
+                                <font-awesome-icon :icon="['fad', 'trash']" /> Elimina selezione
+                            </button>
+                        </div>
                     </div>
 
                     <div class="table-wrapper">
                         <table class="results-table">
                             <thead>
                                 <tr>
+                                    <th></th>
                                     <th class="col-img">Anteprima</th>
                                     <th>Nome</th>
                                     <th>Tipo</th>
@@ -179,67 +313,127 @@ onBeforeUnmount(() => {
                             </thead>
                             <tbody>
 
-                                <tr v-for="row in results" :key="row._id" :class="['result-row', row.status]">
-                             
-                                        <!-- Preview -->
-                                        <td class="col-img">
-                                            <div class="card-thumb-wrapper">
-                                                <img :src="row.image_url" :alt="row.filename" class="card-thumb" />
-                                                <div v-if="row.status === 'loading'" class="thumb-overlay">
-                                                    <div class="spinner-sm"></div>
-                                                </div>
+                                <tr v-for="(row, index) in results" :key="row._id" :class="['result-row', row.status]">
+
+                                    <td>
+                                        <input type="checkbox" @change="toggleCheckbox(index)">
+                                    </td>
+                                    <!-- Preview -->
+                                    <td class="col-img">
+                                        <div class="card-thumb-wrapper">
+                                            <img :src="row.image_url" :alt="row.filename" class="card-thumb" />
+                                            <div v-if="row.status === 'loading'" class="thumb-overlay">
+                                                <div class="spinner-sm"></div>
                                             </div>
-                                        </td>
+                                        </div>
+                                    </td>
 
-                                        <!-- Name -->
-                                        <td>
-                                            <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
-                                            <span v-else-if="row.status === 'error'" class="text-muted">—</span>
-                                            <span v-else class="card-name">{{ row.name ?? '—' }}</span>
-                                        </td>
+                                    <!-- Name -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
+                                        <span v-else-if="row.status === 'error'" class="text-muted">—</span>
+                                        <span v-else-if="row.status === 'done' && !row.isEditing" class="card-name">{{
+                                            row.name ?? '—' }}</span>
+                                        <span v-else-if="row.status === 'done' && row.isEditing" class="card-name">
+                                            <input v-model="row.name" class="form-control form-control-md">
+                                        </span>
+                                        <span v-else class="text-muted">-</span>
+                                    </td>
 
-                                        <!-- Type -->
-                                        <td>
-                                            <span v-if="row.status === 'loading'" class="skeleton skeleton-chip"></span>
-                                            <span v-else-if="row.type" class="type-chip"
-                                                :style="{ background: typeColor(row.type) }">
-                                                {{ row.type }}
-                                            </span>
-                                            <span v-else class="text-muted">—</span>
-                                        </td>
+                                    <!-- Type -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-chip"></span>
+                                        <span v-else-if="row.type && !row.isEditing" class="type-chip"
+                                            :style="{ background: typeColor(row.type) }">
+                                            {{ row.type }}
+                                        </span>
+                                        <span v-else-if="row.type && row.isEditing" class="type-chip">
+                                            <select v-model="row.type" class="form-select form-select-md">
+                                                <option v-for="value in typeOptions" :value="value.value">{{ value.label
+                                                    }}</option>
+                                            </select>
+                                        </span>
+                                        <span v-else class="text-muted">—</span>
+                                    </td>
 
-                                        <!-- Set -->
-                                        <td>
-                                            <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
-                                            <span v-else class="set-name">{{ row.set ?? '—' }}</span>
-                                        </td>
+                                    <!-- Set -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
+                                        <span v-else-if="!row.isEditing && row.status === 'done'" class="set-name">{{
+                                            row.set ?? '—' }}</span>
+                                        <select v-else-if="row.isEditing && row.status === 'done'" v-model="row.set_id"
+                                            class="form-select form-select-md">
+                                            <option v-for="value in setOptions" :value="value.id" :key="value.id">{{
+                                                value.name }}
+                                            </option>
+                                        </select>
+                                        <span v-else class="set-name">{{ row.set ?? '—' }}</span>
+                                    </td>
 
-                                        <!-- Card number -->
-                                        <td>
-                                            <span v-if="row.status === 'loading'"
-                                                class="skeleton skeleton-short"></span>
-                                            <code v-else class="card-number">{{ row.card_number ?? '—' }}</code>
-                                        </td>
+                                    <!-- Card number -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-short"></span>
+                                        <span v-else-if="row.status === 'done' && !row.isEditing">{{ row.card_number ??
+                                            '—' }}</span>
+                                        <span v-else-if="row.status === 'done' && row.isEditing">
+                                            <input v-model="row.card_number" class="form-control form-control-sm">
+                                        </span>
+                                        <code v-else class="card-number">{{ row.card_number ?? '—' }}</code>
+                                    </td>
 
-                                        <!-- Illustrator -->
-                                        <td>
-                                            <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
-                                            <span v-else class="illustrator">{{ row.illustrator ?? '—' }}</span>
-                                        </td>
+                                    <!-- Illustrator -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-short"></span>
+                                        <span v-else-if="row.status === 'done' && !row.isEditing">{{ row.illustrator ??
+                                            '—' }}</span>
+                                        <span v-else-if="row.status === 'done' && row.isEditing">
+                                            <input v-model="row.illustrator" class="form-control form-control-md">
+                                        </span>
+                                        <code v-else class="card-number">{{ row.illustrator ?? '—' }}</code>
+                                    </td>
 
-                                        <!-- Status -->
-                                        <td class="col-status">
-                                            <span v-if="row.status === 'loading'" class="status-pill loading">
-                                                <div class="spinner-xs"></div> Analisi…
-                                            </span>
-                                            <span v-else-if="row.status === 'done'" class="status-pill done">✓
-                                                Fatto</span>
-                                            <span v-else class="status-pill error" :title="row.error">✕ Errore</span>
-                                        </td>
+                                    <!-- Status -->
+                                    <td class="col-status">
+                                        <span v-if="row.status === 'loading'" class="status-pill loading">
+                                            <div class="spinner-xs"></div> Analisi…
+                                        </span>
+                                        <span v-else-if="row.status === 'done' && !row.isSave && !row.isSaving"
+                                            class="status-pill done">✓ Fatto</span>
+                                        <span v-else-if="row.status === 'done' && row.isSave && !row.isSaving"
+                                            class="status-pill done">✓ Salvata</span>
+                                        <span v-else-if="row.status === 'done' && !row.isSave && row.isSaving"
+                                            class="status-pill done">Salvataggio in corso</span>
+                                        <span v-else class="status-pill error" :title="row.error">✕ Errore</span>
+                                    </td>
 
-                                        <td class="col-action">
-                                            <font-awesome-icon :icon="['fad', 'save']"  v-if="row.status === 'done'" @click=""/>
-                                        </td>
+                                    <td class="col-action d-flex flex-column gap-3" v-if="!row.isSave && !row.isSaving">
+                                        <span style="cursor: pointer;" class="text-center bg-success p-1"
+                                            v-if="row.status === 'done' && !row.isEditing">
+                                            <font-awesome-icon :icon="['fad', 'save']" @click="saveCard(row, index)" />
+                                        </span>
+
+                                        <span style="cursor: pointer;" class="text-center bg-primary p-1"
+                                            v-if="row.status === 'done' && !row.isEditing">
+                                            <font-awesome-icon :icon="['fas', 'pencil']" @click="editRow(row, index)" />
+                                        </span>
+
+                                        <span style="cursor: pointer;" class="text-center bg-danger p-1"
+                                            v-if="row.status === 'done' && !row.isEditing">
+                                            <font-awesome-icon :icon="['fas', 'trash']" @click="deleteRow(row)" />
+                                        </span>
+
+                                        <span style="cursor: pointer;" class="text-center bg-success  p-1"
+                                            v-if="row.status === 'done' && row.isEditing">
+                                            <font-awesome-icon :icon="['fas', 'check']"
+                                                @click="saveLocalCard(row, index)" />
+                                        </span>
+
+                                        <span style="cursor: pointer;" class="text-center bg-danger p-1"
+                                            v-if="row.status === 'done' && row.isEditing">
+                                            <font-awesome-icon :icon="['fas', 'times']"
+                                                @click="deleteChangesCard(row, index)" />
+                                        </span>
+                                    </td>
 
 
                                 </tr>
@@ -489,7 +683,6 @@ onBeforeUnmount(() => {
 /* Text / chips */
 .card-name {
     font-weight: 600;
-    color: #f1f5f9;
 }
 
 .type-chip {

@@ -33,11 +33,12 @@ class CardUploadController extends Controller
         $cardsWithoutSet = $cards->filter(fn($card) => $card->card_set_id === null)->values();
         $cardsWithSet = $cards->filter(fn($card) => $card->card_set_id !== null)->values();
         $cardsBySet = $cardsWithSet->groupBy(fn($card) => $card->cardSet->name);
+        $sets = array_map(function ($cardSet) {
+            return ['id' => $cardSet['id'], 'name' => $cardSet['name'] . " ( " . $cardSet['card_set_abbreviation'] . " )"];
+        }, CardSet::all()->toArray());
 
         return \Inertia\Inertia::render('Cards/Upload', [
-            'initialCards' => $cards,
-            'cardsBySet' => $cardsBySet,
-            'cardsWithoutSet' => $cardsWithoutSet
+            'sets' => $sets
         ]);
     }
 
