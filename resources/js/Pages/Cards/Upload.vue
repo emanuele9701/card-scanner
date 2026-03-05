@@ -130,6 +130,7 @@ async function retryRow(row, index) {
         // Rifinanzia l'upload tramite Dropzone riaggiungendo il file
         row.retryType = null;
         dz.addFile(row._file);
+        results.value.splice(index, 1);
     } else if (row.retryType === 'save') {
         // Riprova solo il salvataggio su DB
         row.retryType = null;

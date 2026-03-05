@@ -291,7 +291,10 @@ class CardUploadController extends Controller
      */
     public function saveCard(SaveCardRequest $request)
     {
-        return response(null, 500)->json([]);
+        // return response([], 500)->json([
+        //     'success' => false,
+        //     'message' => 'Funzione disabilitata temporaneamente per manutenzione. Torna presto!'
+        // ])->setStatusCode(500);
         if ($request->has('cards') && is_array($request->cards)) {
             $cardsRequestData = $request->cards;
             $idCardsRequestData = array_map(fn($cardData) => $cardData['card_id'], $cardsRequestData);
@@ -374,6 +377,7 @@ class CardUploadController extends Controller
         $tcgCard = $dataService['tcg_card'] ?? null;
 
         if ($tcgCard) {
+            Log::info("AAA Carta trovata su TCGDex: {$tcgCard->name} ({$tcgCard->set->name})");
             // Si crea il record del market data
             $marketCardData = [
                 'product_id' => $tcgCard->id,
@@ -483,6 +487,8 @@ class CardUploadController extends Controller
         }
 
         foreach ($pricing as $provider => $price) {
+            if(!is_array($price)) continue;
+
             if (strtolower($provider) == 'cardmarket') {
                 $this->TCGGenerateCardMarketsPrice($marketCard, $price);
             } else if (strtolower($provider) === 'tcgplayer') {
