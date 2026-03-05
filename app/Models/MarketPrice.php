@@ -9,21 +9,41 @@ class MarketPrice extends Model
 {
     public $timestamps = false;
 
+    public const UNITS_DIVISA = [
+        'eur' => '€',
+        'dol' => '$'
+    ];
+
     protected $fillable = [
         'market_card_id',
         'condition',
         'printing',
         'low_price',
+        'high_price',
+        'mid_price',
         'market_price',
+        'trend',
+        'avg1',
+        'avg7',
+        'avg30',
         'sales_count',
+        'unit_divisa',
         'import_date',
+        'external_product_id',
+        'provider_id'
     ];
 
     protected $casts = [
-        'low_price' => 'decimal:2',
-        'market_price' => 'decimal:2',
-        'import_date' => 'date',
-        'created_at' => 'datetime',
+        'low_price'     => 'decimal:2',
+        'mid_price'     => 'decimal:2',
+        'high_price'    => 'decimal:2',
+        'market_price'  => 'decimal:2',
+        'trend'         => 'decimal:2',
+        'avg1'          => 'decimal:2',
+        'avg7'          => 'decimal:2',
+        'avg30'         => 'decimal:2',
+        'import_date'   => 'date',
+        'created_at'    => 'datetime',
     ];
 
     /**
@@ -80,5 +100,37 @@ class MarketPrice extends Model
     public function getFormattedLowPriceAttribute(): string
     {
         return '$' . number_format($this->low_price, 2);
+    }
+
+    /**
+     * Get formatted trend price with currency symbol
+     */
+    public function getFormattedTrendAttribute(): string
+    {
+        return '$' . number_format($this->trend, 2);
+    }
+
+    /**
+     * Get formatted 1-day average price with currency symbol
+     */
+    public function getFormattedAvg1Attribute(): string
+    {
+        return '$' . number_format($this->avg1, 2);
+    }
+
+    /**
+     * Get formatted 7-day average price with currency symbol
+     */
+    public function getFormattedAvg7Attribute(): string
+    {
+        return '$' . number_format($this->avg7, 2);
+    }
+
+    /**
+     * Get formatted 30-day average price with currency symbol
+     */
+    public function getFormattedAvg30Attribute(): string
+    {
+        return '$' . number_format($this->avg30, 2);
     }
 }

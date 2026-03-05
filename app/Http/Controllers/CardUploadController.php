@@ -10,14 +10,17 @@ use App\Models\CardSet;
 use App\Models\MarketCard;
 use App\Models\PokemonCard;
 use App\Models\MarketPrice;
+use App\Models\ProviderPrice;
 use App\Services\GeminiService;
 use App\Services\GoogleDriveService;
 use App\Services\ImageResizeService;
 use App\Services\TCGdexLookupService;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use TCGdex\Model\Card;
 
 class CardUploadController extends Controller
 {
@@ -347,7 +350,6 @@ class CardUploadController extends Controller
             'illustrator' => $request['illustrator'] ?? '-',
             'flavor_text' => $request['flavor_text'] ?? '-',
             'card_set_id' => $request['card_set_id'] ?? '-',
-            'market_card_id' => $request['market_card_id'] ?? null,
             'game' => $request['game'] ? $request['game'] : null,
             'game_id' => $gameId,
             'status' => PokemonCard::STATUS_COMPLETED,
@@ -367,20 +369,11 @@ class CardUploadController extends Controller
          * @var Card $tcgCard
          */
         $tcgCard = $dataService['tcg_card'];
-        $card->update([
-            'hp' => $tcgCard->hp, 
-            'type' => $tcgCard->types[0] ?? 'Unknown', 
-            'evolution_stage' => $tcgCard->stage ?? 'Unknown', 
-            'attacks' => $tcgCard->attacks ?? null, 
-            'weakness' => $tcgCard->weakness ?? 'Unknown', 
-            'resistance' => $tcgCard->resistance ?? 'Unknown', 
-            'retreat_cost' => $tcgCard->retreat ?? 'Unknown', 
-            'rarity' => $tcgCard->rarity ?? 'Unknown'
-        ]);
+
 
         // Si crea il record del market data
         $marketCardData = [
-            'product_id' => $card->id,
+            'product_id' => $tcgCard->id,
             'product_name' => $card->card_name,
             'card_number' => $card->set_number,
             'set_name' => $set ? $set->name : null,
@@ -390,14 +383,23 @@ class CardUploadController extends Controller
             'type' => implode(', ', $tcgCard->types ?? ['Unknown']),
             'game' => $tcgCard->category ?? 'Unknown',
         ];
+        $card->refresh();
+        $marketCard = MarketCard::updateOrCreate(['product_id' => $tcgCard->id], $marketCardData);
 
-        $marketCard = MarketCard::create($marketCardData);
-
+        $card->update([
+            'hp' => $tcgCard->hp,
+            'type' => $tcgCard->types[0] ?? 'Unknown',
+            'evolution_stage' => $tcgCard->stage ?? 'Unknown',
+            'attacks' => $tcgCard->attacks ?? null,
+            'weakness' => $tcgCard->weakness ?? 'Unknown',
+            'resistance' => $tcgCard->resistance ?? 'Unknown',
+            'retreat_cost' => $tcgCard->retreat ?? 'Unknown',
+            'rarity' => $tcgCard->rarity ?? 'Unknown',
+            'market_card_id' => $marketCard->id ?? null
+        ]);
 
         // Persist market pricing if provided
-        if (isset($request['pricing']) && isset($request['market_card_id'])) {
-            $this->persistMarketPricing($request['pricing'], $request['market_card_id']);
-        }
+        $this->persistMarketPricing($card, json_decode(json_encode($tcgCard->pricing), true), $marketCard);
 
         // Google Drive upload
         $driveFileId = null;
@@ -419,6 +421,12 @@ class CardUploadController extends Controller
 
         // Auto-create CardInventory for this card
         $this->createCardInventory($card);
+
+
+        // Aggiorno i set dell'utente
+        if (!Auth::user()->cardSets()->where('card_set_id', $card->card_set_id)->exists()) {
+            Auth::user()->cardSets()->attach($card->card_set_id);
+        }
         return $driveFileId;
     }
 
@@ -462,29 +470,98 @@ class CardUploadController extends Controller
     /**
      * Persist market pricing data from TCGdex
      */
-    private function persistMarketPricing(array $pricing, int $marketCardId): void
+    private function persistMarketPricing(PokemonCard $card, array $pricing, MarketCard $marketCard): void
     {
-        $importDate = isset($pricing['updated']) ? date('Y-m-d', strtotime($pricing['updated'])) : null;
-
-        if (!$importDate) {
+        if (empty($pricing)) {
+            Log::info("I valori di questa carta: {$card->card_name} #{$card->set_number} non esistono");
             return;
         }
 
-        $latestPrice = MarketPrice::where('market_card_id', $marketCardId)
-            ->orderBy('import_date', 'desc')
-            ->first();
+        foreach ($pricing as $provider => $price) {
+            if (strtolower($provider) == 'cardmarket') {
+                $this->TCGGenerateCardMarketsPrice($marketCard, $price);
+            } else if (strtolower($provider) === 'tcgplayer') {
+                $this->TCGGenerateTcgPlayerPrice($marketCard, $price);
+            }
+        }
+    }
 
-        if (!$latestPrice || $importDate > $latestPrice->getRawOriginal('import_date')) {
-            MarketPrice::create([
-                'market_card_id' => $marketCardId,
+    /**
+     * From array tcg's pricing (cardmarket) array generate a MarketPrices data
+     */
+    private function TCGGenerateCardMarketsPrice(MarketCard $marketCard, array $price): void
+    {
+        $return = [];
+        $providerPrice = ProviderPrice::where('name', 'CardMarket')->first();
+
+        if (!$providerPrice) {
+            return;
+        }
+        $importDate = (date_create_from_format('Y-m-d', explode("T", $price['updated'])[0]))->format("Y-m-d");
+        if (MarketPrice::where('market_card_id', $marketCard->id)->where('import_date', $importDate)->exists()) return;
+
+        $return[] = [
+            'external_product_id' => $price['idProduct'],
+            'market_card_id' => $marketCard->id,
+            'provider_id' => $providerPrice->id,
+            'condition' => 'Near Mint',
+            'printing' => 'Standard',
+            'low_price' => $price['low'],
+            'trend' => $price['trend'],
+            'avg1' => $price['avg1'],
+            'avg7' => $price['avg7'],
+            'avg30' => $price['avg30'],
+            'unit_divisa' => 'eur',
+            'market_price' => $price['trend'],
+            'import_date' => $importDate
+        ];
+
+        if (!empty($price['trend-holo'])) {
+            $return[] = [
+                'external_product_id' => $price['idProduct'],
+                'market_card_id' => $marketCard->id,
+                'provider_id' => $providerPrice->id,
                 'condition' => 'Near Mint',
-                'printing' => 'Normal',
-                'low_price' => $pricing['low'] ?? 0,
-                'market_price' => $pricing['avg'] ?? 0,
-                'import_date' => $importDate,
-            ]);
+                'printing' => 'Holo',
+                'low_price' => $price['low-holo'] ?? 0,
+                'trend' => $price['trend-holo'],
+                'avg1' => $price['avg1-holo'],
+                'avg7' => $price['avg7-holo'],
+                'avg30' => $price['avg30-holo'],
+                'unit_divisa' => 'eur',
+                'market_price' => $price['trend'],
+                'import_date' => $importDate
+            ];
+        }
+        foreach ($return as $key => $value) {
+            MarketPrice::create($value);
+        }
+    }
 
-            Log::info("Created new MarketPrice for MarketCard #{$marketCardId} from {$importDate}");
+    /**
+     * From array tcg's pricing (cardmarket) array generate a MarketPrices data
+     */
+    private function TCGGenerateTcgPlayerPrice(MarketCard $marketCard, array $price): void
+    {
+        $providerPrice = ProviderPrice::where('name', 'TCG Player')->first();
+
+        $importDate = (date_create_from_format('Y-m-d', explode("T", $price['updated'])[0]))->format("Y-m-d");
+        unset($price['updated'], $price['unit']);
+        foreach ($price as $printing => $value) {
+            $return = [
+                'external_product_id' => $value['productId'],
+                'market_card_id' => $marketCard->id,
+                'provider_id' => $providerPrice->id,
+                'condition' => 'Near Mint',
+                'printing' => $printing,
+                'low_price' => $value['lowPrice'],
+                'high_price' => $value['highPrice'],
+                'mid_price' => $value['midPrice'],
+                'market_price' => $value['marketPrice'],
+                'unit_divisa' => 'dol',
+                'import_date' => $importDate
+            ];
+            MarketPrice::create($return);
         }
     }
 
