@@ -7,6 +7,7 @@ use App\Http\Requests\UploadRawImageRequest;
 use App\Http\Requests\SaveCroppedImageRequest;
 use App\Http\Requests\ProcessCardRequest;
 use App\Models\CardSet;
+use App\Models\MarketCard;
 use App\Models\PokemonCard;
 use App\Models\MarketPrice;
 use App\Services\GeminiService;
@@ -287,45 +288,115 @@ class CardUploadController extends Controller
      */
     public function saveCard(SaveCardRequest $request)
     {
-        $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
+        if ($request->has('cards') && is_array($request->cards)) {
+            $cardsRequestData = $request->cards;
+            $idCardsRequestData = array_map(fn($cardData) => $cardData['card_id'], $cardsRequestData);
+            $cards = PokemonCard::where('user_id', auth()->id())->whereIn('id', $idCardsRequestData)->get();
 
-        // Handle attacks - accept both JSON string and array
+            foreach ($cards as $card) {
+                Log::info("Salvando carta #{$card->id} - {$card->original_filename}");
+                $requestDataForCard = collect($cardsRequestData)->firstWhere('card_id', $card->id);
+                $this->saveCardData($card, $requestDataForCard);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Carte aggiornate.'
+            ]);
+        } else if ($request->has('card_id')) {
+
+            $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
+            $driveFileId = $this->saveCardData($card, $request->validated());
+
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Carta salvata correttamente!',
+                'gfile' => $driveFileId,
+                'storage_mode' => config('services.google_drive.enabled') ? 'drive' : 'local'
+            ]);
+        }
+    }
+
+    private function saveCardData(PokemonCard $card, array $request): string|null
+    {
         $attacks = null;
-        if ($request->filled('attacks') && is_array($request->attacks)) {
-            $attacks = $request->attacks;
-        } elseif ($request->filled('attacks_json')) {
-            $attacks = json_decode($request->attacks_json, true);
+        if (isset($request['attacks']) && is_array($request['attacks'])) {
+            $attacks = $request['attacks'];
+        } elseif (isset($request['attacks_json'])) {
+            $attacks = json_decode($request['attacks_json'], true);
         }
 
         $gameId = null;
-        if ($request->game) {
-            $gameModel = \App\Models\Game::firstOrCreate(['name' => $request->game]);
+        if (isset($request['game'])) {
+            $gameModel = \App\Models\Game::firstOrCreate(['name' => $request['game']]);
             $gameId = $gameModel->id;
         }
 
         $card->update([
-            'card_name' => $request->card_name,
-            'hp' => $request->hp,
-            'type' => $request->type,
-            'evolution_stage' => $request->evolution_stage,
+            'card_name' => $request['card_name'],
+            'hp' => $request['hp'] ?? '-',
+            'type' => $request['type'] ?? '-',
+            'evolution_stage' => $request['evolution_stage'] ?? '-',
             'attacks' => $attacks,
-            'weakness' => $request->weakness,
-            'resistance' => $request->resistance,
-            'retreat_cost' => $request->retreat_cost,
-            'rarity' => $request->rarity,
-            'set_number' => $request->set_number,
-            'illustrator' => $request->illustrator,
-            'flavor_text' => $request->flavor_text,
-            'card_set_id' => $request->card_set_id,
-            'market_card_id' => $request->market_card_id,
-            'game' => $request->game,
+            'weakness' => $request['weakness'] ?? '-',
+            'resistance' => $request['resistance'] ?? '-',
+            'retreat_cost' => $request['retreat_cost'] ?? '-',
+            'rarity' => $request['rarity'] ?? '-',
+            'set_number' => $request['set_number'] ?? '-',
+            'illustrator' => $request['illustrator'] ?? '-',
+            'flavor_text' => $request['flavor_text'] ?? '-',
+            'card_set_id' => $request['card_set_id'] ?? '-',
+            'market_card_id' => $request['market_card_id'] ?? null,
+            'game' => $request['game'] ? $request['game'] : null,
             'game_id' => $gameId,
             'status' => PokemonCard::STATUS_COMPLETED,
         ]);
 
+        $set = $card->cardSet;
+
+        // Recupero il prezzo.
+        $tcgdexService = app(TCGdexLookupService::class);
+        $isOldCard = $request['is_old_card'] ?? false;
+        $parts = explode('/', $card->set_number);
+        [$localId, $totalCards] = count($parts) === 2 ? $parts : [$card->set_number, 0];
+
+        $dataService = $tcgdexService->searchAndMatch($localId, $card->card_name, $totalCards, false);
+
+        /**
+         * @var Card $tcgCard
+         */
+        $tcgCard = $dataService['tcg_card'];
+        $card->update([
+            'hp' => $tcgCard->hp, 
+            'type' => $tcgCard->types[0] ?? 'Unknown', 
+            'evolution_stage' => $tcgCard->stage ?? 'Unknown', 
+            'attacks' => $tcgCard->attacks ?? null, 
+            'weakness' => $tcgCard->weakness ?? 'Unknown', 
+            'resistance' => $tcgCard->resistance ?? 'Unknown', 
+            'retreat_cost' => $tcgCard->retreat ?? 'Unknown', 
+            'rarity' => $tcgCard->rarity ?? 'Unknown'
+        ]);
+
+        // Si crea il record del market data
+        $marketCardData = [
+            'product_id' => $card->id,
+            'product_name' => $card->card_name,
+            'card_number' => $card->set_number,
+            'set_name' => $set ? $set->name : null,
+            'set_abbreviation' => $set ? $set->card_set_abbreviation : null,
+            'game_id' => $card->game->id ?? null,
+            'rarity' => $tcgCard->rarity ?? 'Unknown',
+            'type' => implode(', ', $tcgCard->types ?? ['Unknown']),
+            'game' => $tcgCard->category ?? 'Unknown',
+        ];
+
+        $marketCard = MarketCard::create($marketCardData);
+
+
         // Persist market pricing if provided
-        if ($request->filled('pricing') && $request->filled('market_card_id')) {
-            $this->persistMarketPricing($request->pricing, $request->market_card_id);
+        if (isset($request['pricing']) && isset($request['market_card_id'])) {
+            $this->persistMarketPricing($request['pricing'], $request['market_card_id']);
         }
 
         // Google Drive upload
@@ -348,13 +419,7 @@ class CardUploadController extends Controller
 
         // Auto-create CardInventory for this card
         $this->createCardInventory($card);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Carta salvata correttamente!',
-            'gfile' => $driveFileId,
-            'storage_mode' => config('services.google_drive.enabled') ? 'drive' : 'local'
-        ]);
+        return $driveFileId;
     }
 
     /**
@@ -363,18 +428,35 @@ class CardUploadController extends Controller
     public function discard(ProcessCardRequest $request)
     {
 
-        $card = PokemonCard::where('user_id', auth()->id())->findOrFail($request->card_id);
+        if ($request->has('card_id')) {
+            $cards = PokemonCard::where('user_id', auth()->id())->where('id', $request->card_id)->get();
 
-        if (Storage::disk('public')->exists($card->storage_path)) {
-            Storage::disk('public')->delete($card->storage_path);
+            foreach ($cards as $card) {
+                if (Storage::disk('public')->exists($card->storage_path)) {
+                    Storage::disk('public')->delete($card->storage_path);
+                }
+                $card->delete();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Carte eliminate.'
+            ]);
+        } else if ($request->has('cards_id') && is_array($request->cards_id)) {
+            $cards = PokemonCard::where('user_id', auth()->id())->whereIn('id', $request->cards_id)->get();
+
+            foreach ($cards as $card) {
+                if (Storage::disk('public')->exists($card->storage_path)) {
+                    Storage::disk('public')->delete($card->storage_path);
+                }
+                $card->delete();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Carte eliminate.'
+            ]);
         }
-
-        $card->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Carta eliminata.'
-        ]);
     }
 
     /**

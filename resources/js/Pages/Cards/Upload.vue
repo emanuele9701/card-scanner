@@ -127,6 +127,58 @@ async function deleteRow(row) {
     }
 }
 
+async function saveSelectedCards() {
+    if (!confirm(`Sei sicuro di voler salvare ${selectedCards.value.length} carte selezionate? Questa azione è irreversibile.`)) {
+        return;
+    }
+
+    let dataToSave = results.value.filter(r => selectedCards.value.includes(r.card_id)).map(cardRow => ({
+        card_id: cardRow.card_id,
+        card_name: cardRow.name,
+        type: cardRow.type,
+        set_number: cardRow.card_number,
+        illustrator: cardRow.illustrator,
+        card_set_id: cardRow.set_id,
+        game: 'pokemon',
+        rarity: cardRow.rarity || null,
+    }));
+
+    const response = await axios.post(route('cards.save', {}, true, Ziggy), {
+        cards: dataToSave
+    }, headersCalls);
+
+    if(response.data.success) {
+        // Aggiorna lo stato delle carte salvate
+        results.value.forEach(r => {
+            if (selectedCards.value.includes(r.card_id)) {
+                r.isSave = true;
+                r.isEditing = false;
+                r.status = 'done';
+            }
+        });
+        selectedCards.value = [];
+    } else {
+        alert(response.data.message || "Errore durante il salvataggio delle carte");
+    }
+}
+
+async function deleteSelectedCards() {
+    if (!confirm(`Sei sicuro di voler eliminare ${selectedCards.value.length} carte selezionate? Questa azione è irreversibile.`)) {
+        return;
+    }
+
+    const response = await axios.post(route('cards.discard', {}, true, Ziggy), {
+        cards_id: selectedCards.value
+    }, headersCalls);
+
+    if(response.data.success) {
+        results.value = results.value.filter(r => !selectedCards.value.includes(r.card_id)); // Elimino la riga dal frontend
+        selectedCards.value = [];
+    } else {
+        alert(response.data.message || "Errore durante l'eliminazione delle carte");
+    }
+}
+
 // ---- Dropzone init ----
 onMounted(() => {
     headersCalls = {
@@ -138,9 +190,9 @@ onMounted(() => {
         url: route('cards.upload-and-enhance', {}, true, Ziggy),
         method: 'POST',
         paramName: 'image',
-        maxFilesize: 25,   // MB
+        maxFilesize: 20,   // MB
         acceptedFiles: 'image/*',
-        parallelUploads: 1,
+        parallelUploads: 3,
         addRemoveLinks: false,
         previewsContainer: false,   // we handle previews ourselves
         clickable: true,
