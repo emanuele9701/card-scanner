@@ -291,20 +291,23 @@ class CardUploadController extends Controller
      */
     public function saveCard(SaveCardRequest $request)
     {
+        return response(null, 500)->json([]);
         if ($request->has('cards') && is_array($request->cards)) {
             $cardsRequestData = $request->cards;
             $idCardsRequestData = array_map(fn($cardData) => $cardData['card_id'], $cardsRequestData);
             $cards = PokemonCard::where('user_id', auth()->id())->whereIn('id', $idCardsRequestData)->get();
-
+            $responseCards = [];
             foreach ($cards as $card) {
                 Log::info("Salvando carta #{$card->id} - {$card->original_filename}");
                 $requestDataForCard = collect($cardsRequestData)->firstWhere('card_id', $card->id);
-                $this->saveCardData($card, $requestDataForCard);
+                $esito = $this->saveCardData($card, $requestDataForCard);
+                $responseCards[$card->id] = $esito;
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Carte aggiornate.'
+                'message' => 'Carte salvate.',
+                'response_cards' => $responseCards
             ]);
         } else if ($request->has('card_id')) {
 
@@ -368,38 +371,39 @@ class CardUploadController extends Controller
         /**
          * @var Card $tcgCard
          */
-        $tcgCard = $dataService['tcg_card'];
+        $tcgCard = $dataService['tcg_card'] ?? null;
 
+        if ($tcgCard) {
+            // Si crea il record del market data
+            $marketCardData = [
+                'product_id' => $tcgCard->id,
+                'product_name' => $card->card_name,
+                'card_number' => $card->set_number,
+                'set_name' => $set ? $set->name : null,
+                'set_abbreviation' => $set ? $set->card_set_abbreviation : null,
+                'game_id' => $card->game->id ?? null,
+                'rarity' => $tcgCard->rarity ?? 'Unknown',
+                'type' => implode(', ', $tcgCard->types ?? ['Unknown']),
+                'game' => $tcgCard->category ?? 'Unknown',
+            ];
+            $card->refresh();
+            $marketCard = MarketCard::updateOrCreate(['product_id' => $tcgCard->id], $marketCardData);
 
-        // Si crea il record del market data
-        $marketCardData = [
-            'product_id' => $tcgCard->id,
-            'product_name' => $card->card_name,
-            'card_number' => $card->set_number,
-            'set_name' => $set ? $set->name : null,
-            'set_abbreviation' => $set ? $set->card_set_abbreviation : null,
-            'game_id' => $card->game->id ?? null,
-            'rarity' => $tcgCard->rarity ?? 'Unknown',
-            'type' => implode(', ', $tcgCard->types ?? ['Unknown']),
-            'game' => $tcgCard->category ?? 'Unknown',
-        ];
-        $card->refresh();
-        $marketCard = MarketCard::updateOrCreate(['product_id' => $tcgCard->id], $marketCardData);
+            $card->update([
+                'hp' => $tcgCard->hp,
+                'type' => $tcgCard->types[0] ?? 'Unknown',
+                'evolution_stage' => $tcgCard->stage ?? 'Unknown',
+                'attacks' => $tcgCard->attacks ?? null,
+                'weakness' => $tcgCard->weakness ?? 'Unknown',
+                'resistance' => $tcgCard->resistance ?? 'Unknown',
+                'retreat_cost' => $tcgCard->retreat ?? 'Unknown',
+                'rarity' => $tcgCard->rarity ?? 'Unknown',
+                'market_card_id' => $marketCard->id ?? null
+            ]);
 
-        $card->update([
-            'hp' => $tcgCard->hp,
-            'type' => $tcgCard->types[0] ?? 'Unknown',
-            'evolution_stage' => $tcgCard->stage ?? 'Unknown',
-            'attacks' => $tcgCard->attacks ?? null,
-            'weakness' => $tcgCard->weakness ?? 'Unknown',
-            'resistance' => $tcgCard->resistance ?? 'Unknown',
-            'retreat_cost' => $tcgCard->retreat ?? 'Unknown',
-            'rarity' => $tcgCard->rarity ?? 'Unknown',
-            'market_card_id' => $marketCard->id ?? null
-        ]);
-
-        // Persist market pricing if provided
-        $this->persistMarketPricing($card, json_decode(json_encode($tcgCard->pricing), true), $marketCard);
+            // Persist market pricing if provided
+            $this->persistMarketPricing($card, json_decode(json_encode($tcgCard->pricing), true), $marketCard);
+        }
 
         // Google Drive upload
         $driveFileId = null;
@@ -427,7 +431,8 @@ class CardUploadController extends Controller
         if (!Auth::user()->cardSets()->where('card_set_id', $card->card_set_id)->exists()) {
             Auth::user()->cardSets()->attach($card->card_set_id);
         }
-        return $driveFileId;
+
+        return true;
     }
 
     /**

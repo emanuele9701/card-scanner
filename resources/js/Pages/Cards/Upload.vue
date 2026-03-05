@@ -73,6 +73,7 @@ function deleteChangesCard(row, index) {
 async function saveCard(cardRow, index) {
     localChangeRow[cardRow.card_id] = JSON.parse(JSON.stringify(results.value[index]));
     cardRow.isSaving = true;
+    cardRow.isProcessing = true;
     try {
         // Costruire l'array conforme a SaveCardRequest
         const postData = {
@@ -90,22 +91,50 @@ async function saveCard(cardRow, index) {
 
         if (response.data.success) {
             // Successo: Salvataggio confermato dal server
+            cardRow.isProcessing = false;
             cardRow.isEditing = false;
             cardRow.status = 'done';
             cardRow.isSave = true;
             cardRow.isSaving = false;
+            cardRow.retry = false;
+            cardRow.retryType = null;
         } else {
             // Caso in cui il server risponde con success: false
+            cardRow.isProcessing = false;
             cardRow.status = 'error';
             cardRow.isSave = false;
             cardRow.isSaving = false;
             cardRow.error = response.data.message || "Errore durante il salvataggio";
+            cardRow.retry = true;
+            cardRow.retryType = 'save';     // errore durante il salvataggio su DB
         }
 
     } catch (e) {
+
+        cardRow.isProcessing = false;
         console.error("Errore durante il salvataggio:", e);
         cardRow.status = 'error';
+        cardRow.isSaving = false;
+        cardRow.retry = true;
+        cardRow.retryType = 'save';         // errore durante il salvataggio su DB
         cardRow.error = e.response?.data?.message || "Errore nel salvataggio finale";
+    }
+}
+
+async function retryRow(row, index) {
+    row.status = 'loading';
+    row.error = null;
+    row.retry = false;
+
+    if (row.retryType === 'upload') {
+        // Rifinanzia l'upload tramite Dropzone riaggiungendo il file
+        row.retryType = null;
+        dz.addFile(row._file);
+    } else if (row.retryType === 'save') {
+        // Riprova solo il salvataggio su DB
+        row.retryType = null;
+        row.status = 'done';   // restore status so saveCard can proceed normally
+        await saveCard(row, index);
     }
 }
 
@@ -132,6 +161,12 @@ async function saveSelectedCards() {
         return;
     }
 
+    results.value.forEach(r => {
+        if (selectedCards.value.includes(r.card_id)) {
+            r.isProcessing = true;
+        }
+    });
+
     let dataToSave = results.value.filter(r => selectedCards.value.includes(r.card_id)).map(cardRow => ({
         card_id: cardRow.card_id,
         card_name: cardRow.name,
@@ -147,7 +182,7 @@ async function saveSelectedCards() {
         cards: dataToSave
     }, headersCalls);
 
-    if(response.data.success) {
+    if (response.data.success) {
         // Aggiorna lo stato delle carte salvate
         results.value.forEach(r => {
             if (selectedCards.value.includes(r.card_id)) {
@@ -158,6 +193,11 @@ async function saveSelectedCards() {
         });
         selectedCards.value = [];
     } else {
+        results.value.forEach(r => {
+            if (selectedCards.value.includes(r.card_id)) {
+                r.isProcessing = false;
+            }
+        });
         alert(response.data.message || "Errore durante il salvataggio delle carte");
     }
 }
@@ -171,7 +211,7 @@ async function deleteSelectedCards() {
         cards_id: selectedCards.value
     }, headersCalls);
 
-    if(response.data.success) {
+    if (response.data.success) {
         results.value = results.value.filter(r => !selectedCards.value.includes(r.card_id)); // Elimino la riga dal frontend
         selectedCards.value = [];
     } else {
@@ -224,6 +264,9 @@ onMounted(() => {
                     isSave: false,
                     isSaving: false,
                     isSelected: false,
+                    retry: false,
+                    retryType: null,
+                    _file: file,         // conserviamo il riferimento al file per il retry upload
                 });
                 file._resultId = results.value[0]._id;
             };
@@ -249,6 +292,7 @@ onMounted(() => {
                     isSave: false,
                     isSaving: false,
                     isSelected: false,
+                    retry: false,
                 });
             } else if (row) {
                 row.status = 'error';
@@ -262,6 +306,9 @@ onMounted(() => {
             const row = results.value.find(r => r._id === file._resultId);
             if (row) {
                 row.status = 'error';
+                row.retry = true;
+                row.retryType = 'upload';    // errore durante l'upload Dropzone
+                row._file = file;            // teniamo il file per riprocessarlo
                 row.error = typeof errorMessage === 'string'
                     ? errorMessage
                     : (errorMessage?.message ?? 'Errore di rete');
@@ -456,6 +503,21 @@ function toggleCheckbox(index) {
                                         <span v-else-if="row.status === 'done' && !row.isSave && row.isSaving"
                                             class="status-pill done">Salvataggio in corso</span>
                                         <span v-else class="status-pill error" :title="row.error">✕ Errore</span>
+
+                                        <!-- Messaggio errore + pulsante Riprova -->
+                                        <div v-if="row.status === 'error' && row.retry" class="retry-wrapper">
+                                            <span class="error-message" :title="row.error">{{ row.error }}</span>
+                                            <button class="btn-retry" @click="retryRow(row, index)"
+                                                :title="row.retryType === 'upload' ? 'Riprova upload immagine' : 'Riprova salvataggio'">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                    stroke-width="2.2" width="13" height="13">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M4.5 12a7.5 7.5 0 0 1 13.28-4.78L20 9.5M20 4v5.5h-5.5M19.5 12A7.5 7.5 0 0 1 6.22 16.78L4 14.5M4 20v-5.5h5.5" />
+                                                </svg>
+                                                {{ row.retryType === 'upload' ? 'Riprova upload' : 'Riprova salvataggio'
+                                                }}
+                                            </button>
+                                        </div>
                                     </td>
 
                                     <td class="col-action d-flex flex-column gap-3" v-if="!row.isSave && !row.isSaving">
@@ -801,6 +863,51 @@ function toggleCheckbox(index) {
     background: rgba(239, 68, 68, .15);
     color: #f87171;
     cursor: help;
+}
+
+/* ── Retry ── */
+.retry-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .35rem;
+    margin-top: .5rem;
+}
+
+.error-message {
+    font-size: .72rem;
+    color: #f87171;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: .85;
+}
+
+.btn-retry {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .25rem .65rem;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(251, 146, 60, .6);
+    background: rgba(251, 146, 60, .08);
+    color: #fb923c;
+    font-size: .72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s, border-color .2s, transform .15s;
+    white-space: nowrap;
+}
+
+.btn-retry:hover {
+    background: rgba(251, 146, 60, .18);
+    border-color: #fb923c;
+    transform: scale(1.04);
+}
+
+.btn-retry:active {
+    transform: scale(.97);
 }
 
 /* ── Skeletons ── */
