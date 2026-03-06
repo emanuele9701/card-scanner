@@ -202,6 +202,8 @@ const logout = () => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
+
+
 .banner-content {
   display: flex;
   align-items: center;

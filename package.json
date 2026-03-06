@@ -27,6 +27,7 @@
         "bootstrap": "^5.3.8",
         "cropperjs": "^1.6.2",
         "dropzone": "^6.0.0-beta.2",
+        "sass": "^1.97.3",
         "ziggy-js": "^2.6.1"
     }
 }

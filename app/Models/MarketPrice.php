@@ -63,6 +63,14 @@ class MarketPrice extends Model
     }
 
     /**
+     * Relation to provider of the price data (e.g. TCGPlayer, Cardmarket)
+     */
+    public function provider(): BelongsTo
+    {
+        return $this->belongsTo(ProviderPrice::class, 'provider_id');
+    }
+
+    /**
      * Scope to get latest prices
      */
     public function scopeLatest($query)

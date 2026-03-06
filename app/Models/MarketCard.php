@@ -46,9 +46,9 @@ class MarketCard extends Model
     /**
      * Get all Pokemon cards in user's collection linked to this market card
      */
-    public function pokemonCards(): HasMany
+    public function pokemonCards(): HasOne
     {
-        return $this->hasMany(PokemonCard::class);
+        return $this->hasOne(PokemonCard::class, 'market_card_id', 'id');
     }
 
     /**
