@@ -400,18 +400,24 @@ onBeforeUnmount(() => {
 });
 
 function toggleCheckbox(index) {
-    results.value[index].isSelected = !results.value[index].isSelected;
-    const cardId = results.value[index].card_id;
 
-    // Solo carte con card_id valido (non errori di upload senza ID)
-    if (cardId !== null && cardId !== undefined) {
-        if (results.value[index].isSelected) {
-            if (!selectedCards.value.includes(cardId)) {
-                selectedCards.value.push(cardId);
+    if (index == null) {
+        // Sono tutte da selezionare
+        results.value.map((r) => r.isSelected = true);
+    } else {
+        results.value[index].isSelected = !results.value[index].isSelected;
+        const cardId = results.value[index].card_id;
+
+        // Solo carte con card_id valido (non errori di upload senza ID)
+        if (cardId !== null && cardId !== undefined) {
+            if (results.value[index].isSelected) {
+                if (!selectedCards.value.includes(cardId)) {
+                    selectedCards.value.push(cardId);
+                }
+            } else {
+                const pos = selectedCards.value.indexOf(cardId);
+                if (pos !== -1) selectedCards.value.splice(pos, 1);
             }
-        } else {
-            const pos = selectedCards.value.indexOf(cardId);
-            if (pos !== -1) selectedCards.value.splice(pos, 1);
         }
     }
 }
@@ -474,10 +480,12 @@ function toggleCheckbox(index) {
                             never added to selectedCards. Now we check isSelected directly on results.
                         -->
                         <div class="d-flex gap-2 mt-2" v-if="results.some(r => r.isSelected)">
-                            <button class="btn btn-warning btn-sm" @click="retrySelectedCards()" v-if="results.some(r => r.isSelected && r.status === 'error' && r.retry)">
+                            <button class="btn btn-warning btn-sm" @click="retrySelectedCards()"
+                                v-if="results.some(r => r.isSelected && r.status === 'error' && r.retry)">
                                 <font-awesome-icon :icon="['fas', 'redo']" /> Rielabora
                             </button>
-                            <button class="btn btn-success btn-sm" @click="saveSelectedCards()" v-if="results.some(r => r.isSelected && r.status === 'done' && !r.isSave)">
+                            <button class="btn btn-success btn-sm" @click="saveSelectedCards()"
+                                v-if="results.some(r => r.isSelected && r.status === 'done' && !r.isSave)">
                                 <font-awesome-icon :icon="['fad', 'save']" /> Salva selezione
                             </button>
                             <button class="btn btn-danger btn-sm" @click="deleteSelectedCards()">
@@ -490,7 +498,9 @@ function toggleCheckbox(index) {
                         <table class="results-table">
                             <thead>
                                 <tr>
-                                    <th></th>
+                                    <th>
+                                        <input type="checkbox" @change="toggleCheckbox(null)">
+                                    </th>
                                     <th class="col-img">Anteprima</th>
                                     <th>Nome</th>
                                     <th>Tipo</th>
@@ -507,12 +517,14 @@ function toggleCheckbox(index) {
 
                                     <td>
                                         <!-- Solo se non è salvata -->
-                                        <input v-if="!(row.status === 'done' && row.isSave)" type="checkbox" :checked="row.isSelected" @change="toggleCheckbox(index)">
+                                        <input v-if="!(row.status === 'done' && row.isSave)" type="checkbox"
+                                            :checked="row.isSelected" @change="toggleCheckbox(index)">
                                     </td>
                                     <!-- Preview -->
                                     <td class="col-img">
                                         <div class="card-thumb-wrapper">
-                                            <img v-if="row.image_url" :src="row.image_url" :alt="row.filename" class="card-thumb" />
+                                            <img v-if="row.image_url" :src="row.image_url" :alt="row.filename"
+                                                class="card-thumb" />
                                             <div v-if="row.status === 'loading'" class="thumb-overlay">
                                                 <div class="spinner-sm"></div>
                                             </div>
@@ -541,7 +553,7 @@ function toggleCheckbox(index) {
                                         <span v-else-if="row.type && row.isEditing" class="type-chip">
                                             <select v-model="row.type" class="form-select form-select-md">
                                                 <option v-for="value in typeOptions" :value="value.value">{{ value.label
-                                                    }}</option>
+                                                }}</option>
                                             </select>
                                         </span>
                                         <span v-else class="text-muted">—</span>
