@@ -24,6 +24,9 @@ const results = ref([]);    // array of { image_url, name, type, set, card_numbe
 const localChangeRow = {};
 const isProcessing = ref(false);
 
+// FIX: counter to track parallel uploads and avoid premature isProcessing = false
+let activeUploads = 0;
+
 const typeOptions = [
     { label: 'Normale', value: 'Normal', color: '#A8A77A' },
     { label: 'Fuoco', value: 'Fire', color: '#EE8130' },
@@ -60,14 +63,15 @@ function typeColor(type) {
 function saveLocalCard(row, index) {
     row.isEditing = false;
     localChangeRow[row.card_id] = JSON.parse(JSON.stringify(row));
-
 }
 
-function deleteChangesCard(row, index) {
-    row = localChangeRow[row.card_id];
-    row.isEditing = false;
-    results.value[index] = row;
-    localChangeRow[row.card_id] = JSON.parse(JSON.stringify(results.value[index]));
+function deleteChangesCard(cardRow, index) {
+    const restoredRow = localChangeRow[cardRow.card_id];
+    if (restoredRow) {
+        Object.assign(cardRow, restoredRow);
+        cardRow.isEditing = false;
+        localChangeRow[cardRow.card_id] = JSON.parse(JSON.stringify(results.value[index]));
+    }
 }
 
 async function saveCard(cardRow, index) {
@@ -75,22 +79,19 @@ async function saveCard(cardRow, index) {
     cardRow.isSaving = true;
     cardRow.isProcessing = true;
     try {
-        // Costruire l'array conforme a SaveCardRequest
         const postData = {
             card_id: cardRow.card_id,
             card_name: cardRow.name,
             type: cardRow.type,
             set_number: cardRow.card_number,
             illustrator: cardRow.illustrator,
-            card_set_id: cardRow.set_id, // Preso dalla risposta dell'upload
-            game: 'pokemon',            // Richiesto dalla Form Request
-            // Altri campi opzionali se presenti nella riga
+            card_set_id: cardRow.set_id,
+            game: 'pokemon',
             rarity: cardRow.rarity || null,
         };
         const response = await axios.post(route('cards.save', {}, true, Ziggy), postData, headersCalls);
 
         if (response.data.success) {
-            // Successo: Salvataggio confermato dal server
             cardRow.isProcessing = false;
             cardRow.isEditing = false;
             cardRow.status = 'done';
@@ -99,44 +100,54 @@ async function saveCard(cardRow, index) {
             cardRow.retry = false;
             cardRow.retryType = null;
         } else {
-            // Caso in cui il server risponde con success: false
             cardRow.isProcessing = false;
             cardRow.status = 'error';
             cardRow.isSave = false;
             cardRow.isSaving = false;
             cardRow.error = response.data.message || "Errore durante il salvataggio";
             cardRow.retry = true;
-            cardRow.retryType = 'save';     // errore durante il salvataggio su DB
+            cardRow.retryType = 'save';
         }
-
     } catch (e) {
-
         cardRow.isProcessing = false;
         console.error("Errore durante il salvataggio:", e);
         cardRow.status = 'error';
         cardRow.isSaving = false;
         cardRow.retry = true;
-        cardRow.retryType = 'save';         // errore durante il salvataggio su DB
+        cardRow.retryType = 'save';
         cardRow.error = e.response?.data?.message || "Errore nel salvataggio finale";
     }
 }
 
 async function retryRow(row, index) {
-    row.status = 'loading';
     row.error = null;
     row.retry = false;
 
     if (row.retryType === 'upload') {
-        // Rifinanzia l'upload tramite Dropzone riaggiungendo il file
+        // FIX: set the row to loading BEFORE calling dz.addFile.
+        // The sending handler will detect the existing _resultId and reuse this row,
+        // so it will NOT create a duplicate loading row.
+        row.status = 'loading';
         row.retryType = null;
         dz.addFile(row._file);
-        results.value.splice(index, 1);
     } else if (row.retryType === 'save') {
-        // Riprova solo il salvataggio su DB
         row.retryType = null;
-        row.status = 'done';   // restore status so saveCard can proceed normally
+        row.status = 'done';
         await saveCard(row, index);
     }
+}
+
+async function retrySelectedCards() {
+    const rowsToRetry = results.value
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => row.isSelected && row.status === 'error' && row.retry);
+
+    for (const { row, index } of rowsToRetry) {
+        await retryRow(row, index);
+    }
+    // Deseleziona tutte le carte dopo il retry
+    selectedCards.value = [];
+    results.value.forEach(r => r.isSelected = false);
 }
 
 function editRow(cardRow, index) {
@@ -150,7 +161,6 @@ async function deleteRow(row) {
             card_id: row.card_id
         }, headersCalls);
 
-        // Rimuovi la riga dal frontend dopo il successo
         results.value = results.value.filter(r => r.card_id !== row.card_id);
     } catch (e) {
         console.error('Errore durante l\'eliminazione della carta', e);
@@ -162,13 +172,23 @@ async function saveSelectedCards() {
         return;
     }
 
-    results.value.forEach(r => {
-        if (selectedCards.value.includes(r.card_id)) {
-            r.isProcessing = true;
-        }
+    const cardsToSave = results.value.filter(r =>
+        r.isSelected &&
+        r.status === 'done' &&
+        r.card_id !== null &&
+        r.card_id !== undefined
+    );
+
+    if (cardsToSave.length === 0) {
+        alert('Nessuna carta valida e pronta da salvare. Seleziona solo carte completate.');
+        return;
+    }
+
+    cardsToSave.forEach(r => {
+        r.isProcessing = true;
     });
 
-    let dataToSave = results.value.filter(r => selectedCards.value.includes(r.card_id)).map(cardRow => ({
+    let dataToSave = cardsToSave.map(cardRow => ({
         card_id: cardRow.card_id,
         card_name: cardRow.name,
         type: cardRow.type,
@@ -179,63 +199,88 @@ async function saveSelectedCards() {
         rarity: cardRow.rarity || null,
     }));
 
-    const response = await axios.post(route('cards.save', {}, true, Ziggy), {
-        cards: dataToSave
-    }, headersCalls);
+    try {
+        const response = await axios.post(route('cards.save', {}, true, Ziggy), {
+            cards: dataToSave
+        }, headersCalls);
 
-    if (response.data.success) {
-        // Aggiorna lo stato delle carte salvate
-        results.value.forEach(r => {
-            if (selectedCards.value.includes(r.card_id)) {
+        if (response.data.success) {
+            cardsToSave.forEach(r => {
                 r.isSave = true;
                 r.isEditing = false;
                 r.status = 'done';
-            }
-        });
-        selectedCards.value = [];
-    } else {
-        results.value.forEach(r => {
-            if (selectedCards.value.includes(r.card_id)) {
                 r.isProcessing = false;
-            }
+            });
+        } else {
+            cardsToSave.forEach(r => {
+                r.isProcessing = false;
+            });
+            alert(response.data.message || "Errore durante il salvataggio delle carte");
+        }
+    } catch (e) {
+        cardsToSave.forEach(r => {
+            r.isProcessing = false;
         });
-        alert(response.data.message || "Errore durante il salvataggio delle carte");
+        console.error('Errore nel salvataggio batch:', e);
+        alert('Errore durante il salvataggio delle carte');
+    } finally {
+        selectedCards.value = [];
+        results.value.forEach(r => r.isSelected = false);
     }
 }
 
 async function deleteSelectedCards() {
-    if (!confirm(`Sei sicuro di voler eliminare ${selectedCards.value.length} carte selezionate? Questa azione è irreversibile.`)) {
+    if (!confirm(`Sei sicuro di voler eliminare le carte selezionate? Questa azione è irreversibile.`)) {
         return;
     }
 
-    const response = await axios.post(route('cards.discard', {}, true, Ziggy), {
-        cards_id: selectedCards.value
-    }, headersCalls);
+    // Collect all selected rows (including error rows that may not have a card_id)
+    const selectedRows = results.value.filter(r => r.isSelected);
 
-    if (response.data.success) {
-        results.value = results.value.filter(r => !selectedCards.value.includes(r.card_id)); // Elimino la riga dal frontend
-        selectedCards.value = [];
-    } else {
-        alert(response.data.message || "Errore durante l'eliminazione delle carte");
+    // Only send to backend the rows that actually have a card_id
+    const validCardIds = selectedRows
+        .filter(r => r.card_id !== null && r.card_id !== undefined)
+        .map(r => r.card_id);
+
+    if (validCardIds.length > 0) {
+        try {
+            const response = await axios.post(route('cards.discard', {}, true, Ziggy), {
+                cards_id: validCardIds
+            }, headersCalls);
+
+            if (!response.data.success) {
+                alert(response.data.message || "Errore durante l'eliminazione delle carte");
+                return;
+            }
+        } catch (e) {
+            console.error('Errore durante l\'eliminazione:', e);
+            alert("Errore durante l'eliminazione delle carte");
+            return;
+        }
     }
+
+    // Remove all selected rows from the frontend (including error-only rows without card_id)
+    const selectedInternalIds = new Set(selectedRows.map(r => r._id));
+    results.value = results.value.filter(r => !selectedInternalIds.has(r._id));
+    selectedCards.value = [];
 }
 
 // ---- Dropzone init ----
 onMounted(() => {
     headersCalls = {
         headers: {
-            'X-CSRF-TOKEN': csrfToken(), // ⚠️ chiamato subito, prima del mount del DOM
+            'X-CSRF-TOKEN': csrfToken(),
         }
     };
     dz = new Dropzone(dropzoneRef.value, {
         url: route('cards.upload-and-enhance', {}, true, Ziggy),
         method: 'POST',
         paramName: 'image',
-        maxFilesize: 20,   // MB
+        maxFilesize: 20,
         acceptedFiles: 'image/*',
         parallelUploads: 3,
         addRemoveLinks: false,
-        previewsContainer: false,   // we handle previews ourselves
+        previewsContainer: false,
         clickable: true,
         headers: {
             'X-CSRF-TOKEN': csrfToken(),
@@ -244,38 +289,64 @@ onMounted(() => {
 
         // --- Events ---
         sending(file) {
+            // FIX: increment counter for accurate processing state
+            activeUploads++;
             isProcessing.value = true;
-            // Push a "loading" row immediately with a local preview
+
+            // FIX: if the file already has a _resultId it's a retry upload.
+            // The existing row was already set to 'loading' in retryRow.
+            // We only need to refresh the image preview — no new row is created.
+            if (file._resultId) {
+                const existingResultId = file._resultId;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const row = results.value.find(r => r._id === existingResultId);
+                    if (row) row.image_url = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                return;
+            }
+
+            // FIX: assign _resultId SYNCHRONOUSLY before the async FileReader,
+            // and create the row immediately so success/error can always find it.
+            const resultId = crypto.randomUUID();
+            file._resultId = resultId;
+
+            results.value.unshift({
+                _id: resultId,
+                image_url: null,   // will be set by FileReader below
+                name: null,
+                type: null,
+                set: null,
+                card_number: null,
+                illustrator: null,
+                status: 'loading',
+                error: null,
+                filename: file.name,
+                isEditing: false,
+                isSave: false,
+                isSaving: false,
+                isSelected: false,
+                isProcessing: false,
+                retry: false,
+                retryType: null,
+                _file: file,
+            });
+
+            // Async: load the local preview and update only the image_url field
             const reader = new FileReader();
             reader.onload = (e) => {
-                // ✅ Soluzione sicura
-
-                results.value.unshift({
-                    _id: crypto.randomUUID(),
-                    image_url: e.target.result,
-                    name: null,
-                    type: null,
-                    set: null,
-                    card_number: null,
-                    illustrator: null,
-                    status: 'loading',
-                    error: null,
-                    filename: file.name,
-                    isEditing: false,
-                    isSave: false,
-                    isSaving: false,
-                    isSelected: false,
-                    retry: false,
-                    retryType: null,
-                    _file: file,         // conserviamo il riferimento al file per il retry upload
-                });
-                file._resultId = results.value[0]._id;
+                const row = results.value.find(r => r._id === resultId);
+                if (row) row.image_url = e.target.result;
             };
             reader.readAsDataURL(file);
         },
 
         success(file, response) {
-            isProcessing.value = false;
+            // FIX: decrement counter; turn off spinner only when all uploads are done
+            activeUploads--;
+            if (activeUploads === 0) isProcessing.value = false;
+
             const row = results.value.find(r => r._id === file._resultId);
             if (response.success && row) {
                 Object.assign(row, {
@@ -298,18 +369,23 @@ onMounted(() => {
             } else if (row) {
                 row.status = 'error';
                 row.error = response.message || 'Errore sconosciuto';
+                row.retry = true;
+                row.retryType = 'upload';
             }
             dz.removeFile(file);
         },
 
         error(file, errorMessage) {
-            isProcessing.value = false;
+            // FIX: decrement counter; turn off spinner only when all uploads are done
+            activeUploads--;
+            if (activeUploads === 0) isProcessing.value = false;
+
             const row = results.value.find(r => r._id === file._resultId);
             if (row) {
                 row.status = 'error';
                 row.retry = true;
-                row.retryType = 'upload';    // errore durante l'upload Dropzone
-                row._file = file;            // teniamo il file per riprocessarlo
+                row.retryType = 'upload';
+                row._file = file;
                 row.error = typeof errorMessage === 'string'
                     ? errorMessage
                     : (errorMessage?.message ?? 'Errore di rete');
@@ -325,12 +401,18 @@ onBeforeUnmount(() => {
 
 function toggleCheckbox(index) {
     results.value[index].isSelected = !results.value[index].isSelected;
+    const cardId = results.value[index].card_id;
 
-    if (results.value[index].isSelected) {
-        selectedCards.value.push(results.value[index].card_id);
-    } else {
-        const pos = selectedCards.value.indexOf(results.value[index].card_id);
-        if (pos !== -1) selectedCards.value.splice(pos, 1);
+    // Solo carte con card_id valido (non errori di upload senza ID)
+    if (cardId !== null && cardId !== undefined) {
+        if (results.value[index].isSelected) {
+            if (!selectedCards.value.includes(cardId)) {
+                selectedCards.value.push(cardId);
+            }
+        } else {
+            const pos = selectedCards.value.indexOf(cardId);
+            if (pos !== -1) selectedCards.value.splice(pos, 1);
+        }
     }
 }
 </script>
@@ -386,8 +468,16 @@ function toggleCheckbox(index) {
                             Carte riconosciute
                             <span class="badge">{{results.filter(r => r.status === 'done').length}}</span>
                         </h2>
-                        <div class="d-flex gap-2 mt-2" v-if="selectedCards.length > 0">
-                            <button class="btn btn-success btn-sm" @click="saveSelectedCards()">
+                        <!--
+                            FIX: was `v-if="selectedCards.length > 0"` — this hid all buttons when
+                            only error cards (without card_id) were selected, because those rows are
+                            never added to selectedCards. Now we check isSelected directly on results.
+                        -->
+                        <div class="d-flex gap-2 mt-2" v-if="results.some(r => r.isSelected)">
+                            <button class="btn btn-warning btn-sm" @click="retrySelectedCards()" v-if="results.some(r => r.isSelected && r.status === 'error' && r.retry)">
+                                <font-awesome-icon :icon="['fas', 'redo']" /> Rielabora
+                            </button>
+                            <button class="btn btn-success btn-sm" @click="saveSelectedCards()" v-if="results.some(r => r.isSelected && r.status === 'done' && !r.isSave)">
                                 <font-awesome-icon :icon="['fad', 'save']" /> Salva selezione
                             </button>
                             <button class="btn btn-danger btn-sm" @click="deleteSelectedCards()">
@@ -416,12 +506,13 @@ function toggleCheckbox(index) {
                                 <tr v-for="(row, index) in results" :key="row._id" :class="['result-row', row.status]">
 
                                     <td>
-                                        <input type="checkbox" @change="toggleCheckbox(index)">
+                                        <!-- Solo se non è salvata -->
+                                        <input v-if="!(row.status === 'done' && row.isSave)" type="checkbox" :checked="row.isSelected" @change="toggleCheckbox(index)">
                                     </td>
                                     <!-- Preview -->
                                     <td class="col-img">
                                         <div class="card-thumb-wrapper">
-                                            <img :src="row.image_url" :alt="row.filename" class="card-thumb" />
+                                            <img v-if="row.image_url" :src="row.image_url" :alt="row.filename" class="card-thumb" />
                                             <div v-if="row.status === 'loading'" class="thumb-overlay">
                                                 <div class="spinner-sm"></div>
                                             </div>
