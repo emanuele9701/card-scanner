@@ -93,9 +93,9 @@ class PokemonCard extends Model
     /**
      * Get the market card data for this card
      */
-    public function marketCard(): BelongsTo
+    public function marketCard(): HasOne
     {
-        return $this->belongsTo(MarketCard::class);
+        return $this->hasOne(MarketCard::class, 'id', 'market_card_id'); 
     }
 
     /**

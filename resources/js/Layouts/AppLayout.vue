@@ -30,7 +30,7 @@ const closeMobileMenu = () => {
 }
 
 const logout = () => {
-    router.post('/logout');
+  router.post('/logout');
 };
 </script>
 
@@ -40,7 +40,8 @@ const logout = () => {
     <div class="demo-banner">
       <div class="container banner-content">
         <i class="bi bi-exclamation-triangle-fill"></i>
-        <span>ATTENZIONE: Ogni giorno a mezzanotte viene eseguita la pulizia del DB e dello storage (Ambiente Demo).</span>
+        <span>ATTENZIONE: Ogni giorno a mezzanotte viene eseguita la pulizia del DB e dello storage (Ambiente
+          Demo).</span>
       </div>
     </div>
 
@@ -64,7 +65,8 @@ const logout = () => {
             <a href="/cards/upload" :class="['nav-link', { active: isActive('/cards/upload') }]">
               <i class="bi bi-camera-fill"></i> Scansiona
             </a>
-            <a href="/cards" :class="['nav-link', { active: currentUrl === '/cards' || currentUrl.startsWith('/cards?') }]">
+            <a href="/cards"
+              :class="['nav-link', { active: currentUrl === '/cards' || currentUrl.startsWith('/cards?') }]">
               <i class="bi bi-collection-fill"></i> Collezione
             </a>
             <Link href="/collection/value" :class="['nav-link', { active: isActive('/collection') }]">
@@ -88,17 +90,19 @@ const logout = () => {
             </div>
             <span class="user-name">{{ user.name }}</span>
             <i class="bi bi-chevron-down"></i>
-            
+
             <!-- Dropdown Menu -->
             <div :class="['dropdown-menu', { 'show': userDropdownOpen }]" @click.stop>
               <a href="/profile" class="dropdown-item">
                 <i class="bi bi-person"></i> Il Mio Profilo
               </a>
               <hr class="dropdown-divider">
-              <a href="https://github.com/emanuele9701/card-scanner/blob/main/docs/GUIDA-COMPLETA.md" target="_blank" class="dropdown-item">
+              <a href="https://github.com/emanuele9701/card-scanner/blob/main/docs/GUIDA-COMPLETA.md" target="_blank"
+                class="dropdown-item">
                 <i class="bi bi-book"></i> Guida Completa
               </a>
-              <a href="https://github.com/emanuele9701/card-scanner/blob/main/README.md" target="_blank" class="dropdown-item">
+              <a href="https://github.com/emanuele9701/card-scanner/blob/main/README.md" target="_blank"
+                class="dropdown-item">
                 <i class="bi bi-gear"></i> Guida Installazione
               </a>
               <hr class="dropdown-divider">
@@ -117,7 +121,8 @@ const logout = () => {
           <a href="/cards" :class="['nav-link', { active: currentUrl === '/cards' }]" @click="closeMobileMenu">
             <i class="bi bi-collection-fill"></i> Collezione
           </a>
-          <Link href="/collection/value" :class="['nav-link', { active: isActive('/collection') }]" @click="closeMobileMenu">
+          <Link href="/collection/value" :class="['nav-link', { active: isActive('/collection') }]"
+            @click="closeMobileMenu">
             <i class="bi bi-currency-dollar"></i> Valore
           </Link>
           <Link href="/matching" :class="['nav-link', { active: isActive('/matching') }]" @click="closeMobileMenu">
@@ -126,17 +131,19 @@ const logout = () => {
           <a href="/market-data" :class="['nav-link', { active: isActive('/market-data') }]" @click="closeMobileMenu">
             <i class="bi bi-cloud-upload"></i> Market Data
           </a>
-          
+
           <hr class="mobile-divider" v-if="user">
-          
+
           <template v-if="user">
             <a href="/profile" class="nav-link" @click="closeMobileMenu">
               <i class="bi bi-person"></i> Il Mio Profilo
             </a>
-            <a href="https://github.com/emanuele9701/card-scanner/blob/main/docs/GUIDA-COMPLETA.md" target="_blank" class="nav-link" @click="closeMobileMenu">
+            <a href="https://github.com/emanuele9701/card-scanner/blob/main/docs/GUIDA-COMPLETA.md" target="_blank"
+              class="nav-link" @click="closeMobileMenu">
               <i class="bi bi-book"></i> Guida Completa
             </a>
-            <a href="https://github.com/emanuele9701/card-scanner/blob/main/README.md" target="_blank" class="nav-link" @click="closeMobileMenu">
+            <a href="https://github.com/emanuele9701/card-scanner/blob/main/README.md" target="_blank" class="nav-link"
+              @click="closeMobileMenu">
               <i class="bi bi-gear"></i> Guida Installazione
             </a>
             <Link href="/logout" method="post" as="button" class="nav-link text-danger" @click="closeMobileMenu">
@@ -192,8 +199,10 @@ const logout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
+
+
 
 .banner-content {
   display: flex;
@@ -210,23 +219,24 @@ const logout = () => {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding: 0.75rem 0;
   position: fixed;
-  top: 40px; /* Offset for banner */
+  top: 40px;
+  /* Offset for banner */
   left: 0;
   right: 0;
   z-index: 1000;
 }
 
 .avatar-circle {
-    width: 32px;
-    height: 32px;
-    background: linear-gradient(135deg, #FFCB05, #f39c12);
-    color: #000;
-    font-weight: bold;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #FFCB05, #f39c12);
+  color: #000;
+  font-weight: bold;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
 }
 
 .container {
@@ -261,7 +271,7 @@ const logout = () => {
   height: 40px;
   position: relative;
   display: inline-block;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   border: 2px solid #FFCB05;
   overflow: hidden;
@@ -275,7 +285,7 @@ const logout = () => {
   left: 4px;
   right: 4px;
   bottom: 4px;
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 2px;
 }
 
@@ -292,10 +302,23 @@ const logout = () => {
 }
 
 @keyframes scan-vertical {
-  0% { top: 0; opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { top: 100%; opacity: 0; }
+  0% {
+    top: 0;
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
 }
 
 .nav-links {
@@ -499,7 +522,8 @@ const logout = () => {
 
 /* Main Content */
 .main-container {
-  padding-top: 130px; /* Desktop default */
+  padding-top: 130px;
+  /* Desktop default */
   padding-bottom: 80px;
   color: #fff;
   flex: 1;
@@ -542,31 +566,33 @@ const logout = () => {
   .desktop-only {
     display: none !important;
   }
-  
+
   .navbar-toggler {
     display: block;
   }
-  
+
   .mobile-menu .nav-link {
     padding: 12px 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 8px;
     margin-bottom: 4px;
   }
-  
+
   .mobile-menu .nav-link:active {
-      background: rgba(255, 203, 5, 0.1);
+    background: rgba(255, 203, 5, 0.1);
   }
 
   .main-container {
-      padding-top: 110px; /* Increased for safety (40px banner + ~60px nav + 10px spacing) */
-      padding-bottom: 100px; /* Extra space for bottom fabs if any */
-      padding-left: 15px;
-      padding-right: 15px;
+    padding-top: 110px;
+    /* Increased for safety (40px banner + ~60px nav + 10px spacing) */
+    padding-bottom: 100px;
+    /* Extra space for bottom fabs if any */
+    padding-left: 15px;
+    padding-right: 15px;
   }
-  
+
   .container {
-      padding: 0 15px;
+    padding: 0 15px;
   }
 }
 
@@ -580,13 +606,14 @@ const logout = () => {
   .footer-content {
     padding: 0 1rem;
   }
-  
+
   .navbar-brand {
-      font-size: 1.2rem;
+    font-size: 1.2rem;
   }
-  
+
   .brand-text {
-      display: inline-block; /* Ensure it doesn't disappear unless intended */
+    display: inline-block;
+    /* Ensure it doesn't disappear unless intended */
   }
 }
 </style>

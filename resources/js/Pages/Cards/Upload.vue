@@ -1,1643 +1,1107 @@
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick, onBeforeUnmount } from 'vue';
-import { Head, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import ConfirmModal from '@/Components/ConfirmModal.vue';
-import { useModal } from '@/composables/useModal';
-import Cropper from 'cropperjs';
-import 'cropperjs/dist/cropper.css';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { Head } from '@inertiajs/vue3';
+import Dropzone from 'dropzone';
 import axios from 'axios';
+import 'dropzone/dist/dropzone.css';
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap";
+import { route } from 'ziggy-js';
+import { Ziggy } from '../../ziggy.js';
 
-const { showConfirm, showAlert } = useModal();
+// Prevent Dropzone from auto-discovering all elements
+Dropzone.autoDiscover = false;
+let headersCalls;
 
 const props = defineProps({
-    initialCards: Array,
-    cardsBySet: Object,
-    cardsWithoutSet: Array,
+    sets: Object
 });
 
-// State
-const cards = ref([]); // Local state of cards being processed
-const currentTab = ref('pending'); // pending, processing, completed
-const selectedCardIds = ref(new Set());
-const isDragging = ref(false);
-const fileInput = ref(null);
-const toasts = ref([]); // Toast state
+// ---- State ----
+const dropzoneRef = ref(null);
+const results = ref([]);    // array of { image_url, name, type, set, card_number, illustrator, status, error }
+const localChangeRow = {};
+const isProcessing = ref(false);
 
-// Loading states
-const isSkipping = ref(false);
-const isCropping = ref(false);
-const isUploading = ref(false);
-const isEnhancing = ref(new Set()); // Set of card IDs being enhanced
-const isSaving = ref(new Set()); // Set of card IDs being saved
-const isBulkEnhancing = ref(false);
-const isBulkSaving = ref(false);
+// FIX: counter to track parallel uploads and avoid premature isProcessing = false
+let activeUploads = 0;
 
-// Edit Modal State
-const showEditModal = ref(false);
-const editingCardId = ref(null);
-const editForm = reactive({
-    card_name: '',
-    hp: '',
-    type: '',
-    evolution_stage: '',
-    attacks: [],
-    weakness: '',
-    resistance: '',
-    retreat_cost: '',
-    set_number: '',
-    rarity: '',
-    illustrator: '',
-    flavor_text: '',
-    card_set_id: '',
-    game: '',
-    pricing: null,
-    market_card_id: null,
-});
-const cardSets = ref([]);
-const availableGames = ref([]);
-const validationErrors = ref({});
+const typeOptions = [
+    { label: 'Normale', value: 'Normal', color: '#A8A77A' },
+    { label: 'Fuoco', value: 'Fire', color: '#EE8130' },
+    { label: 'Acqua', value: 'Water', color: '#6390F0' },
+    { label: 'Erba', value: 'Grass', color: '#7AC74C' },
+    { label: 'Elettro', value: 'Electric', color: '#F7D02C' },
+    { label: 'Ghiaccio', value: 'Ice', color: '#96D9D6' },
+    { label: 'Lotta', value: 'Fighting', color: '#C22E28' },
+    { label: 'Veleno', value: 'Poison', color: '#A33EA1' },
+    { label: 'Terra', value: 'Ground', color: '#E2BF65' },
+    { label: 'Volante', value: 'Flying', color: '#A98FF3' },
+    { label: 'Psico', value: 'Psychic', color: '#F95587' },
+    { label: 'Coleottero', value: 'Bug', color: '#A6B91A' },
+    { label: 'Roccia', value: 'Rock', color: '#B6A136' },
+    { label: 'Spettro', value: 'Ghost', color: '#735797' },
+    { label: 'Drago', value: 'Dragon', color: '#6F35FC' },
+    { label: 'Buio', value: 'Dark', color: '#705746' },
+    { label: 'Acciaio', value: 'Steel', color: '#B7B7CE' },
+    { label: 'Folletto', value: 'Fairy', color: '#D685AD' },
+]
 
-const editingCard = computed(() => {
-    return cards.value.find(c => c.tempId === editingCardId.value || c.id === editingCardId.value);
-});
+const setOptions = props.sets;
+const selectedCards = ref([]);
+let dz = null;
+// ---- Helpers ----
+function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+}
 
-// Cropper State
-const showCropperModal = ref(false);
-const cropperImageSrc = ref('');
-const croppingCardId = ref(null);
-let cropperInstance = null;
+function typeColor(type) {
+    return typeOptions.find(t => t.value === type)?.color || '#6366f1';
+}
 
-// Fullscreen Viewer State
-const showFullscreen = ref(false);
-const fullscreenImageSrc = ref('');
+function saveLocalCard(row, index) {
+    row.isEditing = false;
+    localChangeRow[row.card_id] = JSON.parse(JSON.stringify(row));
+}
 
-// Computed Stats
-const stats = computed(() => {
-    let pending = 0;
-    let processing = 0;
-    let completed = 0;
-
-    cards.value.forEach(card => {
-        if (card.state === 'pending' || card.state === 'uploading') pending++;
-        else if (['cropped', 'processing', 'ready', 'failed'].includes(card.state)) processing++;
-        else if (card.state === 'completed') completed++;
-    });
-
-    return { pending, processing, completed };
-});
-
-const filteredCards = computed(() => {
-    return cards.value.filter(card => {
-        if (currentTab.value === 'pending') return card.state === 'pending' || card.state === 'uploading';
-        if (currentTab.value === 'processing') return ['cropped', 'processing', 'ready', 'failed'].includes(card.state);
-        if (currentTab.value === 'completed') return card.state === 'completed';
-        return false;
-    });
-});
-
-// Actions
-const triggerFileInput = () => fileInput.value.click();
-
-const handleDrop = (e) => {
-    isDragging.value = false;
-    const files = e.dataTransfer.files;
-    handleFiles(files);
-};
-
-const handleFileSelect = (e) => {
-    handleFiles(e.target.files);
-    e.target.value = ''; // Allow re-selecting the same file
-};
-
-/**
- * Resize image client-side if it exceeds 1920x1080 (1080p)
- * @param {File} file - The image file to resize
- * @returns {Promise<File>} - The resized file or original if within limits
- */
-const resizeImageIfNeeded = (file) => {
-    return new Promise((resolve, reject) => {
-        const MAX_WIDTH = 2160;
-        const MAX_HEIGHT = 3240;
-        const QUALITY = 1; // 85% quality for JPEG
-
-        // Create image object
-        const img = new Image();
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        img.onload = () => {
-            const width = img.width;
-            const height = img.height;
-
-            console.log(`[CLIENT RESIZE] Original: ${width}x${height}, File size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-
-            // Check if resize is needed
-            if (width <= MAX_WIDTH && height <= MAX_HEIGHT) {
-                console.log('[CLIENT RESIZE] No resize needed - within limits');
-                resolve(file);
-                return;
-            }
-
-            // Calculate new dimensions maintaining aspect ratio
-            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
-            const newWidth = Math.floor(width * ratio);
-            const newHeight = Math.floor(height * ratio);
-
-            console.log(`[CLIENT RESIZE] Resizing to: ${newWidth}x${newHeight}, Ratio: ${ratio.toFixed(4)}`);
-
-            // Set canvas dimensions
-            canvas.width = newWidth;
-            canvas.height = newHeight;
-
-            // Draw resized image
-            ctx.drawImage(img, 0, 0, newWidth, newHeight);
-
-            // Convert canvas to blob
-            canvas.toBlob(
-                (blob) => {
-                    if (!blob) {
-                        reject(new Error('Failed to create blob'));
-                        return;
-                    }
-
-                    console.log(`[CLIENT RESIZE] New file size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
-
-                    // Create new File object from blob
-                    const resizedFile = new File(
-                        [blob],
-                        file.name,
-                        {
-                            type: file.type || 'image/jpeg',
-                            lastModified: Date.now()
-                        }
-                    );
-
-                    resolve(resizedFile);
-                },
-                file.type || 'image/jpeg',
-                QUALITY
-            );
-        };
-
-        img.onerror = () => {
-            reject(new Error('Failed to load image'));
-        };
-
-        // Load image
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            img.src = e.target.result;
-        };
-        reader.onerror = () => {
-            reject(new Error('Failed to read file'));
-        };
-        reader.readAsDataURL(file);
-    });
-};
-
-const handleFiles = async (files) => {
-    currentTab.value = 'pending';
-    const fileArray = Array.from(files).filter(file => file.type.startsWith('image/'));
-
-    for (const originalFile of fileArray) {
-        const tempId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-        
-        try {
-            // Resize image if needed BEFORE upload
-            console.log(`[UPLOAD] Processing file: ${originalFile.name}`);
-            const file = await resizeImageIfNeeded(originalFile);
-            
-            // Add to local state immediately
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                cards.value.push({
-                    tempId: tempId,
-                    id: null, // Server ID
-                    thumbnail: e.target.result,
-                    state: 'uploading',
-                    data: null,
-                    error: null
-                });
-            };
-            reader.readAsDataURL(file);
-
-            // Upload resized file
-            const formData = new FormData();
-            formData.append('image', file);
-
-            const response = await axios.post('/cards/upload-image', formData);
-            const cardIndex = cards.value.findIndex(c => c.tempId === tempId);
-            if (cardIndex !== -1) {
-                cards.value[cardIndex].id = response.data.data.id;
-                cards.value[cardIndex].state = 'pending';
-                cards.value[cardIndex].thumbnail = response.data.data.image_url;
-            }
-        } catch (error) {
-            console.error('[UPLOAD ERROR]', error);
-            const cardIndex = cards.value.findIndex(c => c.tempId === tempId);
-            if (cardIndex !== -1) {
-                 // Remove failed uploads for now or show error state?
-                 // Let's remove to match blade logic roughly or show error
-                 cards.value.splice(cardIndex, 1);
-            }
-            showToast('Errore upload: ' + originalFile.name, 'error');
-        }
+function deleteChangesCard(cardRow, index) {
+    const restoredRow = localChangeRow[cardRow.card_id];
+    if (restoredRow) {
+        Object.assign(cardRow, restoredRow);
+        cardRow.isEditing = false;
+        localChangeRow[cardRow.card_id] = JSON.parse(JSON.stringify(results.value[index]));
     }
-};
+}
 
-// Selection Logic
-const toggleSelection = (cardId) => {
-     // Vue 3 Set reactivity needs new Set trigger or assume setup handles it
-     // For safety we can mutate the Set.
-    if (selectedCardIds.value.has(cardId)) {
-        selectedCardIds.value.delete(cardId);
-    } else {
-        selectedCardIds.value.add(cardId);
-    }
-};
-
-const toggleSelectAll = (e) => {
-    selectedCardIds.value.clear();
-    if (e.target.checked) {
-        filteredCards.value.forEach(card => {
-             // Logic from blade: prevent selecting processing/uploading if strict
-             if(card.state !== 'uploading' && card.state !== 'processing') {
-                 selectedCardIds.value.add(card.id || card.tempId); // Use best ID
-             }
-        });
-    }
-};
-
-// Cropper Logic
-const openCropper = (card) => {
-    croppingCardId.value = card.tempId; // Use tempId for local lookup
-    cropperImageSrc.value = card.thumbnail;
-    showCropperModal.value = true;
-    
-    nextTick(() => {
-        const image = document.getElementById('cropperImage');
-        if (cropperInstance) cropperInstance.destroy();
-        cropperInstance = new Cropper(image, {
-            aspectRatio: NaN,
-            viewMode: 1,
-            autoCropArea: 1
-        });
-    });
-};
-
-const closeCropper = () => {
-    showCropperModal.value = false;
-    if (cropperInstance) cropperInstance.destroy();
-    cropperInstance = null;
-    cropperImageSrc.value = '';
-};
-
-const confirmCrop = () => {
-    if (!cropperInstance) return;
-    
-    cropperInstance.getCroppedCanvas().toBlob(async (blob) => {
-        const cardIndex = cards.value.findIndex(c => c.tempId === croppingCardId.value);
-        if (cardIndex === -1) return;
-        const card = cards.value[cardIndex];
-
-        if (!card.id) return; // Need server ID
-
-        const formData = new FormData();
-        formData.append('cropped_image', blob, 'card_crop.jpg');
-        formData.append('card_id', card.id);
-
-        try {
-            const response = await axios.post('/cards/save-crop', formData);
-            cards.value[cardIndex].state = 'cropped';
-            cards.value[cardIndex].thumbnail = response.data.data.image_url;
-            showToast('Ritaglio salvato!', 'success');
-        } catch (error) {
-            showToast('Errore salvataggio ritaglio', 'error');
-        }
-        closeCropper();
-    });
-};
-
-const skipCrop = async (card, notify = true) => {
+async function saveCard(cardRow, index) {
+    localChangeRow[cardRow.card_id] = JSON.parse(JSON.stringify(results.value[index]));
+    cardRow.isSaving = true;
+    cardRow.isProcessing = true;
     try {
-        await axios.post('/cards/skip-crop', { card_id: card.id });
-        card.state = 'cropped';
-        if (notify) showToast('Ritaglio saltato!', 'success');
-    } catch (error) {
-        if (notify) showToast('Errore durante lo skip', 'error');
+        const postData = {
+            card_id: cardRow.card_id,
+            card_name: cardRow.name,
+            type: cardRow.type,
+            set_number: cardRow.card_number,
+            illustrator: cardRow.illustrator,
+            card_set_id: cardRow.set_id,
+            game: 'pokemon',
+            rarity: cardRow.rarity || null,
+        };
+        const response = await axios.post(route('cards.save', {}, true, Ziggy), postData, headersCalls);
+
+        if (response.data.success) {
+            cardRow.isProcessing = false;
+            cardRow.isEditing = false;
+            cardRow.status = 'done';
+            cardRow.isSave = true;
+            cardRow.isSaving = false;
+            cardRow.retry = false;
+            cardRow.retryType = null;
+        } else {
+            cardRow.isProcessing = false;
+            cardRow.status = 'error';
+            cardRow.isSave = false;
+            cardRow.isSaving = false;
+            cardRow.error = response.data.message || "Errore durante il salvataggio";
+            cardRow.retry = true;
+            cardRow.retryType = 'save';
+        }
+    } catch (e) {
+        cardRow.isProcessing = false;
+        console.error("Errore durante il salvataggio:", e);
+        cardRow.status = 'error';
+        cardRow.isSaving = false;
+        cardRow.retry = true;
+        cardRow.retryType = 'save';
+        cardRow.error = e.response?.data?.message || "Errore nel salvataggio finale";
     }
-};
+}
 
-// AI Enhance
-const recognizeWithAI = async (card, notify = true) => {
-    if (isEnhancing.value.has(card.id || card.tempId)) return;
-    
-    const cardKey = card.id || card.tempId;
-    isEnhancing.value.add(cardKey);
-    card.state = 'processing';
-    card.error = null;
+async function retryRow(row, index) {
+    row.error = null;
+    row.retry = false;
 
+    if (row.retryType === 'upload') {
+        // FIX: set the row to loading BEFORE calling dz.addFile.
+        // The sending handler will detect the existing _resultId and reuse this row,
+        // so it will NOT create a duplicate loading row.
+        row.status = 'loading';
+        row.retryType = null;
+        dz.addFile(row._file);
+    } else if (row.retryType === 'save') {
+        row.retryType = null;
+        row.status = 'done';
+        await saveCard(row, index);
+    }
+}
+
+async function retrySelectedCards() {
+    const rowsToRetry = results.value
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => row.isSelected && row.status === 'error' && row.retry);
+
+    for (const { row, index } of rowsToRetry) {
+        await retryRow(row, index);
+    }
+    // Deseleziona tutte le carte dopo il retry
+    selectedCards.value = [];
+    results.value.forEach(r => r.isSelected = false);
+}
+
+function editRow(cardRow, index) {
+    cardRow.isEditing = true;
+    localChangeRow[cardRow.card_id] = JSON.parse(JSON.stringify(results.value[index]));
+}
+
+async function deleteRow(row) {
     try {
-        const response = await axios.post('/cards/enhance', { card_id: card.id });
-        card.data = response.data.data;
-        card.state = 'ready';
-        if (notify) showToast('Analisi completata!', 'success');
-    } catch (error) {
-        card.state = 'failed';
-        card.error = error.response?.data?.message || error.message || 'Errore AI';
-        if (notify) showToast(card.error, 'error');
-    } finally {
-        isEnhancing.value.delete(cardKey);
-    }
-};
+        await axios.post(route('cards.discard', {}, true, Ziggy), {
+            card_id: row.card_id
+        }, headersCalls);
 
-const reanalyze = (card) => {
-    recognizeWithAI(card);
-};
+        results.value = results.value.filter(r => r.card_id !== row.card_id);
+    } catch (e) {
+        console.error('Errore durante l\'eliminazione della carta', e);
+    }
+}
 
-// Edit Modal
-const openEditModal = async (card) => {
-    editingCardId.value = card.tempId;
-    
-    // Reset form and validation errors
-    Object.keys(editForm).forEach(key => {
-        if (key === 'attacks') {
-            editForm[key] = [];
-        } else {
-            editForm[key] = '';
-        }
-    });
-    validationErrors.value = {};
-
-    if (card.data) {
-        Object.keys(editForm).forEach(key => {
-            if (key === 'attacks' && card.data.attacks) {
-                // Deep copy attacks array to avoid mutations
-                editForm.attacks = JSON.parse(JSON.stringify(card.data.attacks));
-            } else if (card.data[key] !== undefined && card.data[key] !== null) {
-                editForm[key] = card.data[key];
-            }
-        });
-    }
-
-    if (cardSets.value.length === 0) {
-        try {
-            const res = await axios.get('/cards/api/card-sets');
-            cardSets.value = res.data.data;
-        } catch (e) {
-            console.error(e);
-        }
-    }
-    
-    // Load available games if not already loaded
-    if (availableGames.value.length === 0) {
-        try {
-            const res = await axios.get('/cards/api/available-games');
-            availableGames.value = res.data.data;
-        } catch (e) {
-            console.error(e);
-        }
-    }
-    
-    // If AI detected a game that's NOT in the available list, clear it
-    // This forces the user to manually select a valid game
-    if (card.data && card.data.game) {
-        const detectedGame = card.data.game.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const matchedGame = availableGames.value.find(g => {
-            const gameName = g.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            return gameName === detectedGame || gameName.includes(detectedGame) || detectedGame.includes(gameName);
-        });
-
-        if (matchedGame) {
-            editForm.game = matchedGame.name;
-        } else {
-            console.warn(`AI detected game "${card.data.game}" is not in available games list. User must select manually.`);
-            editForm.game = '';
-            validationErrors.value.game = `Il game "${card.data.game}" rilevato dall'AI non è valido. Seleziona manualmente.`;
-        }
-    }
-    
-    showEditModal.value = true;
-};
-
-const saveEdit = async () => {
-    // Clear previous errors
-    validationErrors.value = {};
-    
-    // Validate required fields
-    if (!editForm.card_name || editForm.card_name.trim() === '') {
-        validationErrors.value.card_name = 'Il nome della carta è obbligatorio';
-    }
-    
-    if (!editForm.game || editForm.game.trim() === '') {
-        validationErrors.value.game = 'Il game è obbligatorio';
-    }
-    
-    // If there are errors, show toast and return
-    if (Object.keys(validationErrors.value).length > 0) {
-        showToast('Compila tutti i campi obbligatori', 'error');
+async function saveSelectedCards() {
+    if (!confirm(`Sei sicuro di voler salvare ${selectedCards.value.length} carte selezionate? Questa azione è irreversibile.`)) {
         return;
     }
 
-    const cardIndex = cards.value.findIndex(c => c.tempId === editingCardId.value);
-    if (cardIndex === -1) return;
-    const card = cards.value[cardIndex];
+    const cardsToSave = results.value.filter(r =>
+        r.isSelected &&
+        r.status === 'done' &&
+        r.card_id !== null &&
+        r.card_id !== undefined
+    );
 
-    // Local update
-    card.data = { ...editForm };
-    card.state = 'ready';
-    
-    
-    showEditModal.value = false;
-    showToast('Dati salvati localmente', 'success');
-};
-
-const addAttack = () => {
-    if (!editForm.attacks) {
-        editForm.attacks = [];
+    if (cardsToSave.length === 0) {
+        alert('Nessuna carta valida e pronta da salvare. Seleziona solo carte completate.');
+        return;
     }
-    editForm.attacks.push({
-        name: '',
-        cost: '',
-        damage: '',
-        text: ''
+
+    cardsToSave.forEach(r => {
+        r.isProcessing = true;
     });
-};
 
-const removeAttack = (index) => {
-    editForm.attacks.splice(index, 1);
-};
+    let dataToSave = cardsToSave.map(cardRow => ({
+        card_id: cardRow.card_id,
+        card_name: cardRow.name,
+        type: cardRow.type,
+        set_number: cardRow.card_number,
+        illustrator: cardRow.illustrator,
+        card_set_id: cardRow.set_id,
+        game: 'pokemon',
+        rarity: cardRow.rarity || null,
+    }));
 
-const saveCard = async (card, notify = true) => {
-    const cardKey = card.id || card.tempId;
-    if (isSaving.value.has(cardKey)) return;
-    
-    isSaving.value.add(cardKey);
-    
     try {
-        await axios.post('/cards/save', {
-            card_id: card.id,
-            ...card.data
-        });
-        card.state = 'completed';
-        if (notify) showToast('Carta salvata!', 'success');
-    } catch (error) {
-        if (notify) showToast('Errore salvataggio', 'error');
-    } finally {
-        isSaving.value.delete(cardKey);
-    }
-};
+        const response = await axios.post(route('cards.save', {}, true, Ziggy), {
+            cards: dataToSave
+        }, headersCalls);
 
-const deleteCard = async (card, skipConfirm = false) => {
-    if (!skipConfirm) {
-        const confirmed = await showConfirm(
-            'Sei sicuro di voler eliminare questa carta?',
-            'Conferma Eliminazione',
-            { confirmText: 'Elimina', cancelText: 'Annulla' }
-        );
-        if (!confirmed) return;
-    }
-    try {
-        if (card.id) {
-            await axios.delete(`/cards/${card.id}`); 
+        if (response.data.success) {
+            cardsToSave.forEach(r => {
+                r.isSave = true;
+                r.isEditing = false;
+                r.status = 'done';
+                r.isProcessing = false;
+            });
+        } else {
+            cardsToSave.forEach(r => {
+                r.isProcessing = false;
+            });
+            alert(response.data.message || "Errore durante il salvataggio delle carte");
         }
-        // Blade used /cards/discard POST. Let's use discard to be safe with existing logic
-        // await axios.post('/cards/discard', { card_id: card.id });
-         // Checking web.php: Route::delete('/{card}', [CardUploadController::class, 'destroy']) exists.
-         // But blade used discard. I'll use destroy if possible, or discard.
-         // Let's stick to blade logic if unsure, but standard DELETE is better if routes exist.
-         // Blade JS: await fetch('{{ route("cards.discard") }}'...
-        
-         // Actually I'll use DELETE /cards/{id}
-         const cardIndex = cards.value.findIndex(c => c.tempId === card.tempId);
-         if (cardIndex !== -1) cards.value.splice(cardIndex, 1);
-         selectedCardIds.value.delete(card.id || card.tempId);
-         
-         // Fire and forget server delete to be snappy? Or await?
-         await axios.delete(`/cards/${card.id}`);
     } catch (e) {
-        console.error(e);
+        cardsToSave.forEach(r => {
+            r.isProcessing = false;
+        });
+        console.error('Errore nel salvataggio batch:', e);
+        alert('Errore durante il salvataggio delle carte');
+    } finally {
+        selectedCards.value = [];
+        results.value.forEach(r => r.isSelected = false);
     }
-};
+}
 
-// Bulk Actions
-const bulkSkipCrop = async () => {
-    const confirmed = await showConfirm(
-        `Saltare il ritaglio per ${selectedCardIds.value.size} carte?`,
-        'Conferma Azione',
-        { confirmText: 'Salta', cancelText: 'Annulla' }
-    );
-    if (!confirmed) return;
-    const ids = Array.from(selectedCardIds.value);
-    selectedCardIds.value.clear();
-    
-    for (const id of ids) {
-         // Find card by ID or tempId? logic above used tempId for lookup but Set probably stores ID
-         // I should store objects or look up carefully.
-         const card = cards.value.find(c => c.id === id || c.tempId === id);
-         if (card) await skipCrop(card, false);
+async function deleteSelectedCards() {
+    if (!confirm(`Sei sicuro di voler eliminare le carte selezionate? Questa azione è irreversibile.`)) {
+        return;
     }
-    showToast('Ritaglio saltato per le carte selezionate', 'success');
-};
 
-const bulkAnalyze = async () => {
-     const ids = Array.from(selectedCardIds.value);
-     selectedCardIds.value.clear();
-     showToast('Analisi avviata...', 'info');
-     for (const id of ids) {
-          const card = cards.value.find(c => c.id === id || c.tempId === id);
-          if (card && card.state === 'cropped') recognizeWithAI(card, false);
-     }
-};
+    // Collect all selected rows (including error rows that may not have a card_id)
+    const selectedRows = results.value.filter(r => r.isSelected);
 
-const bulkSave = async () => {
-     const ids = Array.from(selectedCardIds.value);
-     selectedCardIds.value.clear();
-     for (const id of ids) {
-          const card = cards.value.find(c => c.id === id || c.tempId === id);
-          if (card && card.state === 'ready') await saveCard(card, false);
-     }
-     showToast('Carte salvate', 'success');
-};
+    // Only send to backend the rows that actually have a card_id
+    const validCardIds = selectedRows
+        .filter(r => r.card_id !== null && r.card_id !== undefined)
+        .map(r => r.card_id);
 
-const bulkDelete = async () => {
-    const confirmed = await showConfirm(
-        `Eliminare ${selectedCardIds.value.size} carte?`,
-        'Conferma Eliminazione Multipla',
-        { confirmText: 'Elimina', cancelText: 'Annulla' }
-    );
-    if (!confirmed) return;
-    const ids = Array.from(selectedCardIds.value);
-    selectedCardIds.value.clear();
-    for (const id of ids) {
-         const card = cards.value.find(c => c.id === id || c.tempId === id);
-         if (card) await deleteCard(card, true);
-    }
-};
+    if (validCardIds.length > 0) {
+        try {
+            const response = await axios.post(route('cards.discard', {}, true, Ziggy), {
+                cards_id: validCardIds
+            }, headersCalls);
 
-const resetGallery = async () => {
-    const confirmed = await showConfirm(
-        'Sei sicuro di voler eliminare tutto?\nLe carte salvate o caricate verranno eliminate DEFINITIVAMENTE dal database e dallo storage.',
-        'Reset Galleria',
-        { confirmText: 'Elimina Tutto', cancelText: 'Annulla' }
-    );
-    if (!confirmed) return;
-    
-    // Create a copy of cards to delete to avoid iteration issues while modifying
-    const cardsToDelete = [...cards.value];
-    let deletedCount = 0;
-    
-    showToast('Eliminazione in corso...', 'info');
-
-    for (const card of cardsToDelete) {
-        if (card.id) {
-            try {
-                // Delete from server (using logic similar to deleteCard but without reloading UI/confirm)
-                await axios.delete(`/cards/${card.id}`);
-                deletedCount++;
-            } catch (e) {
-                console.error(`Errore eliminazione carta ${card.id}:`, e);
+            if (!response.data.success) {
+                alert(response.data.message || "Errore durante l'eliminazione delle carte");
+                return;
             }
+        } catch (e) {
+            console.error('Errore durante l\'eliminazione:', e);
+            alert("Errore durante l'eliminazione delle carte");
+            return;
         }
     }
-    
-    cards.value = [];
-    selectedCardIds.value.clear();
-    if (fileInput.value) fileInput.value.value = '';
-    
-    if (deletedCount > 0) {
-        showToast(`${deletedCount} carte eliminate definitivamente`, 'success');
-    } else {
-        showToast('Galleria svuotata', 'success');
-    }
-};
 
+    // Remove all selected rows from the frontend (including error-only rows without card_id)
+    const selectedInternalIds = new Set(selectedRows.map(r => r._id));
+    results.value = results.value.filter(r => !selectedInternalIds.has(r._id));
+    selectedCards.value = [];
+}
 
-// Utils
-const showToast = (message, type = 'success') => {
-    const id = Date.now();
-    toasts.value.push({ id, message, type });
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        removeToast(id);
-    }, 5000);
-};
-
-const removeToast = (id) => {
-    toasts.value = toasts.value.filter(t => t.id !== id);
-};
-
-// Fullscreen
-const openFullscreen = (src) => {
-    fullscreenImageSrc.value = src;
-    showFullscreen.value = true;
-};
-
-// Browser/Tab Close Interception
-const handleBeforeUnload = (e) => {
-    const unsavedCards = cards.value.filter(c => c.id && c.state !== 'completed');
-    if (unsavedCards.length === 0) return;
-
-    // Standard way to trigger a confirmation dialog
-    e.preventDefault();
-    e.returnValue = '';
-};
-
-const handleUnload = () => {
-    const unsavedCards = cards.value.filter(c => c.id && c.state !== 'completed');
-    if (unsavedCards.length === 0) return;
-
-    const csrfToken = document.head.querySelector('meta[name="csrf-token"]')?.content;
-    
-    // We must use fetch with keepalive because axios is cancelled on unload
-    // We iterate because we don't have a batch delete endpoint yet
-    unsavedCards.forEach(card => {
-        fetch(`/cards/${card.id}`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            keepalive: true
-        }).catch(err => console.error('Cleanup failed for card', card.id, err));
-    });
-};
-
+// ---- Dropzone init ----
 onMounted(() => {
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handleUnload);
+    headersCalls = {
+        headers: {
+            'X-CSRF-TOKEN': csrfToken(),
+        }
+    };
+    dz = new Dropzone(dropzoneRef.value, {
+        url: route('cards.upload-and-enhance', {}, true, Ziggy),
+        method: 'POST',
+        paramName: 'image',
+        maxFilesize: 20,
+        acceptedFiles: 'image/*',
+        parallelUploads: 3,
+        addRemoveLinks: false,
+        previewsContainer: false,
+        clickable: true,
+        headers: {
+            'X-CSRF-TOKEN': csrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+
+        // --- Events ---
+        sending(file) {
+            // FIX: increment counter for accurate processing state
+            activeUploads++;
+            isProcessing.value = true;
+
+            // FIX: if the file already has a _resultId it's a retry upload.
+            // The existing row was already set to 'loading' in retryRow.
+            // We only need to refresh the image preview — no new row is created.
+            if (file._resultId) {
+                const existingResultId = file._resultId;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const row = results.value.find(r => r._id === existingResultId);
+                    if (row) row.image_url = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                return;
+            }
+
+            // FIX: assign _resultId SYNCHRONOUSLY before the async FileReader,
+            // and create the row immediately so success/error can always find it.
+            const resultId = crypto.randomUUID();
+            file._resultId = resultId;
+
+            results.value.unshift({
+                _id: resultId,
+                image_url: null,   // will be set by FileReader below
+                name: null,
+                type: null,
+                set: null,
+                card_number: null,
+                illustrator: null,
+                status: 'loading',
+                error: null,
+                filename: file.name,
+                isEditing: false,
+                isSave: false,
+                isSaving: false,
+                isSelected: false,
+                isProcessing: false,
+                retry: false,
+                retryType: null,
+                _file: file,
+            });
+
+            // Async: load the local preview and update only the image_url field
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const row = results.value.find(r => r._id === resultId);
+                if (row) row.image_url = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        },
+
+        success(file, response) {
+            // FIX: decrement counter; turn off spinner only when all uploads are done
+            activeUploads--;
+            if (activeUploads === 0) isProcessing.value = false;
+
+            const row = results.value.find(r => r._id === file._resultId);
+            if (response.success && row) {
+                Object.assign(row, {
+                    image_url: response.data.image_url || row.image_url,
+                    name: response.data.name,
+                    type: response.data.type,
+                    set: response.data.set,
+                    set_id: response.data.set_id,
+                    set_code: response.data.set_code,
+                    card_number: response.data.card_number,
+                    card_id: response.data.card_id,
+                    illustrator: response.data.illustrator,
+                    status: 'done',
+                    isEditing: false,
+                    isSave: false,
+                    isSaving: false,
+                    isSelected: false,
+                    retry: false,
+                });
+            } else if (row) {
+                row.status = 'error';
+                row.error = response.message || 'Errore sconosciuto';
+                row.retry = true;
+                row.retryType = 'upload';
+            }
+            dz.removeFile(file);
+        },
+
+        error(file, errorMessage) {
+            // FIX: decrement counter; turn off spinner only when all uploads are done
+            activeUploads--;
+            if (activeUploads === 0) isProcessing.value = false;
+
+            const row = results.value.find(r => r._id === file._resultId);
+            if (row) {
+                row.status = 'error';
+                row.retry = true;
+                row.retryType = 'upload';
+                row._file = file;
+                row.error = typeof errorMessage === 'string'
+                    ? errorMessage
+                    : (errorMessage?.message ?? 'Errore di rete');
+            }
+            dz.removeFile(file);
+        },
+    });
 });
 
 onBeforeUnmount(() => {
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-    window.removeEventListener('pagehide', handleUnload);
+    if (dz) dz.destroy();
 });
+
+function toggleCheckbox(index) {
+
+    if (index == null) {
+        // Sono tutte da selezionare
+        results.value.map((r) => r.isSelected = true);
+    } else {
+        results.value[index].isSelected = !results.value[index].isSelected;
+        const cardId = results.value[index].card_id;
+
+        // Solo carte con card_id valido (non errori di upload senza ID)
+        if (cardId !== null && cardId !== undefined) {
+            if (results.value[index].isSelected) {
+                if (!selectedCards.value.includes(cardId)) {
+                    selectedCards.value.push(cardId);
+                }
+            } else {
+                const pos = selectedCards.value.indexOf(cardId);
+                if (pos !== -1) selectedCards.value.splice(pos, 1);
+            }
+        }
+    }
+}
 </script>
 
 <template>
+
+    <Head title="Carica Carta" />
     <AppLayout>
-        <Head title="Card Scanner - Carica Carta" />
-        
-        <div class="container h-custom-padding">
-            <div class="text-center mb-5">
-                <h1 class="page-title">Carica le Tue Carte</h1>
-                <p class="page-subtitle">Scansiona le tue Carte con intelligenza artificiale o inserisci i dati manualmente</p>
+        <div class="upload-page">
+
+            <!-- ── Header ── -->
+            <div class="page-header">
+                <div class="header-glow"></div>
+                <h1 class="page-title">
+                    <span class="title-icon">⚡</span>
+                    Carica &amp; Riconosci
+                </h1>
+                <p class="page-subtitle">
+                    Trascina le immagini delle tue carte — l'AI le identifica automaticamente
+                </p>
             </div>
 
-            <!-- Upload Area -->
-            <div class="glass-card p-4 mb-4">
-                <div 
-                    class="upload-zone" 
-                    :class="{ 'drag-over': isDragging }"
-                    @click="triggerFileInput"
-                    @dragover.prevent="isDragging = true"
-                    @dragleave.prevent="isDragging = false"
-                    @drop.prevent="handleDrop"
-                >
-                    <i class="bi bi-cloud-upload" style="font-size: 48px; color: #FFCB05;"></i>
-                    <h3 class="mt-3">Trascina le immagini qui</h3>
-                    <p class="text-muted">oppure clicca per selezionare</p>
-                    <input 
-                        ref="fileInput" 
-                        type="file" 
-                        accept="image/*" 
-                        multiple 
-                        class="d-none" 
-                        @change="handleFileSelect"
-                    >
+            <!-- ── Dropzone ── -->
+            <div class="dropzone-wrapper">
+                <div ref="dropzoneRef" class="custom-dropzone" id="card-dropzone">
+                    <div class="dz-default dz-message">
+                        <div class="dz-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                            </svg>
+                        </div>
+                        <span class="dz-label">Trascina le foto qui</span>
+                        <span class="dz-sublabel">o <strong>clicca</strong> per selezionare · JPG, PNG, WEBP · max 25
+                            MB</span>
+                    </div>
                 </div>
+
+                <!-- Processing badge -->
+                <transition name="fade">
+                    <div v-if="isProcessing" class="processing-badge">
+                        <div class="spinner"></div>
+                        <span>Analisi AI in corso…</span>
+                    </div>
+                </transition>
             </div>
 
-            <!-- Gallery -->
-            <div v-if="cards.length > 0" id="gallerySection">
-                <!-- Tabs -->
-                <div class="tabs-nav">
-                    <div class="tab-item" :class="{ active: currentTab === 'pending' }" @click="currentTab = 'pending'">
-                        Da Ritagliare <span class="tab-badge" :class="{ 'active-badge': currentTab === 'pending' }">{{ stats.pending }}</span>
-                    </div>
-                    <div class="tab-item" :class="{ active: currentTab === 'processing' }" @click="currentTab = 'processing'">
-                        Da Analizzare <span class="tab-badge" :class="{ 'active-badge': currentTab === 'processing' }">{{ stats.processing }}</span>
-                    </div>
-                    <div class="tab-item" :class="{ active: currentTab === 'completed' }" @click="currentTab = 'completed'">
-                        Completate <span class="tab-badge" :class="{ 'active-badge': currentTab === 'completed' }">{{ stats.completed }}</span>
-                    </div>
-                </div>
-
-                <!-- Controls -->
-                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="selectAll" @change="toggleSelectAll">
-                        <label class="form-check-label text-white-50 ms-2" for="selectAll">Seleziona Tutti</label>
-                    </div>
-                    <button class="btn btn-sm btn-danger-pokemon" @click="resetGallery">
-                        <i class="bi bi-trash"></i> Svuota Tutto
-                    </button>
-                </div>
-
-                <!-- Grid -->
-                <div class="gallery-grid">
-                    <div v-for="card in filteredCards" :key="card.tempId" class="card-item">
-                        <!-- Checkbox -->
-                        <div 
-                            v-if="card.state !== 'uploading' && card.state !== 'processing'" 
-                            class="card-checkbox" 
-                            :class="{ checked: selectedCardIds.has(card.id || card.tempId) }"
-                            @click="toggleSelection(card.id || card.tempId)"
-                        >
-                            <i class="bi bi-check"></i>
+            <!-- ── Results Table ── -->
+            <transition name="slide-up">
+                <div v-if="results.length > 0" class="results-section">
+                    <div class="results-header">
+                        <h2 class="results-title">
+                            Carte riconosciute
+                            <span class="badge">{{results.filter(r => r.status === 'done').length}}</span>
+                        </h2>
+                        <!--
+                            FIX: was `v-if="selectedCards.length > 0"` — this hid all buttons when
+                            only error cards (without card_id) were selected, because those rows are
+                            never added to selectedCards. Now we check isSelected directly on results.
+                        -->
+                        <div class="d-flex gap-2 mt-2" v-if="results.some(r => r.isSelected)">
+                            <button class="btn btn-warning btn-sm" @click="retrySelectedCards()"
+                                v-if="results.some(r => r.isSelected && r.status === 'error' && r.retry)">
+                                <font-awesome-icon :icon="['fas', 'redo']" /> Rielabora
+                            </button>
+                            <button class="btn btn-success btn-sm" @click="saveSelectedCards()"
+                                v-if="results.some(r => r.isSelected && r.status === 'done' && !r.isSave)">
+                                <font-awesome-icon :icon="['fad', 'save']" /> Salva selezione
+                            </button>
+                            <button class="btn btn-danger btn-sm" @click="deleteSelectedCards()">
+                                <font-awesome-icon :icon="['fad', 'trash']" /> Elimina selezione
+                            </button>
                         </div>
-
-                        <!-- Image -->
-                        <div class="card-image-wrapper" @click="openFullscreen(card.thumbnail)">
-                            <img :src="card.thumbnail" class="card-image" alt="Card">
-                            <div class="zoom-overlay"><i class="bi bi-arrows-fullscreen"></i></div>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="d-flex flex-column gap-2">
-                             <div v-if="card.state === 'uploading'" class="text-center text-white-50"><small>Upload in corso...</small></div>
-                             
-                             <template v-else-if="card.state === 'pending'">
-                                <button class="btn btn-sm btn-pokemon" @click="openCropper(card)">
-                                    <i class="bi bi-crop"></i> Ritaglia
-                                </button>
-                                <button class="btn btn-sm btn-secondary" @click="skipCrop(card)">
-                                    <i class="bi bi-skip-forward"></i> Salta
-                                </button>
-                                <button class="btn btn-sm btn-danger" @click="deleteCard(card)">
-                                    <i class="bi bi-trash"></i> Elimina
-                                </button>
-                             </template>
-
-                              <template v-else-if="card.state === 'cropped'">
-                                <button class="btn btn-sm btn-success" @click="recognizeWithAI(card)">
-                                    <i class="bi bi-robot"></i> Analizza
-                                </button>
-                                <button class="btn btn-sm btn-warning" @click="openEditModal(card)">
-                                    <i class="bi bi-pencil"></i> Manuale
-                                </button>
-                                <button class="btn btn-sm btn-danger" @click="deleteCard(card)">
-                                    <i class="bi bi-trash"></i> Elimina
-                                </button>
-                             </template>
-
-                             <template v-else-if="card.state === 'processing'">
-                                <div class="text-center">
-                                    <div class="spinner-border spinner-border-sm text-warning" role="status"></div>
-                                    <small class="d-block mt-1">AI in corso...</small>
-                                </div>
-                             </template>
-
-                             <template v-else-if="card.state === 'ready'">
-                                <button class="btn btn-sm btn-success" @click="saveCard(card)">
-                                    <i class="bi bi-save"></i> Salva
-                                </button>
-                                <button class="btn btn-sm btn-warning text-white" @click="reanalyze(card)">
-                                    <i class="bi bi-robot"></i> Analizza
-                                </button>
-                                <button class="btn btn-sm btn-info" @click="openEditModal(card)">
-                                    <i class="bi bi-pencil"></i> Modifica
-                                </button>
-                                <button class="btn btn-sm btn-danger" @click="deleteCard(card)">
-                                    <i class="bi bi-trash"></i> Elimina
-                                </button>
-                             </template>
-
-                             <template v-else-if="card.state === 'completed'">
-                                <div class="alert alert-success p-1 text-center mb-0"><small>Completata</small></div>
-                                <button class="btn btn-sm btn-secondary" @click="deleteCard(card)">
-                                    <i class="bi bi-trash"></i> Rimuovi
-                                </button>
-                             </template>
-                             
-                             <template v-else-if="card.state === 'failed'">
-                                <div class="alert alert-danger p-1 text-center mb-1">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                    <small class="d-block text-truncate" style="max-width: 100%;">{{ card.error }}</small>
-                                </div>
-                                <button class="btn btn-sm btn-success" @click="reanalyze(card)">
-                                    <i class="bi bi-arrow-clockwise"></i> Riprova
-                                </button>
-                                <button class="btn btn-sm btn-warning" @click="openEditModal(card)">
-                                    <i class="bi bi-pencil"></i> Manuale
-                                </button>
-                                <button class="btn btn-sm btn-secondary" @click="deleteCard(card)">
-                                    <i class="bi bi-trash"></i> Elimina
-                                </button>
-                             </template>
-                        </div>
-                        
-                        <!-- Info -->
-                         <div v-if="card.data" class="mt-2 small text-white-50">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <strong>{{ card.data.card_name || 'Sconosciuta' }}</strong>
-                                <span v-if="card.data.pricing" class="badge bg-warning text-dark ms-1" style="font-size: 0.7rem;">
-                                    € {{ card.data.pricing.avg || card.data.pricing.low || '0.00' }}
-                                </span>
-                            </div>
-                            <span v-if="card.data.type">{{ card.data.type }}</span>
-                            <span v-if="card.data.hp"> - HP {{ card.data.hp }}</span><br>
-                            <div v-if="card.data.attacks && card.data.attacks.length" class="mt-1">
-                                <small><strong>Attacchi:</strong></small>
-                                <div v-for="(attack, idx) in card.data.attacks" :key="idx" class="ms-2 small">
-                                    {{ attack.name || 'N/D' }} 
-                                    <span v-if="attack.damage">({{ attack.damage }})</span>
-                                </div>
-                            </div>
-                         </div>
                     </div>
-                </div>
-            </div>
-            
-            <!-- Floating Action Bar -->
-            <div class="floating-action-bar" :class="{ visible: selectedCardIds.size > 0 }">
-                <div class="fab-count">{{ selectedCardIds.size }}</div>
-                <div class="d-flex gap-2">
-                     <template v-if="currentTab === 'pending'">
-                        <button class="btn btn-sm btn-secondary" @click="bulkSkipCrop">
-                            <i class="bi bi-skip-forward"></i> Salta Ritaglio
-                        </button>
-                    </template>
-                    <template v-if="currentTab === 'processing'">
-                        <button class="btn btn-sm btn-success" @click="bulkAnalyze">
-                            <i class="bi bi-robot"></i> Analizza
-                        </button>
-                        <button class="btn btn-sm btn-primary" @click="bulkSave">
-                            <i class="bi bi-save"></i> Salva
-                        </button>
-                    </template>
-                     <template v-if="currentTab === 'completed'">
-                        <button class="btn btn-sm btn-danger" @click="bulkDelete">
-                            <i class="bi bi-trash"></i> Elimina
-                        </button>
-                    </template>
-                </div>
-            </div>
 
-            <!-- Cropper Modal -->
-            <div v-if="showCropperModal" class="custom-modal-overlay">
-                <div class="cropper-container-wrapper">
-                    <h4 class="text-white text-center mb-3">Ritaglia la Carta</h4>
-                    <div style="max-height: 60vh; overflow:hidden;">
-                        <img id="cropperImage" :src="cropperImageSrc" style="max-width: 100%;">
-                    </div>
-                    <div class="text-center mt-3">
-                        <button class="btn btn-pokemon me-2" @click="confirmCrop">
-                            <i class="bi bi-check-lg"></i> Conferma Ritaglio
-                        </button>
-                        <button class="btn btn-secondary" @click="closeCropper">
-                            <i class="bi bi-x-lg"></i> Annulla
-                        </button>
-                    </div>
-                </div>
-            </div>
+                    <div class="table-wrapper">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <input type="checkbox" @change="toggleCheckbox(null)">
+                                    </th>
+                                    <th class="col-img">Anteprima</th>
+                                    <th>Nome</th>
+                                    <th>Tipo</th>
+                                    <th>Set</th>
+                                    <th>N° Carta</th>
+                                    <th>Illustratore</th>
+                                    <th class="col-status">Stato</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
 
-            <!-- Edit Modal (Teleported to body for better z-index handling) -->
-        <Teleport to="body">
-            <div v-if="showEditModal" class="custom-modal-overlay" @click.self="showEditModal = false">
-                <div class="card-edit-glass-container">
-                    <div class="glass-header">
-                        <h4 class="mb-0 text-white"><i class="bi bi-pencil-square me-2 text-warning"></i>Modifica Carta</h4>
-                        <button class="glass-close-btn" @click="showEditModal = false">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="glass-body">
-                     <div class="row g-3">
-                        <!-- Image Column -->
-                        <div class="col-md-4">
-                             <div class="glass-image-container mb-3 d-flex align-items-center justify-content-center" style="background: rgba(0,0,0,0.2); border-radius: 12px; height: 100%; min-height: 400px;">
-                                 <img v-if="editingCard" :src="editingCard.cropped_image || editingCard.thumbnail || editingCard.image_url" class="img-fluid rounded shadow-sm" style="max-height: 400px; width: auto; object-fit: contain;">
-                                 <div v-else class="text-white-50 text-center">
-                                     <div>Immagine non disponibile</div>
-                                     <small class="text-muted" style="font-size: 0.65rem;">ID: {{ editingCard.id || editingCard.tempId }}</small>
-                                 </div>
-                             </div>
-                        </div>
+                                <tr v-for="(row, index) in results" :key="row._id" :class="['result-row', row.status]">
 
-                        <!-- Center Column: Core Info -->
-                        <div class="col-md-4">
-                            <h6 class="section-title">Informazioni Base</h6>
-                            
-                            <div class="form-floating-custom mb-3">
-                                <input type="text" v-model="editForm.card_name" id="cardName" placeholder=" " class="glass-input" :class="{ 'border-error': validationErrors.card_name }">
-                                <label for="cardName">Nome Carta *</label>
-                                <span v-if="validationErrors.card_name" class="error-text">{{ validationErrors.card_name }}</span>
-                            </div>
-
-                            <div class="row g-2 mb-3">
-                                <div class="col-6">
-                                     <div class="form-floating-custom">
-                                        <input type="text" v-model="editForm.hp" id="hp" placeholder=" " class="glass-input">
-                                        <label for="hp">HP</label>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="form-floating-custom">
-                                        <input type="text" v-model="editForm.type" id="type" placeholder=" " class="glass-input">
-                                        <label for="type">Tipo</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-floating-custom mb-3">
-                                <select v-model="editForm.game" id="game" class="glass-select" :class="{ 'border-error': validationErrors.game }">
-                                    <option value="" disabled selected>Seleziona Game</option>
-                                    <option v-for="game in availableGames" :key="game.id" :value="game.name">
-                                        {{ game.name }}
-                                    </option>
-                                </select>
-                                <label for="game">Gioco *</label>
-                                <span v-if="validationErrors.game" class="error-text">{{ validationErrors.game }}</span>
-                            </div>
-
-                            <div class="form-floating-custom mb-3">
-                                <select v-model="editForm.card_set_id" id="set" class="glass-select">
-                                    <option value="">Nessun Set</option>
-                                    <option v-for="set in cardSets" :key="set.id" :value="set.id">
-                                        {{ set.name }} ({{ set.abbreviation }})
-                                    </option>
-                                </select>
-                                <label for="set">Set</label>
-                            </div>
-
-                            <div class="row g-2 mb-3">
-                                <div class="col-6">
-                                    <div class="form-floating-custom">
-                                        <input type="text" v-model="editForm.set_number" id="setNumber" placeholder=" " class="glass-input">
-                                        <label for="setNumber">N. Set</label>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                     <div class="form-floating-custom">
-                                        <select v-model="editForm.rarity" id="rarity" class="glass-select">
-                                            <option value="">Seleziona...</option>
-                                            <option value="Comune">Comune</option>
-                                            <option value="Non Comune">Non Comune</option>
-                                            <option value="Rara">Rara</option>
-                                            <option value="Rara Holo">Rara Holo</option>
-                                            <option value="Double Rare">Double Rare (ex/V/GX)</option>
-                                            <option value="Rara Illustrazione">Rara Illustrazione (AR/IR)</option>
-                                            <option value="Ultra Rara">Ultra Rara</option>
-                                            <option value="Segreta">Segreta</option>
-                                        </select>
-                                        <label for="rarity">Rarità</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-floating-custom mb-3">
-                                <input type="text" v-model="editForm.illustrator" id="illustrator" placeholder=" " class="glass-input">
-                                <label for="illustrator">Illustratore</label>
-                            </div>
-                        </div>
-
-                        <!-- Right Column: Stats & Attacks -->
-                        <div class="col-md-4">
-                            <h6 class="section-title">Statistiche & Attacchi</h6>
-
-                            <!-- Market Data -->
-                            <div v-if="editForm.pricing" class="glass-card mb-3 p-2" style="background: rgba(255, 203, 5, 0.1); border: 1px solid rgba(255, 203, 5, 0.3);">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="text-warning small fw-bold text-uppercase"><i class="bi bi-graph-up me-1"></i> Valore di Mercato</span>
-                                    <span class="badge bg-dark-pokemon text-warning" style="font-size: 0.65rem;">Cardmarket</span>
-                                </div>
-                                <div class="row g-2 text-center text-white">
-                                    <div class="col-6 border-end border-white-10">
-                                        <div class="small text-white-50">Media</div>
-                                        <div class="fw-bold">€ {{ editForm.pricing.avg || '0.00' }}</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="small text-white-50">Basso</div>
-                                        <div class="fw-bold">€ {{ editForm.pricing.low || '0.00' }}</div>
-                                    </div>
-                                </div>
-                                <div v-if="editForm.pricing.updated" class="mt-2 text-center" style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">
-                                    Aggiornato: {{ new Date(editForm.pricing.updated).toLocaleDateString('it-IT') }}
-                                </div>
-                            </div>
-
-                            <div class="row g-2 mb-3">
-                                 <div class="col-4">
-                                    <div class="form-floating-custom">
-                                        <input type="text" v-model="editForm.weakness" id="weakness" placeholder=" " class="glass-input">
-                                        <label for="weakness">Debolezza</label>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="form-floating-custom">
-                                        <input type="text" v-model="editForm.resistance" id="resistance" placeholder=" " class="glass-input">
-                                        <label for="resistance">Resistenza</label>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="form-floating-custom">
-                                        <input type="text" v-model="editForm.retreat_cost" id="retreat" placeholder=" " class="glass-input">
-                                        <label for="retreat">Ritirata</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="attacks-section mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <label class="text-white-50 small text-uppercase fw-bold">Attacchi</label>
-                                    <button type="button" class="btn btn-xs btn-outline-success rounded-pill" @click="addAttack">
-                                        <i class="bi bi-plus-lg"></i>
-                                    </button>
-                                </div>
-                                
-                                <div class="attacks-container custom-scrollbar">
-                                    <div v-if="editForm.attacks && editForm.attacks.length > 0">
-                                        <div v-for="(attack, index) in editForm.attacks" :key="index" class="attack-card mb-2">
-                                            <div class="d-flex justify-content-between mb-1">
-                                                <input v-model="attack.name" class="glass-input-sm fw-bold w-50" placeholder="Nome Attacco">
-                                                <input v-model="attack.damage" class="glass-input-sm text-end w-25" placeholder="Danno">
-                                                <button type="button" class="btn-icon-danger" @click="removeAttack(index)"><i class="bi bi-x"></i></button>
+                                    <td>
+                                        <!-- Solo se non è salvata -->
+                                        <input v-if="!(row.status === 'done' && row.isSave)" type="checkbox"
+                                            :checked="row.isSelected" @change="toggleCheckbox(index)">
+                                    </td>
+                                    <!-- Preview -->
+                                    <td class="col-img">
+                                        <div class="card-thumb-wrapper">
+                                            <img v-if="row.image_url" :src="row.image_url" :alt="row.filename"
+                                                class="card-thumb" />
+                                            <div v-if="row.status === 'loading'" class="thumb-overlay">
+                                                <div class="spinner-sm"></div>
                                             </div>
-                                            <div class="d-flex gap-2 mb-1">
-                                                <input v-model="attack.cost" class="glass-input-sm w-100" placeholder="Costo (es. Fire, Fire)">
-                                            </div>
-                                            <textarea v-model="attack.text" class="glass-input-sm w-100" rows="2" placeholder="Effetto..."></textarea>
                                         </div>
-                                    </div>
-                                    <div v-else class="text-center py-4 text-white-50 border border-dashed border-secondary rounded">
-                                        <small>Nessun attacco aggiunto</small>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="form-floating-custom">
-                                <textarea v-model="editForm.flavor_text" id="flavor" class="glass-textarea" placeholder=" " style="height: 80px"></textarea>
-                                <label for="flavor">Testo del Gusto</label>
-                            </div>
-                        </div>
-                     </div>
-                    </div>
+                                    </td>
 
-                    <div class="glass-footer">
-                        <button class="btn btn-glass-secondary me-2" @click="showEditModal = false">Annulla</button>
-                        <button class="btn btn-glass-primary" @click="saveEdit">
-                            <i class="bi bi-check-lg me-1"></i> Salva Modifiche
-                        </button>
+                                    <!-- Name -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
+                                        <span v-else-if="row.status === 'error'" class="text-muted">—</span>
+                                        <span v-else-if="row.status === 'done' && !row.isEditing" class="card-name">{{
+                                            row.name ?? '—' }}</span>
+                                        <span v-else-if="row.status === 'done' && row.isEditing" class="card-name">
+                                            <input v-model="row.name" class="form-control form-control-md">
+                                        </span>
+                                        <span v-else class="text-muted">-</span>
+                                    </td>
+
+                                    <!-- Type -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-chip"></span>
+                                        <span v-else-if="row.type && !row.isEditing" class="type-chip"
+                                            :style="{ background: typeColor(row.type) }">
+                                            {{ row.type }}
+                                        </span>
+                                        <span v-else-if="row.type && row.isEditing" class="type-chip">
+                                            <select v-model="row.type" class="form-select form-select-md">
+                                                <option v-for="value in typeOptions" :value="value.value">{{ value.label
+                                                }}</option>
+                                            </select>
+                                        </span>
+                                        <span v-else class="text-muted">—</span>
+                                    </td>
+
+                                    <!-- Set -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
+                                        <span v-else-if="!row.isEditing && row.status === 'done'" class="set-name">{{
+                                            row.set ?? '—' }}</span>
+                                        <select v-else-if="row.isEditing && row.status === 'done'" v-model="row.set_id"
+                                            class="form-select form-select-md">
+                                            <option v-for="value in setOptions" :value="value.id" :key="value.id">{{
+                                                value.name }}
+                                            </option>
+                                        </select>
+                                        <span v-else class="set-name">{{ row.set ?? '—' }}</span>
+                                    </td>
+
+                                    <!-- Card number -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-short"></span>
+                                        <span v-else-if="row.status === 'done' && !row.isEditing">{{ row.card_number ??
+                                            '—' }}</span>
+                                        <span v-else-if="row.status === 'done' && row.isEditing">
+                                            <input v-model="row.card_number" class="form-control form-control-sm">
+                                        </span>
+                                        <code v-else class="card-number">{{ row.card_number ?? '—' }}</code>
+                                    </td>
+
+                                    <!-- Illustrator -->
+                                    <td>
+                                        <span v-if="row.status === 'loading'" class="skeleton skeleton-short"></span>
+                                        <span v-else-if="row.status === 'done' && !row.isEditing">{{ row.illustrator ??
+                                            '—' }}</span>
+                                        <span v-else-if="row.status === 'done' && row.isEditing">
+                                            <input v-model="row.illustrator" class="form-control form-control-md">
+                                        </span>
+                                        <code v-else class="card-number">{{ row.illustrator ?? '—' }}</code>
+                                    </td>
+
+                                    <!-- Status -->
+                                    <td class="col-status">
+                                        <span v-if="row.status === 'loading'" class="status-pill loading">
+                                            <div class="spinner-xs"></div> Analisi…
+                                        </span>
+                                        <span v-else-if="row.status === 'done' && !row.isSave && !row.isSaving"
+                                            class="status-pill done">✓ Fatto</span>
+                                        <span v-else-if="row.status === 'done' && row.isSave && !row.isSaving"
+                                            class="status-pill done">✓ Salvata</span>
+                                        <span v-else-if="row.status === 'done' && !row.isSave && row.isSaving"
+                                            class="status-pill done">Salvataggio in corso</span>
+                                        <span v-else class="status-pill error" :title="row.error">✕ Errore</span>
+
+                                        <!-- Messaggio errore + pulsante Riprova -->
+                                        <div v-if="row.status === 'error' && row.retry" class="retry-wrapper">
+                                            <span class="error-message" :title="row.error">{{ row.error }}</span>
+                                            <button class="btn-retry" @click="retryRow(row, index)"
+                                                :title="row.retryType === 'upload' ? 'Riprova upload immagine' : 'Riprova salvataggio'">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                    stroke-width="2.2" width="13" height="13">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M4.5 12a7.5 7.5 0 0 1 13.28-4.78L20 9.5M20 4v5.5h-5.5M19.5 12A7.5 7.5 0 0 1 6.22 16.78L4 14.5M4 20v-5.5h5.5" />
+                                                </svg>
+                                                {{ row.retryType === 'upload' ? 'Riprova upload' : 'Riprova salvataggio'
+                                                }}
+                                            </button>
+                                        </div>
+                                    </td>
+
+                                    <td class="col-action d-flex flex-column gap-3" v-if="!row.isSave && !row.isSaving">
+                                        <span style="cursor: pointer;" class="text-center bg-success p-1"
+                                            v-if="row.status === 'done' && !row.isEditing">
+                                            <font-awesome-icon :icon="['fad', 'save']" @click="saveCard(row, index)" />
+                                        </span>
+
+                                        <span style="cursor: pointer;" class="text-center bg-primary p-1"
+                                            v-if="row.status === 'done' && !row.isEditing">
+                                            <font-awesome-icon :icon="['fas', 'pencil']" @click="editRow(row, index)" />
+                                        </span>
+
+                                        <span style="cursor: pointer;" class="text-center bg-danger p-1"
+                                            v-if="row.status === 'done' && !row.isEditing">
+                                            <font-awesome-icon :icon="['fas', 'trash']" @click="deleteRow(row)" />
+                                        </span>
+
+                                        <span style="cursor: pointer;" class="text-center bg-success  p-1"
+                                            v-if="row.status === 'done' && row.isEditing">
+                                            <font-awesome-icon :icon="['fas', 'check']"
+                                                @click="saveLocalCard(row, index)" />
+                                        </span>
+
+                                        <span style="cursor: pointer;" class="text-center bg-danger p-1"
+                                            v-if="row.status === 'done' && row.isEditing">
+                                            <font-awesome-icon :icon="['fas', 'times']"
+                                                @click="deleteChangesCard(row, index)" />
+                                        </span>
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
-        </Teleport>
-            
-            <!-- Fullscreen Viewer -->
-            <div v-if="showFullscreen" class="fullscreen-viewer" @click="showFullscreen = false">
-                <img :src="fullscreenImageSrc" class="fullscreen-image">
-            </div>
-
-            <!-- Toast Container -->
-            <div class="toast-container-custom">
-                <div 
-                    v-for="toast in toasts" 
-                    :key="toast.id" 
-                    class="toast-custom" 
-                    :class="toast.type"
-                >
-                    <div class="d-flex align-items-center justify-content-between">
-                         <div class="d-flex align-items-center gap-2">
-                            <i class="bi" :class="{
-                                'bi-check-circle-fill text-success': toast.type === 'success',
-                                'bi-exclamation-triangle-fill text-warning': toast.type === 'warning',
-                                'bi-exclamation-circle-fill text-danger': toast.type === 'error',
-                                'bi-info-circle-fill text-info': toast.type === 'info'
-                            }"></i>
-                            <span>{{ toast.message }}</span>
-                         </div>
-                         <button type="button" class="btn-close btn-close-white ms-3" @click="removeToast(toast.id)"></button>
-                    </div>
-                </div>
-            </div>
+            </transition>
 
         </div>
-
-        <!-- Confirm Modal -->
-        <ConfirmModal />
     </AppLayout>
 </template>
 
 <style scoped>
-/* Ported CSS */
-.h-custom-padding {
-    padding-top: 2rem; /* Adjusted because main-container handles top padding */
+/* ── Page ── */
+.upload-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+    font-family: 'Inter', sans-serif;
 }
 
-.upload-zone {
-    border: 3px dashed rgba(255, 203, 5, 0.4);
-    border-radius: 20px;
-    padding: 60px 20px;
+/* ── Header ── */
+.page-header {
+    position: relative;
     text-align: center;
-    background: rgba(255, 255, 255, 0.03);
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.upload-zone:hover, .upload-zone.drag-over {
-    border-color: #FFCB05;
-    background: rgba(255, 203, 5, 0.08);
-}
-
-.gallery-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
-    margin-top: 30px;
-}
-
-.card-item {
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 15px;
-    padding: 15px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    position: relative;
-}
-
-.card-image-wrapper {
-    position: relative;
-    cursor: pointer;
+    margin-bottom: 2.5rem;
     overflow: hidden;
-    border-radius: 10px;
-    margin-bottom: 10px;
 }
 
-.card-image {
-    width: 100%;
-    aspect-ratio: 1;
-    object-fit: cover;
-}
-
-.zoom-overlay {
+.header-glow {
     position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0; transition: opacity 0.3s ease;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 80% at 50% 0%, rgba(99, 102, 241, .18) 0%, transparent 70%);
+    pointer-events: none;
 }
 
-.card-image-wrapper:hover .zoom-overlay { opacity: 1; }
-.zoom-overlay i { color: white; font-size: 2rem; }
-
-/* Tabs */
-.tabs-nav {
-    display: flex; gap: 15px; margin-bottom: 25px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.tab-item {
-    padding: 12px 20px; color: rgba(255, 255, 255, 0.6);
-    cursor: pointer; border-bottom: 3px solid transparent;
-    font-weight: 500;
-}
-
-.tab-item:hover { color: #fff; }
-.tab-item.active { color: #FFCB05; border-bottom-color: #FFCB05; }
-
-.tab-badge {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px;
-}
-.active-badge { background: #FFCB05; color: #000; }
-
-/* Checkbox */
-.card-checkbox {
-    position: absolute; top: 10px; left: 10px; z-index: 10;
-    width: 24px; height: 24px;
-    background: rgba(0, 0, 0, 0.6);
-    border: 2px solid rgba(255, 255, 255, 0.5);
-    border-radius: 6px;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-}
-.card-checkbox.checked { background: #FFCB05; border-color: #FFCB05; }
-.card-checkbox i { display: none; color: #000; }
-.card-checkbox.checked i { display: block; }
-
-/* FAB */
-.floating-action-bar {
-    position: fixed; bottom: 30px; left: 50%;
-    transform: translateX(-50%) translateY(150px);
-    background: #1e233c; border: 1px solid rgba(255, 203, 5, 0.3);
-    padding: 15px 30px; border-radius: 50px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    display: flex; align-items: center; gap: 20px; z-index: 1000;
-    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.floating-action-bar.visible { transform: translateX(-50%) translateY(0); }
-.fab-count {
-    background: #FFCB05; color: #000; width: 30px; height: 30px;
-    border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;
-}
-
-/* Modals Overlay */
-.custom-modal-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.9); z-index: 2000;
-    display: flex; align-items: center; justify-content: center;
-}
-
-.cropper-container-wrapper {
-    max-width: 800px; width: 100%; padding: 20px;
-}
-
-.card-edit-container {
-    background: #1e233c; width: 90%; max-width: 800px;
-    border-radius: 20px; overflow: hidden;
-}
-
-.modal-header-custom {
-    padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex; justify-content: space-between; align-items: center;
-}
-.modal-close-btn { background: none; border: none; color: white; cursor: pointer; font-size: 1.2rem; }
-
-/* Glassmorphism Edit Modal */
-.card-edit-glass-container {
-    background: rgba(30, 35, 60, 0.7);
-    backdrop-filter: blur(20px);
-    width: 95%;
-    max-width: 1200px;
-    border-radius: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    max-height: 90vh;
-}
-
-.glass-header {
-    padding: 20px 30px;
-    background: rgba(0, 0, 0, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.glass-close-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    color: white;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+.page-title {
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #f8fafc;
+    margin: 0 0 .5rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: .5rem;
+}
+
+.title-icon {
+    font-size: 1.4em;
+    filter: drop-shadow(0 0 8px #eab308);
+}
+
+.page-subtitle {
+    color: #94a3b8;
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* ── Dropzone wrapper ── */
+.dropzone-wrapper {
+    position: relative;
+    margin-bottom: 2.5rem;
+}
+
+.custom-dropzone {
+    border: 2px dashed rgba(99, 102, 241, .5);
+    border-radius: 1.25rem;
+    background: rgba(15, 23, 42, .6);
+    backdrop-filter: blur(12px);
+    padding: 3.5rem 2rem;
     cursor: pointer;
-    transition: all 0.2s;
-}
-.glass-close-btn:hover { background: rgba(255, 255, 255, 0.2); transform: rotate(90deg); }
-
-.glass-body {
-    padding: 30px;
-    overflow-y: auto;
-    flex: 1;
+    transition: border-color .25s, background .25s, box-shadow .25s;
+    text-align: center;
 }
 
-.glass-footer {
-    padding: 20px 30px;
-    background: rgba(0, 0, 0, 0.2);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    justify-content: flex-end;
+.custom-dropzone:hover,
+.custom-dropzone.dz-drag-hover {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, .08);
+    box-shadow: 0 0 40px -10px rgba(99, 102, 241, .35);
 }
 
-.section-title {
-    color: #FFCB05;
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 1px;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Glass Inputs */
-.glass-input, .glass-select, .glass-textarea {
-    width: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: white;
-    padding: 12px 16px;
-    border-radius: 12px;
-    transition: all 0.3s ease;
-}
-.glass-input:focus, .glass-select:focus, .glass-textarea:focus {
-    background: rgba(0, 0, 0, 0.5);
-    border-color: #FFCB05;
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(255, 203, 5, 0.1);
-}
-
-/* Floating Label Override */
-.form-floating-custom { position: relative; }
-.form-floating-custom label {
-    position: absolute;
-    top: -10px;
-    left: 10px;
-    background: #1e233c; /* Match bg mainly */
-    padding: 0 5px;
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.6);
-    border-radius: 4px;
-}
-
-/* Attacks */
-.attacks-section {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 16px;
-    padding: 15px;
-}
-.attacks-container {
-    max-height: 250px;
-    overflow-y: auto;
-    padding-right: 5px;
-}
-.attack-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-}
-.glass-input-sm {
-    background: transparent;
-    border: none;
-    color: white;
-    font-size: 0.9rem;
-    padding: 2px 5px;
-}
-.glass-input-sm:focus { outline: none; background: rgba(0,0,0,0.2); border-radius: 4px; }
-.btn-icon-danger {
-    background: rgba(239, 68, 68, 0.2);
-    border: none;
-    color: #ef4444;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-}
-.btn-icon-danger:hover { background: #ef4444; color: white; }
-
-/* Buttons */
-.btn-glass-primary {
-    background: linear-gradient(135deg, #FFCB05 0%, #f39c12 100%);
-    border: none;
-    color: #000;
-    font-weight: 600;
-    padding: 10px 24px;
-    border-radius: 50px;
-}
-.btn-glass-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: white;
-    padding: 10px 24px;
-    border-radius: 50px;
-}
-.btn-glass-secondary:hover { background: rgba(255, 255, 255, 0.2); }
-
-/* Scrollbar */
-.custom-scrollbar::-webkit-scrollbar { width: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
-
-/* Buttons */
-.btn-pokemon {
-    background: linear-gradient(135deg, #FFCB05 0%, #f39c12 100%);
-    border: none; color: #000; font-weight: 600;
-    border-radius: 50px; padding: 0.375rem 1rem;
-}
-.btn-danger-pokemon {
-    background: linear-gradient(135deg, #CC0000 0%, #ff4444 100%);
-    border: none; color: #fff;
-}
-
-/* Fullscreen */
-.fullscreen-viewer {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.95); z-index: 9999;
-    display: flex; align-items: center; justify-content: center;
-}
-.fullscreen-image { max-width: 90vw; max-height: 90vh; }
-
-.form-group-custom { margin-bottom: 1rem; }
-.form-group-custom label { display: block; color: rgba(255,255,255,0.7); margin-bottom: 5px; }
-.form-group-custom input, .form-group-custom select {
-    width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);
-    padding: 8px 12px; color: white; border-radius: 8px;
-}
-
-/* Toast Styles */
-.toast-container-custom {
-    position: fixed;
-    top: 100px;
-    right: 20px;
-    z-index: 9999;
+.dz-message {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    align-items: center;
+    gap: .75rem;
+    pointer-events: none;
 }
 
-.toast-custom {
-    background: rgba(30, 35, 60, 0.9);
+.dz-icon {
+    width: 60px;
+    height: 60px;
+    color: #6366f1;
+    opacity: .85;
+}
+
+.dz-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.dz-label {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+.dz-sublabel {
+    font-size: .875rem;
+    color: #64748b;
+}
+
+.dz-sublabel strong {
+    color: #6366f1;
+    font-weight: 600;
+}
+
+/* ── Processing badge ── */
+.processing-badge {
+    position: absolute;
+    bottom: -1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    font-size: .8rem;
+    font-weight: 600;
+    padding: .35rem .9rem;
+    border-radius: 9999px;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, .4);
+}
+
+/* ── Results ── */
+.results-section {
+    background: rgba(15, 23, 42, .7);
+    border: 1px solid rgba(99, 102, 241, .2);
+    border-radius: 1.25rem;
+    overflow: hidden;
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 12px 16px;
-    color: white;
-    min-width: 300px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    animation: slideIn 0.3s ease-out;
 }
 
-@keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+.results-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(99, 102, 241, .15);
 }
 
-/* Validation Error Styles */
-.border-error {
-    border-color: #ef4444 !important;
-    border-width: 2px !important;
+.results-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    padding: 0 8px;
+    background: rgba(99, 102, 241, .25);
+    color: #a5b4fc;
+    border-radius: 9999px;
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+/* ── Table ── */
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .9rem;
+    color: #cbd5e1;
+}
+
+.results-table thead tr {
+    background: rgba(30, 41, 59, .8);
+}
+
+.results-table th {
+    padding: .9rem 1.2rem;
+    text-align: left;
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.results-table td {
+    padding: .9rem 1.2rem;
+    vertical-align: middle;
+    border-top: 1px solid rgba(51, 65, 85, .5);
+}
+
+.result-row:hover td {
+    background: rgba(99, 102, 241, .05);
+}
+
+.result-row.error td {
+    opacity: .65;
+}
+
+/* Thumb */
+.col-img {
+    width: 72px;
+}
+
+.card-thumb-wrapper {
+    position: relative;
+    width: 56px;
+    height: 78px;
+    border-radius: .5rem;
+    overflow: hidden;
+    background: rgba(30, 41, 59, .8);
+}
+
+.card-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.thumb-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, .55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Text / chips */
+.card-name {
+    font-weight: 600;
+}
+
+.type-chip {
+    display: inline-block;
+    padding: .2rem .65rem;
+    border-radius: 9999px;
+    font-size: .78rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .4);
+}
+
+.set-name {
+    color: #94a3b8;
+    font-size: .875rem;
+}
+
+.card-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .82rem;
+    color: #a5b4fc;
+    background: rgba(99, 102, 241, .12);
+    padding: .15rem .45rem;
+    border-radius: .3rem;
+}
+
+.illustrator {
+    font-style: italic;
+    color: #94a3b8;
+    font-size: .875rem;
+}
+
+.text-muted {
+    color: #475569;
+}
+
+/* Status pills */
+.col-status {
+    text-align: center;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .25rem .75rem;
+    border-radius: 9999px;
+    font-size: .78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.status-pill.loading {
+    background: rgba(99, 102, 241, .15);
+    color: #a5b4fc;
+}
+
+.status-pill.done {
+    background: rgba(34, 197, 94, .15);
+    color: #4ade80;
+}
+
+.status-pill.error {
+    background: rgba(239, 68, 68, .15);
+    color: #f87171;
+    cursor: help;
+}
+
+/* ── Retry ── */
+.retry-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .35rem;
+    margin-top: .5rem;
 }
 
 .error-message {
-    display: block;
-    color: #ef4444;
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
+    font-size: .72rem;
+    color: #f87171;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: .85;
 }
 
-/* Glass Image Container */
-.glass-image-container {
-    transition: all 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+.btn-retry {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .25rem .65rem;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(251, 146, 60, .6);
+    background: rgba(251, 146, 60, .08);
+    color: #fb923c;
+    font-size: .72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s, border-color .2s, transform .15s;
+    white-space: nowrap;
 }
-.glass-image-container:hover {
-    background: rgba(0,0,0,0.3) !important;
-    border-color: rgba(255, 255, 255, 0.2);
+
+.btn-retry:hover {
+    background: rgba(251, 146, 60, .18);
+    border-color: #fb923c;
+    transform: scale(1.04);
 }
 
-/* Mobile Responsiveness for Upload Page */
-@media (max-width: 768px) {
-    .h-custom-padding {
-        padding-top: 1rem;
+.btn-retry:active {
+    transform: scale(.97);
+}
+
+/* ── Skeletons ── */
+.skeleton {
+    display: inline-block;
+    background: linear-gradient(90deg, rgba(51, 65, 85, .6) 25%, rgba(71, 85, 105, .6) 50%, rgba(51, 65, 85, .6) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: .35rem;
+}
+
+.skeleton-text {
+    width: 110px;
+    height: 14px;
+}
+
+.skeleton-short {
+    width: 55px;
+    height: 14px;
+}
+
+.skeleton-chip {
+    width: 70px;
+    height: 22px;
+    border-radius: 9999px;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0
     }
 
-    .page-title {
-        font-size: 1.8rem;
+    100% {
+        background-position: -200% 0
     }
-    
-    .page-subtitle {
-        font-size: 0.9rem;
-        padding: 0 10px;
-    }
+}
 
-    /* Upload Zone */
-    .upload-zone {
-        padding: 30px 15px;
-    }
+/* ── Spinners ── */
+.spinner,
+.spinner-sm,
+.spinner-xs {
+    display: inline-block;
+    border-radius: 50%;
+    border-style: solid;
+    border-color: rgba(255, 255, 255, .2);
+    border-top-color: #fff;
+    animation: spin .7s linear infinite;
+}
 
-    /* Gallery Grid */
-    .gallery-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 10px;
-    }
-    
-    .card-item {
-        padding: 10px;
-    }
-    
-    .card-image-wrapper {
-        margin-bottom: 8px;
-    }
+.spinner {
+    width: 18px;
+    height: 18px;
+    border-width: 2.5px;
+}
 
-    /* Tabs */
-    .tabs-nav {
-        flex-wrap: wrap;
-        gap: 5px;
-        justify-content: center;
-    }
-    
-    .tab-item {
-        padding: 8px 12px;
-        font-size: 0.9rem;
-        flex: 1 1 auto;
-        text-align: center;
-    }
+.spinner-sm {
+    width: 22px;
+    height: 22px;
+    border-width: 3px;
+}
 
-    /* Controls Header */
-    .d-flex.justify-content-between.align-items-center.mb-3 {
-        flex-direction: column;
-        gap: 15px;
-        align-items: stretch !important;
-    }
-    
-    .form-check {
-        text-align: center;
-        background: rgba(255,255,255,0.05);
-        padding: 10px;
-        border-radius: 8px;
-    }
+.spinner-xs {
+    width: 12px;
+    height: 12px;
+    border-width: 2px;
+}
 
-    .btn-danger-pokemon {
-        width: 100%;
+@keyframes spin {
+    to {
+        transform: rotate(360deg)
     }
+}
 
-    /* Floating Action Bar */
-    .floating-action-bar {
-        width: 90%;
-        max-width: 400px;
-        padding: 12px 20px;
-        bottom: 20px;
-        border-radius: 16px;
-        flex-direction: row;
-        justify-content: space-between;
-    }
-    
-    .floating-action-bar .d-flex {
-        gap: 8px;
-    }
-    
-    .btn-sm {
-        padding: 4px 8px;
-        font-size: 0.8rem;
-    }
+/* ── Transitions ── */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity .3s;
+}
 
-    /* Modals */
-    .card-edit-glass-container {
-        width: 100%;
-        height: 100%;
-        max-height: 100vh;
-        border-radius: 0;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .glass-body {
-        padding: 15px;
-        overflow-y: auto;
-        flex: 1; /* Take remaining space */
-    }
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
 
-    /* Fix stacking for edit modal columns */
-    .glass-body .row {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .glass-body .col-md-4 {
-        width: 100%;
-        margin-bottom: 20px;
-    }
-    
-    .glass-image-container {
-        min-height: 250px !important;
-        margin-bottom: 20px;
-    }
-    
-    .glass-header {
-        padding: 15px;
-        flex-shrink: 0; /* Keep header visible */
-    }
-    
-    .glass-footer {
-        padding: 15px;
-        justify-content: space-between;
-        flex-shrink: 0; /* Keep footer visible */
-        background: #1e233c; /* Ensure solid bg on mobile */
-    }
-    
-    .glass-footer .btn {
-        flex: 1;
-        padding: 10px;
-        font-size: 0.9rem;
-    }
-    
-    /* Attacks */
-    .attacks-container {
-        max-height: 200px;
-    }
-    
-    .attack-card .d-flex {
-        flex-wrap: wrap;
-    }
-    
-    .glass-input-sm.w-25 {
-        width: 30% !important;
-        margin-left: auto;
-    }
-    
-    .glass-input-sm.w-50 {
-        width: 60% !important;
-    }
+.slide-up-enter-active {
+    transition: all .4s cubic-bezier(.16, 1, .3, 1);
+}
+
+.slide-up-enter-from {
+    opacity: 0;
+    transform: translateY(24px);
 }
 </style>

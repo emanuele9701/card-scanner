@@ -1,11 +1,18 @@
 import './bootstrap';
 import '../css/app.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap/dist/js/bootstrap.bundle.min.js';
-
 import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { ZiggyVue } from 'ziggy-js'
+
+
+import { faUser, faHome, faBars, faSave, faPencil, faCheck, faTimes, faTrash } from '@fortawesome/free-solid-svg-icons'
+
+// Aggiungi le icone che vuoi usare
+library.add(faUser, faHome, faBars, faSave, faPencil, faCheck, faTimes, faTrash)
 
 const appName = import.meta.env.VITE_APP_NAME || 'Card Scanner';
 
@@ -15,6 +22,8 @@ createInertiaApp({
     setup({ el, App, props, plugin }) {
         return createApp({ render: () => h(App, props) })
             .use(plugin)
+            .use(ZiggyVue)
+            .component('font-awesome-icon', FontAwesomeIcon)
             .mount(el);
     },
     progress: {

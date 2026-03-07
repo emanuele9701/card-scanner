@@ -54,7 +54,6 @@ class ImportCardSetPokemon extends Command
             $this->info($set['name']);
 
             $abbreviation = $set['abbreviation'];
-            dump($set);
 
             $setCard = CardSet::updateOrCreate(
                 [

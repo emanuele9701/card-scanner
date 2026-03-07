@@ -6,6 +6,7 @@ import ConfirmModal from '@/Components/ConfirmModal.vue';
 import { useModal } from '@/composables/useModal';
 import axios from 'axios';
 
+
 const props = defineProps({
     cards: Object,
     availableGames: Array,
@@ -144,7 +145,7 @@ const toggleCardSelection = (cardId, checked, event, index) => {
         // Shift-click range selection
         const start = Math.min(lastClickedIndex.value, index);
         const end = Math.max(lastClickedIndex.value, index);
-        
+
         for (let i = start; i <= end; i++) {
             if (props.cards.data[i]) {
                 selectedCards.value.add(props.cards.data[i].id);
@@ -157,7 +158,7 @@ const toggleCardSelection = (cardId, checked, event, index) => {
             selectedCards.value.delete(cardId);
         }
     }
-    
+
     if (checked) {
         lastClickedIndex.value = index;
     }
@@ -203,7 +204,7 @@ const generatePageNumbers = () => {
     const pages = [];
     const current = props.cards.current_page;
     const last = props.cards.last_page;
-    
+
     if (last <= 7) {
         // Show all pages if there are 7 or fewer
         for (let i = 1; i <= last; i++) {
@@ -212,30 +213,30 @@ const generatePageNumbers = () => {
     } else {
         // Always show first page
         pages.push(1);
-        
+
         // Show ellipsis or pages around current
         if (current > 3) {
             pages.push('...');
         }
-        
+
         // Show pages around current page
         for (let i = Math.max(2, current - 1); i <= Math.min(last - 1, current + 1); i++) {
             if (!pages.includes(i)) {
                 pages.push(i);
             }
         }
-        
+
         // Show ellipsis or pages before last
         if (current < last - 2) {
             pages.push('...');
         }
-        
+
         // Always show last page
         if (!pages.includes(last)) {
             pages.push(last);
         }
     }
-    
+
     return pages;
 };
 
@@ -320,7 +321,7 @@ const deleteCard = async (cardId) => {
         'Conferma Eliminazione',
         { confirmText: 'Elimina', cancelText: 'Annulla' }
     );
-    
+
     if (!confirmed) return;
     if (isDeleting.value) return;
     isDeleting.value = true;
@@ -418,10 +419,10 @@ const saveBulkRarity = async () => {
 
     try {
         // Update each card
-        await Promise.all(cardIds.map(id => 
+        await Promise.all(cardIds.map(id =>
             axios.put(`/cards/${id}/update`, { rarity: bulkRarity.value || null })
         ));
-        
+
         await showAlert(`Rarità aggiornata per ${cardIds.length} carte!`, 'success');
         closeBulkRarityModal();
         clearSelection();
@@ -446,7 +447,7 @@ const bulkDelete = async () => {
         'Conferma Eliminazione Multipla',
         { confirmText: 'Elimina', cancelText: 'Annulla' }
     );
-    
+
     if (!confirmed) return;
     if (isDeleting.value) return;
     isDeleting.value = true;
@@ -550,7 +551,7 @@ const deleteInventory = async (inventoryId) => {
         'Conferma Eliminazione',
         { confirmText: 'Elimina', cancelText: 'Annulla' }
     );
-    
+
     if (!confirmed) return;
 
     try {
@@ -576,6 +577,7 @@ onMounted(async () => {
 
 <template>
     <AppLayout>
+
         <Head title="Card Scanner - Collezione" />
         <div class="collection-page">
             <!-- Hero Header -->
@@ -604,14 +606,10 @@ onMounted(async () => {
                     <!-- Search -->
                     <div class="filter-group filter-search">
                         <label class="filter-label"><i class="bi bi-search me-1"></i>Cerca</label>
-                        <input
-                            v-model="searchQuery"
-                            type="search"
-                            placeholder="Nome o numero..."
-                            class="filter-input"
-                        />
+                        <input v-model="searchQuery" type="search" placeholder="Nome o numero..."
+                            class="filter-input" />
                     </div>
-                    
+
                     <!-- Game Filter -->
                     <div class="filter-group">
                         <label class="filter-label"><i class="bi bi-controller me-1"></i>Gioco</label>
@@ -629,7 +627,7 @@ onMounted(async () => {
                             <option v-for="set in availableSets" :key="set" :value="set">{{ set }}</option>
                         </select>
                     </div>
-                    
+
                     <!-- Per Page Selector -->
                     <div class="filter-group filter-small">
                         <label class="filter-label"><i class="bi bi-grid-3x3 me-1"></i>Per pagina</label>
@@ -646,32 +644,24 @@ onMounted(async () => {
                         <label class="filter-label"><i class="bi bi-diamond me-1"></i>Variante</label>
                         <select v-model="selectedVariant" class="filter-input">
                             <option value="">Tutte</option>
-                            <option v-for="variant in availableVariants" :key="variant" :value="variant">{{ variant }}</option>
+                            <option v-for="variant in availableVariants" :key="variant" :value="variant">{{ variant }}
+                            </option>
                         </select>
                     </div>
                 </div>
-                
+
                 <!-- Toggle Filters -->
                 <div class="toggle-filters">
-                    <button 
-                        class="toggle-pill" 
-                        :class="{ active: showCardsWithoutSet }"
-                        @click="showCardsWithoutSet = !showCardsWithoutSet"
-                    >
+                    <button class="toggle-pill" :class="{ active: showCardsWithoutSet }"
+                        @click="showCardsWithoutSet = !showCardsWithoutSet">
                         <i class="bi bi-folder-x"></i> Senza set
                     </button>
-                    <button 
-                        class="toggle-pill" 
-                        :class="{ active: showCardsWithoutRarity }"
-                        @click="showCardsWithoutRarity = !showCardsWithoutRarity"
-                    >
+                    <button class="toggle-pill" :class="{ active: showCardsWithoutRarity }"
+                        @click="showCardsWithoutRarity = !showCardsWithoutRarity">
                         <i class="bi bi-star"></i> Senza rarità
                     </button>
-                    <button 
-                        class="toggle-pill" 
-                        :class="{ active: showOnlyDuplicates }"
-                        @click="showOnlyDuplicates = !showOnlyDuplicates"
-                    >
+                    <button class="toggle-pill" :class="{ active: showOnlyDuplicates }"
+                        @click="showOnlyDuplicates = !showOnlyDuplicates">
                         <i class="bi bi-stack"></i> Solo doppie
                     </button>
                 </div>
@@ -704,26 +694,27 @@ onMounted(async () => {
             <!-- Select All -->
             <div v-if="cards.data && cards.data.length > 0" class="select-all-bar">
                 <label class="select-all-label">
-                    <input type="checkbox" @change="e => { if(e.target.checked) cards.data.forEach(c => selectedCards.add(c.id)); else clearSelection(); }" :checked="cards.data.length > 0 && selectedCards.size === cards.data.length">
+                    <input type="checkbox"
+                        @change="e => { if (e.target.checked) cards.data.forEach(c => selectedCards.add(c.id)); else clearSelection(); }"
+                        :checked="cards.data.length > 0 && selectedCards.size === cards.data.length">
                     <span>Seleziona tutte</span>
                 </label>
                 <button class="sort-btn" @click="sortBy('set_number')">
                     <i class="bi bi-sort-numeric-down"></i> Numero
-                    <i v-if="sortColumn === 'set_number'" class="bi" :class="sortDirection === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down'" style="font-size: 0.7rem;"></i>
+                    <i v-if="sortColumn === 'set_number'" class="bi"
+                        :class="sortDirection === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down'"
+                        style="font-size: 0.7rem;"></i>
                 </button>
             </div>
 
             <!-- Card Grid -->
             <div v-if="cards.data && cards.data.length > 0" class="cards-grid">
-                <div 
-                    v-for="(card, index) in cards.data" 
-                    :key="card.id" 
-                    class="card-tile"
-                    :class="{ selected: selectedCards.has(card.id) }"
-                >
+                <div v-for="(card, index) in cards.data" :key="card.id" class="card-tile"
+                    :class="{ selected: selectedCards.has(card.id) }">
                     <!-- Selection Checkbox -->
                     <div class="tile-checkbox">
-                        <input type="checkbox" @change="e => toggleCardSelection(card.id, e.target.checked, e, index)" :checked="selectedCards.has(card.id)">
+                        <input type="checkbox" @change="e => toggleCardSelection(card.id, e.target.checked, e, index)"
+                            :checked="selectedCards.has(card.id)">
                     </div>
 
                     <!-- Quantity Badge -->
@@ -740,7 +731,8 @@ onMounted(async () => {
                     <div class="tile-info">
                         <div class="tile-name">{{ card.card_name || 'Sconosciuta' }}</div>
                         <div class="tile-meta" v-if="card.hp || card.type">
-                            {{ card.hp ? 'HP ' + card.hp : '' }}{{ card.hp && card.type ? ' · ' : '' }}{{ card.type || '' }}
+                            {{ card.hp ? 'HP ' + card.hp : '' }}{{ card.hp && card.type ? ' · ' : '' }}{{ card.type ||
+                                '' }}
                         </div>
                         <div class="tile-set" v-if="card.card_set">
                             <span class="set-badge">{{ card.card_set.abbreviation }}</span>
@@ -773,16 +765,19 @@ onMounted(async () => {
                     Pagina {{ cards.current_page }} di {{ cards.last_page }}
                 </div>
                 <div class="pagination-buttons">
-                    <button class="page-btn" :disabled="cards.current_page === 1" @click="goToPage(cards.current_page - 1)">
+                    <button class="page-btn" :disabled="cards.current_page === 1"
+                        @click="goToPage(cards.current_page - 1)">
                         <i class="bi bi-chevron-left"></i>
                     </button>
                     <template v-for="page in generatePageNumbers()" :key="page">
                         <span v-if="page === '...'" class="page-ellipsis">…</span>
-                        <button v-else class="page-btn" :class="{ active: page === cards.current_page }" @click="goToPage(page)">
+                        <button v-else class="page-btn" :class="{ active: page === cards.current_page }"
+                            @click="goToPage(page)">
                             {{ page }}
                         </button>
                     </template>
-                    <button class="page-btn" :disabled="cards.current_page === cards.last_page" @click="goToPage(cards.current_page + 1)">
+                    <button class="page-btn" :disabled="cards.current_page === cards.last_page"
+                        @click="goToPage(cards.current_page + 1)">
                         <i class="bi bi-chevron-right"></i>
                     </button>
                 </div>
@@ -817,7 +812,9 @@ onMounted(async () => {
                     </button>
                 </div>
                 <div class="modal-body" style="padding: 20px;">
-                    <p class="text-white-50 mb-3">Seleziona il set da assegnare a <strong>{{ selectedCount }}</strong> carte:</p>
+                    <p class="text-white-50 mb-3">Seleziona il set da assegnare a <strong>{{ selectedCount }}</strong>
+                        carte:
+                    </p>
                     <select class="form-select bg-dark text-white border-secondary" v-model="bulkSetId">
                         <option value="">Nessun Set (rimuovi)</option>
                         <option v-for="set in cardSets" :key="set.id" :value="set.id">
@@ -844,7 +841,9 @@ onMounted(async () => {
                     </button>
                 </div>
                 <div class="modal-body" style="padding: 20px;">
-                    <p class="text-white-50 mb-3">Seleziona la rarità da assegnare a <strong>{{ selectedCards.size }}</strong> carte:</p>
+                    <p class="text-white-50 mb-3">Seleziona la rarità da assegnare a <strong>{{ selectedCards.size
+                            }}</strong>
+                        carte:</p>
                     <select class="form-select bg-dark text-white border-secondary" v-model="bulkRarity">
                         <option value="">Nessuna Rarità (rimuovi)</option>
                         <option value="Comune">Comune</option>
@@ -858,7 +857,8 @@ onMounted(async () => {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @click="closeBulkRarityModal">Annulla</button>
-                    <button type="button" class="btn btn-info text-white" @click="saveBulkRarity" :disabled="isAssigningRarity">
+                    <button type="button" class="btn btn-info text-white" @click="saveBulkRarity"
+                        :disabled="isAssigningRarity">
                         <span v-if="isAssigningRarity" class="spinner-border spinner-border-sm me-1"></span>
                         <i v-else class="bi bi-check-lg"></i> Assegna Rarità
                     </button>
@@ -868,188 +868,256 @@ onMounted(async () => {
 
         <!-- View/Edit Card Modal -->
         <div v-if="showCardModal" class="modal-overlay" @click.self="closeCardModal">
-            <div class="modal-container" style="max-width: 1100px; width: 95%;">
+            <div class="bg-custom rounded-4 shadow-lg overflow-hidden position-relative"
+                style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+
+                <!-- Loader -->
                 <div v-if="isLoadingCard" class="loader-overlay active">
                     <div class="loader-card"></div>
                     <div class="loader-text">Caricamento carta...</div>
                 </div>
-                <div class="modal-header-custom">
-                    <h3>
-                        <span class="text-warning me-2" v-if="currentCardData?.set_number"><small class="text-white-50">#{{ currentCardData.set_number }}</small></span>
-                        {{ isEditMode ? 'Modifica Carta' : (currentCardData?.card_name || 'Dettagli Carta') }}
-                    </h3>
-                    <button type="button" class="btn-close-modal" @click="closeCardModal">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
+
+                <!-- ── HEADER ── -->
+                <div class="d-flex justify-content-between align-items-center px-4 py-3 border-bottom bg-custom">
+                    <h5 class="mb-0 fw-semibold text-white d-flex align-items-center gap-2">
+                        <i class="bi bi-layers text-warning"></i>
+                        {{ isEditMode ? 'Modifica Carta' : 'Dettagli Carta' }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @click="closeCardModal"></button>
                 </div>
-                
-                <div class="modal-body modal-body-grid">
-                    <!-- Image Column -->
-                    <div class="modal-image-col">
-                        <div class="card-image-display" @click="openFullscreenCard(currentCardData.image_url)">
-                            <img :src="currentCardData?.image_url" alt="Card" class="img-fluid rounded shadow-lg">
-                            <div class="zoom-hint"><i class="bi bi-zoom-in"></i></div>
+
+                <!-- ── BODY ── -->
+                <div class="overflow-auto flex-grow-1">
+
+                    <!-- VIEW MODE -->
+                    <div v-if="!isEditMode && currentCardData" class="d-flex flex-column flex-md-row h-100">
+
+                        <!-- Left – immagine carta -->
+                        <div class="d-flex justify-content-center">
+                            <div class="card-image-display p-4" @click="openFullscreenCard(currentCardData.image_url)">
+                                <img :src="currentCardData.image_url" alt="Card" class="img-fluid rounded-3 shadow-lg"
+                                    style="max-height:400px;">
+                                <div class="zoom-hint"><i class="bi bi-zoom-in"></i></div>
+                            </div>
                         </div>
-                        
-                        <!-- Quick Actions under image (Mobile) -->
-                        <div class="d-flex gap-2 justify-content-center mt-3 d-md-none">
-                            <button v-if="!isEditMode" type="button" class="btn btn-warning flex-grow-1" @click="toggleEditMode">
-                                <i class="bi bi-pencil"></i> Modifica
-                            </button>
+
+                        <!-- Right – info -->
+                        <div class="p-4 flex-grow-1 overflow-auto">
+
+                            <!-- Titolo + bottone Modifica -->
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <div>
+                                    <h2 class="fw-bold text-white mb-0 lh-1">
+                                        {{ currentCardData.card_name || 'Sconosciuta' }}
+                                    </h2>
+                                    <p class="text-white-50 mb-0 mt-1" style="font-size:.9rem;">
+                                        <span v-if="currentCardData.hp">HP {{ currentCardData.hp }}</span>
+                                        <span v-if="currentCardData.hp && currentCardData.evolution_stage"> · </span>
+                                        <span v-if="currentCardData.evolution_stage">
+                                            {{ currentCardData.evolution_stage }} Pokemon
+                                        </span>
+                                    </p>
+                                </div>
+                                <button type="button"
+                                    class="btn btn-warning text-white fw-semibold d-flex align-items-center gap-1 ms-3"
+                                    @click="toggleEditMode">
+                                    <i class="bi bi-pencil-fill"></i> Modifica Carta
+                                </button>
+                            </div>
+
+                            <!-- Griglia stats -->
+                            <table class="table table-borderless mb-0 mt-3" style="font-size:.92rem;">
+                                <tbody>
+                                    <tr>
+                                        <td class="text-white-50 ps-0 py-2" style="width:22%">Stage</td>
+                                        <td class="fw-bold text-white py-2" style="width:28%">
+                                            {{ currentCardData.evolution_stage || '-' }}
+                                        </td>
+                                        <td class="text-white-50 py-2" style="width:22%">Debolezza</td>
+                                        <td class="text-info fw-semibold py-2" style="width:28%">
+                                            {{ currentCardData.weakness || '-' }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-white-50 ps-0 py-2">Resistenza</td>
+                                        <td class="fw-bold text-white py-2">
+                                            {{ currentCardData.resistance || 'Nessuna' }}
+                                        </td>
+                                        <td class="text-white-50 py-2">Costo Ritirata</td>
+                                        <td class="py-2 text-white-50">
+                                            <template
+                                                v-if="currentCardData.retreat_cost && !isNaN(Number(currentCardData.retreat_cost))">
+                                                <span v-for="n in parseInt(currentCardData.retreat_cost)" :key="n">○
+                                                </span>
+                                            </template>
+                                            <span v-else>{{ currentCardData.retreat_cost || '○ ○ ○' }}</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- Flavor text / descrizione -->
+                            <div v-if="currentCardData.flavor_text || currentCardData.description"
+                                class="p-3 rounded-3 fst-italic text-white-50 mt-2 mb-4"
+                                style="background:rgba(255,255,255,0.05); font-size:.88rem; line-height:1.6;">
+                                {{ currentCardData.flavor_text || currentCardData.description }}
+                            </div>
+
+                            <!-- ══ LE MIE COPIE ══ -->
+                            <div class="mt-3">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="fw-bold text-white mb-0 d-flex align-items-center gap-2">
+                                        Le Mie Copie
+                                        <span class="badge bg-warning text-dark fw-normal" style="font-size:.75rem;">
+                                            {{ currentCardData.total_quantity || 0 }} Carte
+                                        </span>
+                                    </h5>
+                                    <button class="btn btn-dark btn-sm d-flex align-items-center justify-content-center"
+                                        style="width:34px;height:34px;border-radius:8px;" @click="openInventoryForm()">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Form nuova/modifica copia -->
+                                <div v-if="showInventoryForm" class="border rounded-3 p-3 mb-3 bg-custom">
+                                    <h6 class="fw-semibold text-white mb-3">
+                                        {{ editingInventoryId ? 'Modifica Copia' : 'Nuova Copia' }}
+                                    </h6>
+                                    <div class="row g-2">
+                                        <div class="col-3">
+                                            <label class="form-label small text-white-50">Quantità</label>
+                                            <input type="number" min="1"
+                                                class="form-control form-control-sm bg-dark text-white border-secondary"
+                                                v-model.number="inventoryForm.quantity">
+                                        </div>
+                                        <div class="col-5">
+                                            <label class="form-label small text-white-50">Variante</label>
+                                            <select
+                                                class="form-select form-select-sm bg-dark text-white border-secondary"
+                                                v-model="inventoryForm.rarity_variant">
+                                                <option v-for="variant in inventoryOptions.rarity_variants"
+                                                    :key="variant" :value="variant">{{ variant }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="form-label small text-white-50">Condizione</label>
+                                            <select
+                                                class="form-select form-select-sm bg-dark text-white border-secondary"
+                                                v-model="inventoryForm.condition">
+                                                <option v-for="cond in inventoryOptions.conditions" :key="cond"
+                                                    :value="cond">{{
+                                                        cond }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small text-white-50">Sorgente / Note</label>
+                                            <input type="text"
+                                                class="form-control form-control-sm bg-dark text-white border-secondary"
+                                                v-model="inventoryForm.notes"
+                                                placeholder="es. Cardmarket, Local Shop, eBay…">
+                                        </div>
+                                        <div class="col-12 d-flex gap-2 mt-1">
+                                            <button class="btn btn-sm btn-success flex-grow-1" @click="saveInventory"
+                                                :disabled="isSavingInventory">
+                                                <span v-if="isSavingInventory"
+                                                    class="spinner-border spinner-border-sm me-1"></span>
+                                                Salva
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary"
+                                                @click="closeInventoryForm">Annulla</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tabella inventario -->
+                                <div v-if="currentCardData.inventory && currentCardData.inventory.length > 0">
+                                    <table class="table table-sm align-middle mb-0 inventory-table">
+                                        <thead>
+                                            <tr class="text-white-50 text-uppercase"
+                                                style="font-size:.68rem; letter-spacing:.06em;">
+                                                <th class="fw-semibold border-0 ps-0">Quantità</th>
+                                                <th class="fw-semibold border-0">Condizione/Finitura</th>
+                                                <th class="fw-semibold border-0">Sorgente</th>
+                                                <th class="fw-semibold border-0">Prezzo</th>
+                                                <th class="fw-semibold border-0">Data</th>
+                                                <th class="fw-semibold border-0">Azioni</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="item in currentCardData.inventory" :key="item.id"
+                                                class="border-top inventory-row">
+                                                <!-- Quantità -->
+                                                <td class="ps-0">
+                                                    <span class="badge bg-warning text-dark rounded-pill fw-bold px-2">
+                                                        {{ item.quantity }}x
+                                                    </span>
+                                                </td>
+                                                <!-- Condizione / Finitura -->
+                                                <td class="text-white">
+                                                    <div class="fw-semibold" style="font-size:.85rem;">
+                                                        {{ item.condition }}
+                                                    </div>
+                                                    <div class="text-white-50" style="font-size:.76rem;">
+                                                        {{ item.rarity_variant }}
+                                                    </div>
+                                                </td>
+                                                <!-- Sorgente (da notes, separato da virgola) -->
+                                                <td>
+                                                    <span class="badge me-1 fw-semibold text-uppercase"
+                                                        style="font-size:.65rem; letter-spacing:.04em;">
+                                                        {{ item.provider_name }}
+                                                    </span>
+                                                </td>
+                                                <!-- Prezzo -->
+                                                <td class="fw-semibold text-white" style="font-size:.85rem;">
+                                                    <span>
+                                                        € {{ item.market_price ?? '-' }}
+                                                    </span>
+                                                </td>
+                                                <!-- Data -->
+                                                <td class="text-white-50" style="font-size:.8rem;">
+                                                    <span>
+                                                        {{ item.import_date ? new Date(item.import_date).toLocaleDateString('it-IT') : '-' }}
+                                                    </span>
+                                                </td>
+                                                <!-- Azioni -->
+                                                <td>
+                                                    <div class="d-flex gap-2">
+                                                        <button class="btn btn-link btn-sm p-0 text-info"
+                                                            @click="openInventoryForm(item)" title="Modifica">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-link btn-sm p-0 text-danger"
+                                                            @click="deleteInventory(item.id)" title="Elimina">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Nessuna copia -->
+                                <div v-else class="text-center py-3">
+                                    <small class="text-white-50">Nessuna copia in collezione</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Info Column -->
-                    <div class="modal-info-col custom-scrollbar">
-                        <!-- View Mode -->
-                        <div v-if="!isEditMode && currentCardData" class="fade-in">
-                            
-                            <!-- Header Stats -->
-                            <div class="d-flex justify-content-between align-items-start mb-4">
-                                <div>
-                                    <h2 class="display-name mb-1">{{ currentCardData.card_name || 'Sconosciuta' }}</h2>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="badge bg-dark border border-secondary text-light">{{ currentCardData.evolution_stage || 'Base' }}</span>
-                                        <span v-if="currentCardData.card_set" class="badge bg-warning text-dark">{{ currentCardData.card_set.name }}</span>
-                                    </div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="hp-badge" v-if="currentCardData.hp">
-                                        <small>HP</small> {{ currentCardData.hp }}
-                                    </div>
-                                    <div class="type-icon mt-1" v-if="currentCardData.type">
-                                        {{ currentCardData.type }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Info Grid -->
-                            <div class="glass-panel mb-4">
-                                <div class="row g-0">
-                                    <div class="col-6 col-md-4 info-item">
-                                        <label>Debolezza</label>
-                                        <span>{{ currentCardData.weakness || '-' }}</span>
-                                    </div>
-                                    <div class="col-6 col-md-4 info-item">
-                                        <label>Resistenza</label>
-                                        <span>{{ currentCardData.resistance || '-' }}</span>
-                                    </div>
-                                    <div class="col-6 col-md-4 info-item">
-                                        <label>Ritirata</label>
-                                        <span>{{ currentCardData.retreat_cost || '-' }}</span>
-                                    </div>
-                                    <div class="col-6 col-md-4 info-item">
-                                        <label>Rarità</label>
-                                        <span>{{ currentCardData.rarity || '-' }}</span>
-                                    </div>
-                                    <div class="col-6 col-md-4 info-item">
-                                        <label>Illustratore</label>
-                                        <span class="text-truncate d-block">{{ currentCardData.illustrator || '-' }}</span>
-                                    </div>
-                                    <div class="col-6 col-md-4 info-item highlight">
-                                        <label>Valore</label>
-                                        <span class="text-success">{{ currentCardData.estimated_value || 'N/D' }}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Attacks -->
-                            <div v-if="currentCardData.attacks && currentCardData.attacks.length" class="mb-4">
-                                <h5 class="section-header"><i class="bi bi-lightning-charge-fill text-warning me-2"></i>Attacchi</h5>
-                                <div class="attacks-list">
-                                    <div v-for="(attack, idx) in currentCardData.attacks" :key="idx" class="attack-row">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <div class="d-flex align-items-center gap-2">
-                                                <div class="attack-cost">
-                                                    <span v-if="Array.isArray(attack.cost)">{{ attack.cost.join('') }}</span>
-                                                    <span v-else>{{ attack.cost }}</span>
-                                                </div>
-                                                <span class="attack-name">{{ attack.name }}</span>
-                                            </div>
-                                            <span class="attack-damage" v-if="attack.damage">{{ attack.damage }}</span>
-                                        </div>
-                                        <p class="attack-text" v-if="attack.text">{{ attack.text }}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Inventory Section -->
-                            <div class="inventory-section mt-4">
-                                <div class="glass-panel p-3 border-warning-subtle">
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <h5 class="mb-0 text-warning fw-bold">
-                                            <i class="bi bi-box-seam me-2"></i>
-                                            Le Mie Copie 
-                                            <span class="badge bg-warning text-dark ms-1">{{ currentCardData.total_quantity || 0 }}</span>
-                                        </h5>
-                                        <button class="btn btn-sm btn-outline-warning" @click="openInventoryForm()">
-                                            <i class="bi bi-plus-lg"></i>
-                                        </button>
-                                    </div>
-                                    
-                                    <!-- Inventory Form -->
-                                    <div v-if="showInventoryForm" class="inventory-form-wrapper mb-3">
-                                        <h6 class="form-title">{{ editingInventoryId ? 'Modifica Copia' : 'Nuova Copia' }}</h6>
-                                        <div class="row g-2">
-                                            <div class="col-3">
-                                                <label>Quantità</label>
-                                                <input type="number" min="1" class="form-control form-control-sm" v-model.number="inventoryForm.quantity">
-                                            </div>
-                                            <div class="col-5">
-                                                <label>Variante</label>
-                                                <select class="form-select form-select-sm" v-model="inventoryForm.rarity_variant">
-                                                    <option v-for="variant in inventoryOptions.rarity_variants" :key="variant" :value="variant">{{ variant }}</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-4">
-                                                <label>Condizione</label>
-                                                <select class="form-select form-select-sm" v-model="inventoryForm.condition">
-                                                    <option v-for="cond in inventoryOptions.conditions" :key="cond" :value="cond">{{ cond }}</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-12">
-                                                <label>Note</label>
-                                                <input type="text" class="form-control form-control-sm" v-model="inventoryForm.notes" placeholder="...">
-                                            </div>
-                                            <div class="col-12 d-flex gap-2 mt-2">
-                                                <button class="btn btn-sm btn-success flex-grow-1" @click="saveInventory">Salva</button>
-                                                <button class="btn btn-sm btn-secondary" @click="closeInventoryForm">Annulla</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Inventory List -->
-                                    <div v-if="currentCardData.inventory && currentCardData.inventory.length > 0" class="inventory-list-mobile">
-                                        <div v-for="item in currentCardData.inventory" :key="item.id" class="inventory-item-row">
-                                            <div class="d-flex align-items-center gap-3">
-                                                <span class="badge bg-warning text-dark rounded-pill">{{ item.quantity }}x</span>
-                                                <div>
-                                                    <div class="small fw-bold">{{ item.rarity_variant }} <span class="text-white-50 ms-1 opacity-50">·</span> {{ item.condition }}</div>
-                                                    <div class="smaller text-white-50" v-if="item.notes">{{ item.notes }}</div>
-                                                </div>
-                                            </div>
-                                            <div class="btn-group">
-                                                <button class="btn-icon-sm" @click="openInventoryForm(item)"><i class="bi bi-pencil"></i></button>
-                                                <button class="btn-icon-sm text-danger" @click="deleteInventory(item.id)"><i class="bi bi-trash"></i></button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div v-else class="text-center py-3">
-                                        <small class="text-white-50">Nessuna copia in collezione</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Edit Mode (Keep existing form but styled if needed) -->
-                        <div v-else-if="isEditMode" class="row g-3">
+                    <!-- EDIT MODE -->
+                    <div v-else-if="isEditMode" class="p-4">
+                        <div class="row g-3">
                             <div class="col-md-8">
                                 <label class="form-label text-warning">Nome Carta</label>
-                                <input type="text" class="form-control bg-dark text-white border-secondary" v-model="editForm.card_name">
+                                <input type="text" class="form-control bg-dark text-white border-secondary"
+                                    v-model="editForm.card_name">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label text-warning">HP</label>
-                                <input type="text" class="form-control bg-dark text-white border-secondary" v-model="editForm.hp">
+                                <input type="text" class="form-control bg-dark text-white border-secondary"
+                                    v-model="editForm.hp">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-warning">Tipo</label>
@@ -1070,7 +1138,8 @@ onMounted(async () => {
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-warning">Stadio Evoluzione</label>
-                                <select class="form-select bg-dark text-white border-secondary" v-model="editForm.evolution_stage">
+                                <select class="form-select bg-dark text-white border-secondary"
+                                    v-model="editForm.evolution_stage">
                                     <option value="">Seleziona...</option>
                                     <option value="Base">Base</option>
                                     <option value="Fase 1">Fase 1</option>
@@ -1080,23 +1149,25 @@ onMounted(async () => {
                                     <option value="ex">ex</option>
                                 </select>
                             </div>
-                            <!-- ... other edit fields ... -->
-                            <!-- Simplified for brevity, assume similar structure works or rely on existing grid -->
-                             <div class="col-md-4">
+                            <div class="col-md-4">
                                 <label class="form-label text-warning">Debolezza</label>
-                                <input type="text" class="form-control bg-dark text-white border-secondary" v-model="editForm.weakness">
+                                <input type="text" class="form-control bg-dark text-white border-secondary"
+                                    v-model="editForm.weakness">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label text-warning">Resistenza</label>
-                                <input type="text" class="form-control bg-dark text-white border-secondary" v-model="editForm.resistance">
+                                <input type="text" class="form-control bg-dark text-white border-secondary"
+                                    v-model="editForm.resistance">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label text-warning">Costo Ritirata</label>
-                                <input type="text" class="form-control bg-dark text-white border-secondary" v-model="editForm.retreat_cost">
+                                <input type="text" class="form-control bg-dark text-white border-secondary"
+                                    v-model="editForm.retreat_cost">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-warning">Set</label>
-                                <select class="form-select bg-dark text-white border-secondary" v-model="editForm.card_set_id">
+                                <select class="form-select bg-dark text-white border-secondary"
+                                    v-model="editForm.card_set_id">
                                     <option value="">Nessun Set</option>
                                     <option v-for="set in cardSets" :key="set.id" :value="set.id">
                                         {{ set.name }} ({{ set.abbreviation }})
@@ -1105,11 +1176,13 @@ onMounted(async () => {
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-warning">Numero Set</label>
-                                <input type="text" class="form-control bg-dark text-white border-secondary" v-model="editForm.set_number" placeholder="es. 002/094">
+                                <input type="text" class="form-control bg-dark text-white border-secondary"
+                                    v-model="editForm.set_number" placeholder="es. 002/094">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-warning">Rarità</label>
-                                <select class="form-select bg-dark text-white border-secondary" v-model="editForm.rarity">
+                                <select class="form-select bg-dark text-white border-secondary"
+                                    v-model="editForm.rarity">
                                     <option value="">Seleziona...</option>
                                     <option value="Comune">Comune</option>
                                     <option value="Non Comune">Non Comune</option>
@@ -1123,36 +1196,132 @@ onMounted(async () => {
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-warning">Illustratore</label>
-                                <input type="text" class="form-control bg-dark text-white border-secondary" v-model="editForm.illustrator">
+                                <input type="text" class="form-control bg-dark text-white border-secondary"
+                                    v-model="editForm.illustrator">
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+
+                <!-- ── FOOTER ── -->
+                <!-- View mode: info set/id/copyright -->
+                <div v-if="!isEditMode && currentCardData"
+                    class="d-flex justify-content-between align-items-center px-4 py-2 border-top bg-custom">
+                    <div class="d-flex gap-4 text-white-50 text-uppercase"
+                        style="font-size:.7rem; letter-spacing:.07em;">
+                        <span v-if="currentCardData.card_set">Set: {{ currentCardData.card_set.name }}</span>
+                        <span v-if="currentCardData.set_number">ID: {{ currentCardData.set_number }}</span>
+                    </div>
+                </div>
+                <!-- Edit mode: salva/annulla -->
+                <div v-else class="d-flex justify-content-end gap-2 px-4 py-3 border-top bg-custom">
                     <button type="button" class="btn btn-secondary" @click="closeCardModal">Chiudi</button>
-                    <button v-if="!isEditMode" type="button" class="btn btn-warning desktop-only" @click="toggleEditMode">
-                        <i class="bi bi-pencil"></i> Modifica
-                    </button>
-                    <button 
-                        v-if="isEditMode" 
-                        type="button" 
-                        class="btn btn-success" 
-                        @click="saveCardChanges"
-                        :disabled="isSaving"
-                    >
+                    <button type="button" class="btn btn-success" @click="saveCardChanges" :disabled="isSaving">
                         <span v-if="isSaving" class="spinner-border spinner-border-sm me-1"></span>
                         <i v-else class="bi bi-check-lg"></i> Salva
                     </button>
                 </div>
             </div>
         </div>
-
         <!-- Confirm Modal -->
         <ConfirmModal />
     </AppLayout>
 </template>
 
 <style scoped>
+.table>:not(caption)>*>* {
+    background-color: #1e2033 !important;
+}
+
+/* Inventory Table Styling */
+.inventory-table {
+    background: transparent;
+    color: #fff;
+}
+
+.inventory-table thead tr {
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.inventory-table tbody tr {
+    background: transparent;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.inventory-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.inventory-table td {
+    color: #fff;
+    vertical-align: middle;
+    padding: 12px 10px;
+}
+
+.inventory-table th {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 10px;
+}
+
+/* Inventory */
+.inventory-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.inventory-item-row .inventory-item-prices {
+    width: 100%;
+}
+
+.bg-custom {
+    background-color: #1e2033 !important;
+}
+
+.inventory-item-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.btn-group {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.btn-icon-sm {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 6px 8px;
+    transition: color 0.2s;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon-sm:hover {
+    color: #fff;
+}
+
+.btn-icon-sm.text-danger:hover {
+    color: #dc3545;
+}
+
 /* ===== Modal Redesign ===== */
 .modal-body-grid {
     display: flex;
@@ -1174,21 +1343,32 @@ onMounted(async () => {
     cursor: zoom-in;
     transition: transform 0.2s;
 }
-.card-image-display:hover { transform: scale(1.02); }
+
+.card-image-display:hover {
+    transform: scale(1.02);
+}
+
 .zoom-hint {
     position: absolute;
-    top: 50%; left: 50%;
+    top: 50%;
+    left: 50%;
     transform: translate(-50%, -50%);
     opacity: 0;
     transition: opacity 0.2s;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     color: white;
     border-radius: 50%;
-    width: 50px; height: 50px;
-    display: flex; align-items: center; justify-content: center;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 1.5rem;
 }
-.card-image-display:hover .zoom-hint { opacity: 1; }
+
+.card-image-display:hover .zoom-hint {
+    opacity: 1;
+}
 
 /* Headers */
 .display-name {
@@ -1204,14 +1384,16 @@ onMounted(async () => {
     font-size: 1.8rem;
     line-height: 1;
 }
+
 .hp-badge small {
     font-size: 0.8rem;
-    color: rgba(255,255,255,0.6);
+    color: rgba(255, 255, 255, 0.6);
     vertical-align: middle;
 }
+
 .type-icon {
     font-size: 0.9rem;
-    color: rgba(255,255,255,0.7);
+    color: rgba(255, 255, 255, 0.7);
     text-transform: uppercase;
     font-weight: 600;
     letter-spacing: 1px;
@@ -1224,13 +1406,17 @@ onMounted(async () => {
     border-radius: 12px;
     overflow: hidden;
 }
-.border-warning-subtle { border-color: rgba(255, 203, 5, 0.2); }
+
+.border-warning-subtle {
+    border-color: rgba(255, 203, 5, 0.2);
+}
 
 .info-item {
     padding: 12px 15px;
     border-right: 1px solid rgba(255, 255, 255, 0.05);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
+
 .info-item label {
     display: block;
     font-size: 0.7rem;
@@ -1238,30 +1424,51 @@ onMounted(async () => {
     text-transform: uppercase;
     margin-bottom: 2px;
 }
+
 .info-item span {
     font-weight: 600;
     color: #e0e0e0;
 }
-.info-item.highlight span { font-weight: 800; }
+
+.info-item.highlight span {
+    font-weight: 800;
+}
 
 /* Attacks */
 .section-header {
     font-size: 1rem;
-    color: rgba(255,255,255,0.8);
+    color: rgba(255, 255, 255, 0.8);
     margin-bottom: 15px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
 .attack-row {
-    background: rgba(255,255,255,0.03);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 10px;
     padding: 12px;
     margin-bottom: 10px;
     border-left: 3px solid #ffcb05;
 }
-.attack-name { font-weight: 700; font-size: 1.1rem; color: #fff; }
-.attack-damage { font-weight: 800; font-size: 1.2rem; color: #fff; }
-.attack-text { font-size: 0.85rem; color: rgba(255,255,255,0.6); margin: 5px 0 0; line-height: 1.4; }
+
+.attack-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #fff;
+}
+
+.attack-damage {
+    font-weight: 800;
+    font-size: 1.2rem;
+    color: #fff;
+}
+
+.attack-text {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 5px 0 0;
+    line-height: 1.4;
+}
 
 /* Inventory */
 .inventory-item-row {
@@ -1269,15 +1476,22 @@ onMounted(async () => {
     justify-content: space-between;
     align-items: center;
     padding: 10px;
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
     margin-bottom: 8px;
 }
+
 .btn-icon-sm {
-    background: none; border: none; color: rgba(255,255,255,0.5);
-    padding: 4px; transition: color 0.2s;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 4px;
+    transition: color 0.2s;
 }
-.btn-icon-sm:hover { color: #fff; }
+
+.btn-icon-sm:hover {
+    color: #fff;
+}
 
 /* Existing layout styles (kept for context) */
 .collection-page {
@@ -1292,6 +1506,7 @@ onMounted(async () => {
     padding: 40px 0 30px;
     position: relative;
 }
+
 /* ... previous styles ... */
 
 /* Mobile Responsiveness for Modal */
@@ -1300,6 +1515,7 @@ onMounted(async () => {
         flex-direction: column;
         gap: 20px;
     }
+
     .modal-image-col {
         flex: 0 0 auto;
         width: 100%;
@@ -1307,17 +1523,23 @@ onMounted(async () => {
         margin: 0 auto;
         text-align: center;
     }
-    .display-name { font-size: 1.6rem; }
-    .hp-badge { font-size: 1.5rem; }
-    
+
+    .display-name {
+        font-size: 1.6rem;
+    }
+
+    .hp-badge {
+        font-size: 1.5rem;
+    }
+
     .info-item {
         font-size: 0.9rem;
         padding: 10px;
     }
-    
+
     /* Improve mobile table look inside inventory form */
     .inventory-form-wrapper {
-        background: rgba(0,0,0,0.3);
+        background: rgba(0, 0, 0, 0.3);
         padding: 15px;
         border-radius: 10px;
     }
@@ -1331,6 +1553,7 @@ onMounted(async () => {
     padding: 40px 0 30px;
     position: relative;
 }
+
 .hero-glow {
     position: absolute;
     top: -60px;
@@ -1341,6 +1564,7 @@ onMounted(async () => {
     background: radial-gradient(ellipse, rgba(255, 203, 5, 0.12) 0%, transparent 70%);
     pointer-events: none;
 }
+
 .hero-title {
     font-size: 2.4rem;
     font-weight: 800;
@@ -1348,22 +1572,26 @@ onMounted(async () => {
     letter-spacing: -0.5px;
     margin: 0 0 6px;
 }
+
 .hero-icon {
     color: #FFCB05;
     margin-right: 10px;
     font-size: 2rem;
 }
+
 .hero-subtitle {
     color: rgba(255, 255, 255, 0.45);
     font-size: 1rem;
     margin: 0 0 18px;
 }
+
 .hero-stats {
     display: flex;
     gap: 12px;
     justify-content: center;
     flex-wrap: wrap;
 }
+
 .stat-pill {
     display: inline-flex;
     align-items: center;
@@ -1386,13 +1614,20 @@ onMounted(async () => {
     padding: 22px 24px 18px;
     margin-bottom: 24px;
 }
+
 .filters-grid {
     display: grid;
     grid-template-columns: 1.5fr repeat(4, 1fr);
     gap: 14px;
     align-items: end;
 }
-.filter-group { display: flex; flex-direction: column; gap: 5px; }
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
 .filter-label {
     font-size: 0.72rem;
     font-weight: 600;
@@ -1400,6 +1635,7 @@ onMounted(async () => {
     letter-spacing: 0.6px;
     color: rgba(255, 203, 5, 0.7);
 }
+
 .filter-input {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1411,17 +1647,23 @@ onMounted(async () => {
     outline: none;
     width: 100%;
 }
+
 .filter-input:focus {
     border-color: rgba(255, 203, 5, 0.5);
     box-shadow: 0 0 0 3px rgba(255, 203, 5, 0.08);
 }
-.filter-input option { background: #1a1e36; }
+
+.filter-input option {
+    background: #1a1e36;
+}
+
 .toggle-filters {
     display: flex;
     gap: 8px;
     margin-top: 14px;
     flex-wrap: wrap;
 }
+
 .toggle-pill {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1433,10 +1675,12 @@ onMounted(async () => {
     transition: all 0.25s;
     font-weight: 500;
 }
+
 .toggle-pill:hover {
     border-color: rgba(255, 203, 5, 0.4);
     color: rgba(255, 255, 255, 0.8);
 }
+
 .toggle-pill.active {
     background: rgba(255, 203, 5, 0.15);
     border-color: #FFCB05;
@@ -1459,13 +1703,23 @@ onMounted(async () => {
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
     animation: slideUp 0.3s ease-out;
 }
+
 @keyframes slideUp {
-    from { transform: translateY(100%); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
-.bulk-bar > * {
+
+.bulk-bar>* {
     flex-shrink: 0;
 }
+
 .bulk-bar-content {
     max-width: 1200px;
     width: 100%;
@@ -1475,8 +1729,19 @@ onMounted(async () => {
     gap: 20px;
     flex-wrap: wrap;
 }
-.bulk-bar-left { display: flex; align-items: center; gap: 10px; }
-.bulk-bar-right { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.bulk-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.bulk-bar-right {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
 .bulk-count {
     background: rgba(0, 0, 0, 0.8);
     color: #FFCB05;
@@ -1485,11 +1750,13 @@ onMounted(async () => {
     padding: 4px 14px;
     border-radius: 50px;
 }
-.bulk-label { 
-    color: rgba(0, 0, 0, 0.85); 
-    font-size: 0.9rem; 
+
+.bulk-label {
+    color: rgba(0, 0, 0, 0.85);
+    font-size: 0.9rem;
     font-weight: 600;
 }
+
 .bulk-btn {
     border: none;
     border-radius: 8px;
@@ -1500,11 +1767,30 @@ onMounted(async () => {
     transition: transform 0.15s, opacity 0.15s;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
-.bulk-btn:hover { transform: scale(1.05); }
-.bulk-btn-set { background: rgba(30, 35, 60, 0.95); color: #fff; }
-.bulk-btn-rarity { background: rgba(13, 202, 240, 0.95); color: #000; }
-.bulk-btn-delete { background: rgba(220, 53, 69, 0.95); color: #fff; }
-.bulk-btn-clear { background: rgba(0, 0, 0, 0.7); color: #fff; }
+
+.bulk-btn:hover {
+    transform: scale(1.05);
+}
+
+.bulk-btn-set {
+    background: rgba(30, 35, 60, 0.95);
+    color: #fff;
+}
+
+.bulk-btn-rarity {
+    background: rgba(13, 202, 240, 0.95);
+    color: #000;
+}
+
+.bulk-btn-delete {
+    background: rgba(220, 53, 69, 0.95);
+    color: #fff;
+}
+
+.bulk-btn-clear {
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+}
 
 /* ===== Select All Bar ===== */
 .select-all-bar {
@@ -1514,6 +1800,7 @@ onMounted(async () => {
     margin-bottom: 14px;
     padding: 0 4px;
 }
+
 .select-all-label {
     display: flex;
     align-items: center;
@@ -1522,12 +1809,14 @@ onMounted(async () => {
     font-size: 0.82rem;
     cursor: pointer;
 }
+
 .select-all-label input[type="checkbox"] {
     width: 17px;
     height: 17px;
     accent-color: #FFCB05;
     cursor: pointer;
 }
+
 .sort-btn {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1538,6 +1827,7 @@ onMounted(async () => {
     cursor: pointer;
     transition: all 0.2s;
 }
+
 .sort-btn:hover {
     border-color: rgba(255, 203, 5, 0.4);
     color: #FFCB05;
@@ -1550,6 +1840,7 @@ onMounted(async () => {
     gap: 16px;
     margin-bottom: 28px;
 }
+
 .card-tile {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -1559,11 +1850,13 @@ onMounted(async () => {
     transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
     cursor: default;
 }
+
 .card-tile:hover {
     transform: translateY(-4px);
     border-color: rgba(255, 203, 5, 0.3);
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3), 0 0 15px rgba(255, 203, 5, 0.05);
 }
+
 .card-tile.selected {
     border-color: #FFCB05;
     box-shadow: 0 0 20px rgba(255, 203, 5, 0.15);
@@ -1576,6 +1869,7 @@ onMounted(async () => {
     left: 14px;
     z-index: 5;
 }
+
 .tile-checkbox input[type="checkbox"] {
     width: 18px;
     height: 18px;
@@ -1584,6 +1878,7 @@ onMounted(async () => {
     opacity: 0.5;
     transition: opacity 0.2s;
 }
+
 .card-tile:hover .tile-checkbox input[type="checkbox"],
 .card-tile.selected .tile-checkbox input[type="checkbox"] {
     opacity: 1;
@@ -1615,6 +1910,7 @@ onMounted(async () => {
     overflow: hidden;
     margin-bottom: 10px;
 }
+
 .tile-image {
     width: 100%;
     aspect-ratio: 0.72;
@@ -1622,12 +1918,16 @@ onMounted(async () => {
     display: block;
     transition: transform 0.3s;
 }
+
 .card-tile:hover .tile-image {
     transform: scale(1.03);
 }
 
 /* Tile Info */
-.tile-info { padding: 0 2px; }
+.tile-info {
+    padding: 0 2px;
+}
+
 .tile-name {
     font-size: 0.85rem;
     font-weight: 700;
@@ -1637,6 +1937,7 @@ onMounted(async () => {
     text-overflow: ellipsis;
     margin-bottom: 2px;
 }
+
 .tile-meta {
     font-size: 0.72rem;
     color: rgba(255, 255, 255, 0.4);
@@ -1649,6 +1950,7 @@ onMounted(async () => {
     gap: 6px;
     margin-bottom: 3px;
 }
+
 .set-badge {
     background: rgba(255, 203, 5, 0.15);
     color: #FFCB05;
@@ -1659,14 +1961,17 @@ onMounted(async () => {
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
 .set-badge.set-none {
     background: rgba(255, 255, 255, 0.06);
     color: rgba(255, 255, 255, 0.3);
 }
+
 .set-number {
     font-size: 0.7rem;
     color: rgba(255, 255, 255, 0.35);
 }
+
 .tile-game {
     font-size: 0.68rem;
     color: rgba(255, 255, 255, 0.25);
@@ -1687,11 +1992,13 @@ onMounted(async () => {
     transition: opacity 0.2s, transform 0.2s;
     pointer-events: none;
 }
+
 .card-tile:hover .tile-actions {
     opacity: 1;
     transform: translateY(0);
     pointer-events: all;
 }
+
 .action-btn {
     width: 34px;
     height: 34px;
@@ -1705,10 +2012,25 @@ onMounted(async () => {
     transition: transform 0.15s;
     backdrop-filter: blur(8px);
 }
-.action-btn:hover { transform: scale(1.12); }
-.action-view { background: rgba(255, 203, 5, 0.85); color: #000; }
-.action-edit { background: rgba(13, 202, 240, 0.85); color: #000; }
-.action-delete { background: rgba(220, 53, 69, 0.85); color: #fff; }
+
+.action-btn:hover {
+    transform: scale(1.12);
+}
+
+.action-view {
+    background: rgba(255, 203, 5, 0.85);
+    color: #000;
+}
+
+.action-edit {
+    background: rgba(13, 202, 240, 0.85);
+    color: #000;
+}
+
+.action-delete {
+    background: rgba(220, 53, 69, 0.85);
+    color: #fff;
+}
 
 /* ===== Pagination ===== */
 .pagination-bar {
@@ -1719,15 +2041,18 @@ onMounted(async () => {
     flex-wrap: wrap;
     gap: 12px;
 }
+
 .pagination-info {
     color: rgba(255, 255, 255, 0.4);
     font-size: 0.82rem;
 }
+
 .pagination-buttons {
     display: flex;
     align-items: center;
     gap: 4px;
 }
+
 .page-btn {
     min-width: 36px;
     height: 36px;
@@ -1743,19 +2068,23 @@ onMounted(async () => {
     align-items: center;
     justify-content: center;
 }
+
 .page-btn:hover:not(:disabled) {
     border-color: rgba(255, 203, 5, 0.4);
     color: #FFCB05;
 }
+
 .page-btn.active {
     background: #FFCB05;
     color: #000;
     border-color: #FFCB05;
 }
+
 .page-btn:disabled {
     opacity: 0.25;
     cursor: not-allowed;
 }
+
 .page-ellipsis {
     color: rgba(255, 255, 255, 0.3);
     padding: 0 6px;
@@ -1767,21 +2096,25 @@ onMounted(async () => {
     text-align: center;
     padding: 80px 20px;
 }
+
 .empty-icon {
     font-size: 4rem;
     color: rgba(255, 255, 255, 0.1);
     margin-bottom: 16px;
 }
+
 .empty-title {
     color: rgba(255, 255, 255, 0.5);
     font-size: 1.3rem;
     font-weight: 700;
     margin: 0 0 8px;
 }
+
 .empty-text {
     color: rgba(255, 255, 255, 0.3);
     margin: 0 0 24px;
 }
+
 .empty-cta {
     display: inline-flex;
     align-items: center;
@@ -1794,6 +2127,7 @@ onMounted(async () => {
     text-decoration: none;
     transition: transform 0.2s;
 }
+
 .empty-cta:hover {
     transform: scale(1.05);
     color: #000;
@@ -1802,8 +2136,10 @@ onMounted(async () => {
 /* ===== Fullscreen Viewer ===== */
 .fullscreen-viewer {
     position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: rgba(0, 0, 0, 0.92);
     z-index: 10000;
     display: flex;
@@ -1811,6 +2147,7 @@ onMounted(async () => {
     justify-content: center;
     cursor: zoom-out;
 }
+
 .fullscreen-image {
     max-height: 90vh;
     max-width: 90vw;
@@ -1821,14 +2158,17 @@ onMounted(async () => {
 /* ===== Modals ===== */
 .modal-overlay {
     position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: rgba(0, 0, 0, 0.8);
     z-index: 9000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
+
 .modal-container {
     background: linear-gradient(180deg, #1e233c 0%, #171b30 100%);
     border: 1px solid rgba(255, 203, 5, 0.2);
@@ -1839,6 +2179,7 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
 }
+
 .modal-header-custom {
     display: flex;
     justify-content: space-between;
@@ -1847,11 +2188,13 @@ onMounted(async () => {
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     background: rgba(255, 203, 5, 0.03);
 }
+
 .modal-header-custom h3 {
     margin: 0;
     color: #FFCB05;
     font-weight: 700;
 }
+
 .btn-close-modal {
     background: none;
     border: none;
@@ -1860,24 +2203,33 @@ onMounted(async () => {
     cursor: pointer;
     transition: color 0.2s;
 }
-.btn-close-modal:hover { color: #fff; }
-.modal-body { 
-    padding: 24px; 
+
+.btn-close-modal:hover {
+    color: #fff;
+}
+
+.modal-body {
+    padding: 24px;
     overflow-y: auto;
 }
+
 .modal-body::-webkit-scrollbar {
     width: 8px;
 }
+
 .modal-body::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.02);
 }
+
 .modal-body::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.15);
     border-radius: 4px;
 }
+
 .modal-body::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.25);
 }
+
 /* .modal-body-grid replaced by new design */
 .modal-footer {
     padding: 16px 24px;
@@ -1890,7 +2242,10 @@ onMounted(async () => {
 /* ===== Loader ===== */
 .loader-overlay {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: rgba(30, 35, 60, 0.95);
     display: flex;
     align-items: center;
@@ -1899,6 +2254,7 @@ onMounted(async () => {
     z-index: 100;
     border-radius: 18px;
 }
+
 .loader-card {
     width: 80px;
     height: 110px;
@@ -1907,10 +2263,19 @@ onMounted(async () => {
     animation: cardScan 1.5s ease-in-out infinite;
     box-shadow: 0 8px 30px rgba(255, 203, 5, 0.3);
 }
+
 @keyframes cardScan {
-    0%, 100% { transform: scale(1) rotate(0deg); }
-    50% { transform: scale(1.05) rotate(2deg); }
+
+    0%,
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
+
+    50% {
+        transform: scale(1.05) rotate(2deg);
+    }
 }
+
 .loader-text {
     margin-top: 15px;
     color: #FFCB05;
@@ -1922,40 +2287,53 @@ onMounted(async () => {
     .filters-grid {
         grid-template-columns: 1fr 1fr;
     }
+
     .cards-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         gap: 12px;
     }
 }
+
 @media (max-width: 550px) {
     .filters-grid {
         grid-template-columns: 1fr;
     }
+
     .cards-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
     }
-    .hero-title { font-size: 1.6rem; }
-    .collection-page { padding: 0 12px 40px; }
-    
+
+    .hero-title {
+        font-size: 1.6rem;
+    }
+
+    .collection-page {
+        padding: 0 12px 40px;
+    }
+
     /* Mobile Bulk Bar */
     .bulk-bar {
         padding: 10px 15px;
     }
+
     .bulk-bar-content {
         gap: 10px;
         justify-content: center;
     }
+
     .bulk-bar-left {
         width: 100%;
         justify-content: center;
         margin-bottom: 5px;
     }
+
     .bulk-bar-right {
         width: 100%;
         justify-content: center;
         gap: 8px;
     }
+
     .bulk-btn {
         flex: 1;
         padding: 8px 10px;
@@ -1965,13 +2343,27 @@ onMounted(async () => {
         align-items: center;
         gap: 2px;
     }
-    .bulk-btn i { font-size: 1rem; }
+
+    .bulk-btn i {
+        font-size: 1rem;
+    }
 
     /* Mobile Modals - Removed Legacy Styles */
 
     /* Mobile Hero */
-    .hero-title { font-size: 1.8rem; }
-    .hero-glow { width: 250px; height: 150px; top: -40px; }
-    .hero-subtitle { font-size: 0.9rem; margin-bottom: 12px; }
+    .hero-title {
+        font-size: 1.8rem;
+    }
+
+    .hero-glow {
+        width: 250px;
+        height: 150px;
+        top: -40px;
+    }
+
+    .hero-subtitle {
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+    }
 }
 </style>

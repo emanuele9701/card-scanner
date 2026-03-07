@@ -20,6 +20,7 @@
         "nyholm/psr7": "^1.8",
         "symfony/cache": "^7.4",
         "tcgdex/sdk": "^2.2",
+        "tightenco/ziggy": "^2.6",
         "yaza/laravel-google-drive-storage": "^4.1"
     },
     "require-dev": {

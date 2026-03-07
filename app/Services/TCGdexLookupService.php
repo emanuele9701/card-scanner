@@ -104,7 +104,7 @@ class TCGdexLookupService
     /**
      * Search for a card on TCGdex and match it to a local CardSet.
      */
-    private function searchAndMatch(string $localId, string $cardName, string $totalCards, bool $isOldCard): ?array
+    public function searchAndMatch(string $localId, string $cardName, string $totalCards, bool $isOldCard): ?array
     {
         // Converto il card name in un formato utf8
 
@@ -161,6 +161,7 @@ class TCGdexLookupService
                     ? $tcgSetData->tcgOnline
                     : $tcgSetData->abbreviation->official;
 
+                Log::info("Abbreviazione set: $abbreviation");
                 $set = CardSet::where('card_set_abbreviation', $abbreviation)->first();
                 if (!$set) {
                     return null;

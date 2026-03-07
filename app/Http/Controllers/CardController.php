@@ -6,6 +6,7 @@ use App\Http\Requests\UpdateCardRequest;
 use App\Http\Requests\BulkDestroyRequest;
 use App\Http\Requests\AssignSetRequest;
 use App\Models\CardSet;
+use App\Models\MarketPrice;
 use App\Models\PokemonCard;
 use App\Services\GoogleDriveService;
 use Exception;
@@ -143,7 +144,35 @@ class CardController extends Controller
     public function show(PokemonCard $card)
     {
         $this->authorize('view', $card);
-        $card->load(['cardSet', 'inventory']);
+        $card->load(['cardSet', 'inventory', 'marketCard']);
+        $marketCard = $card->getRelation('marketCard');
+        $inventary = $card->getRelation('inventory')->toArray();
+
+        $marketCard->load(['prices'], function ($query) {
+            $query->orderBy('import_date', 'desc');
+        });
+
+        $valoreComplessivo = 0;
+
+        $prices = $marketCard->getRelation('prices');
+        $out = [];
+        array_map(function ($item) use ($prices, &$out, &$valoreComplessivo) {
+
+            $cardPrices = [];
+            foreach ($prices as $price) {
+                if ($price->printing === $item['rarity_variant']) {
+                    $cardPrices = [
+                        'provider_name' => $price->provider->name ?? 'Unknown',
+                        'market_price' => $price->market_price,
+                        'import_date' => $price->import_date->toDateString(),
+                        'unit' => MarketPrice::UNITS_DIVISA[$price->unit_divisa] ?? $price->unit_divisa,
+                    ];
+                    $out[] = array_merge($item, $cardPrices);
+                    $valoreComplessivo += $item['quantity'] * $price->market_price;
+                }
+            }
+        }, $inventary);
+
 
         return response()->json([
             'success' => true,
@@ -166,8 +195,9 @@ class CardController extends Controller
                 'card_set_id' => $card->card_set_id,
                 'card_set' => $card->cardSet ? ['name' => $card->cardSet->name] : null,
                 'estimated_value' => $card->formatted_estimated_value,
-                'inventory' => $card->inventory,
+                'inventory' => $out,
                 'total_quantity' => $card->getTotalQuantity(),
+                'total_value' => $valoreComplessivo,
             ]
         ]);
     }
