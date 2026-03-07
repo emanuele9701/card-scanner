@@ -155,24 +155,23 @@ class CardController extends Controller
         $valoreComplessivo = 0;
 
         $prices = $marketCard->getRelation('prices');
-        $inventary = array_map(function ($item) use ($prices, &$valoreComplessivo) {
+        $out = [];
+        array_map(function ($item) use ($prices, &$out, &$valoreComplessivo) {
 
             $cardPrices = [];
             foreach ($prices as $price) {
                 if ($price->printing === $item['rarity_variant']) {
-                    $cardPrices[$price->provider->name ?? 'Unknown'] = [
+                    $cardPrices = [
+                        'provider_name' => $price->provider->name ?? 'Unknown',
                         'market_price' => $price->market_price,
                         'import_date' => $price->import_date->toDateString(),
                         'unit' => MarketPrice::UNITS_DIVISA[$price->unit_divisa] ?? $price->unit_divisa,
                     ];
+                    $out[] = array_merge($item, $cardPrices);
+                    $valoreComplessivo += $item['quantity'] * $price->market_price;
                 }
             }
-
-            $all = array_merge($item, ['prices' => $cardPrices]);
-
-            return $all;
         }, $inventary);
-
 
 
         return response()->json([
@@ -196,7 +195,7 @@ class CardController extends Controller
                 'card_set_id' => $card->card_set_id,
                 'card_set' => $card->cardSet ? ['name' => $card->cardSet->name] : null,
                 'estimated_value' => $card->formatted_estimated_value,
-                'inventory' => $inventary,
+                'inventory' => $out,
                 'total_quantity' => $card->getTotalQuantity(),
                 'total_value' => $valoreComplessivo,
             ]

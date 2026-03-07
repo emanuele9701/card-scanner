@@ -1063,46 +1063,22 @@ onMounted(async () => {
                                                 </td>
                                                 <!-- Sorgente (da notes, separato da virgola) -->
                                                 <td>
-                                                    <template v-if="item.notes">
-                                                        <span v-for="(src, idx) in item.prices.split(',')" :key="idx"
-                                                            class="badge me-1 fw-semibold text-uppercase" :class="{
-                                                                'bg-danger': src.trim().toLowerCase().includes('ebay'),
-                                                                'bg-success': src.trim().toLowerCase().includes('local'),
-                                                                'bg-primary': !src.trim().toLowerCase().includes('ebay') && !src.trim().toLowerCase().includes('local')
-                                                            }" style="font-size:.65rem; letter-spacing:.04em;">
-                                                            {{ src.trim() }}
-                                                        </span>
-                                                    </template>
-                                                    <span v-else class="text-white-50 small">-</span>
+                                                    <span class="badge me-1 fw-semibold text-uppercase"
+                                                        style="font-size:.65rem; letter-spacing:.04em;">
+                                                        {{ item.provider_name }}
+                                                    </span>
                                                 </td>
                                                 <!-- Prezzo -->
                                                 <td class="fw-semibold text-white" style="font-size:.85rem;">
-                                                    <template v-if="item.prices && Object.keys(item.prices).length">
-                                                        <span v-for="(data, provider) in item.prices" :key="provider">
-                                                            € {{ data.market_price ?? '-' }}
-                                                        </span>
-                                                    </template>
-                                                    <span v-else class="text-white-50">-</span>
+                                                    <span>
+                                                        € {{ item.market_price ?? '-' }}
+                                                    </span>
                                                 </td>
                                                 <!-- Data -->
                                                 <td class="text-white-50" style="font-size:.8rem;">
-                                                    <template v-if="item.prices && Object.keys(item.prices).length">
-                                                        <span v-for="(data, provider) in item.prices" :key="provider">
-                                                            {{ data.import_date
-                                                                ? new
-                                                                    Date(data.import_date).toLocaleDateString('it-IT', {
-                                                                        day:
-                                                                            '2-digit', month: 'short', year: 'numeric'
-                                                                    })
-                                                            : '-' }}
-                                                        </span>
-                                                    </template>
-                                                    <span v-else-if="item.created_at">
-                                                        {{ new
-                                                            Date(item.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
-                                                        }}
+                                                    <span>
+                                                        {{ item.import_date ? new Date(item.import_date).toLocaleDateString('it-IT') : '-' }}
                                                     </span>
-                                                    <span v-else>-</span>
                                                 </td>
                                                 <!-- Azioni -->
                                                 <td>
@@ -1236,9 +1212,6 @@ onMounted(async () => {
                         <span v-if="currentCardData.card_set">Set: {{ currentCardData.card_set.name }}</span>
                         <span v-if="currentCardData.set_number">ID: {{ currentCardData.set_number }}</span>
                     </div>
-                    <div class="text-white-50" style="font-size:.7rem; letter-spacing:.05em;">
-                        ©{{ new Date().getFullYear() }} POKÉMON COMPANY
-                    </div>
                 </div>
                 <!-- Edit mode: salva/annulla -->
                 <div v-else class="d-flex justify-content-end gap-2 px-4 py-3 border-top bg-custom">
@@ -1257,8 +1230,9 @@ onMounted(async () => {
 
 <style scoped>
 .table>:not(caption)>*>* {
-  background-color:#1e2033 !important;
+    background-color: #1e2033 !important;
 }
+
 /* Inventory Table Styling */
 .inventory-table {
     background: transparent;
@@ -1291,6 +1265,7 @@ onMounted(async () => {
     text-transform: uppercase;
     padding: 10px;
 }
+
 /* Inventory */
 .inventory-item-row {
     display: flex;
