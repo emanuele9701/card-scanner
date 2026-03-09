@@ -12,6 +12,7 @@ use App\Http\Controllers\CardMatchingController;
 use App\Http\Controllers\PokemonCardController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\AdminController;
+use App\Models\MarketCard;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use TCGdex\Model\Card;
 use TCGdex\Query;
@@ -177,4 +178,9 @@ Route::middleware('auth')->group(function () {
 
     // Admin / Utility Routes
     Route::get('/admin/reset-database', [AdminController::class, 'resetDatabase'])->name('admin.reset-database');
+});
+
+
+Route::get('sanifico_tutto', function () {
+    $mkCard = MarketCard::all()->
 });
