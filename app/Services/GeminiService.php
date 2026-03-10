@@ -62,7 +62,7 @@ class GeminiService
                 'Content-Type' => 'application/json',
                 'x-goog-api-key' => $this->apiKey
             ])->post($this->baseUrl, $payload);
-
+            // dd($response->body());
             if ($response->successful()) {
                 $data = $response->json();
 
@@ -112,46 +112,29 @@ class GeminiService
         });
 
         return <<<TEXT
-      # STEP 0: DETERMINA L'ERA DELLA CARTA (REGOLA VINCOLANTE)
+      Sei un sistema OCR rigoroso per l'estrazione dati da carte Pokémon TCG.
+ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente, restituisci "null".
+NON unire testi lontani tra loro. NON dedurre. NON interpretare. NON inventare dati.
+REGOLE DI OUTPUT: Devi restituire ESCLUSIVAMENTE il codice JSON valido. NON aggiungere saluti, NON aggiungere spiegazioni, NON usare formattazione markdown fuori dal JSON.
 
-Osserva **ESCLUSIVAMENTE** l'angolo in basso a sinistra della carta.
+---
 
-## CARTA MODERNA (2023+)
+# --- STEP 0: DETERMINA L'ERA DELLA CARTA (REGOLA VINCOLANTE) ---
 
-Se è presente **un piccolo riquadro nero o grigio contenente una sigla**  
-(es. `"MEG IT"`, `"OBFit"`, `"PFLit"`, ecc.)
+Cerca l'anno di copyright stampato in basso (es. 1999, 2002, 2023, 2025). Questo è il TUO UNICO CRITERIO per decidere.
 
-**E**
-
-l'anno di copyright in basso riporta **2023 o superiore**
-
-→ È **TASSATIVAMENTE** una carta moderna.  
+### CARTA MODERNA (2023+)
+Se l'anno di copyright è **2023 o superiore** (es. 2023, 2024, 2025)
+OPPURE è visibile un riquadro nero/grigio con il codice del set (es. "MEG IT")
+→ È TASSATIVAMENTE una carta moderna.
 → Segui il **PERCORSO B**.
 
----
-
-## CARTA VECCHIA (pre-2023)
-
-Se **NON** è presente il riquadro con sigla nell'angolo in basso a sinistra
-
-**E**
-
-l'anno di copyright è **precedente al 2023**
-
-→ È una **carta vecchia**.  
+### CARTA VECCHIA (pre-2023)
+Se l'anno di copyright è **2022 o inferiore** (es. 1999, 2015, 2022)
+→ È TASSATIVAMENTE una carta vecchia.
 → Segui il **PERCORSO A**.
 
----
-
-⚠️ **Non usare il colore dei bordi come criterio decisionale.**
-
----
-
-# PERCORSO A: CARTA VECCHIA (pre-2023)
-
-Estrai **SOLO** queste informazioni:
-
----
+Non usare il colore dei bordi come criterio decisionale.
 
 ## 1. NOME DELLA CARTA
 
