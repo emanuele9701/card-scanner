@@ -211,8 +211,8 @@ Route::get('/sistemo_tutto', function () {
             $totalCards,
             false
         );
-        Log::info("Match per card {$marketCard->id} - {$marketCard->product_name}: " . json_encode($match??[]));
-        die;; // Rimuovi questo continue per abilitare l'importazione dei prezzi da TCGdex
+        Log::info("Match per card {$marketCard->id} - {$marketCard->product_name}: " . json_encode($match ?? []));
+        // die;; // Rimuovi questo continue per abilitare l'importazione dei prezzi da TCGdex
 
         if ($match && isset($match['tcg_card'])) {
             /**
