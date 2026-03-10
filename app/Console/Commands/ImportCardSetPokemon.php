@@ -53,7 +53,10 @@ class ImportCardSetPokemon extends Command
             FacadesLog::info($set['name']);
             $this->info($set['name']);
 
+
+
             $abbreviation = $set['abbreviation'];
+            if ($set['name'] == 'Neo Genesis') dd($set);
 
             $setCard = CardSet::updateOrCreate(
                 [

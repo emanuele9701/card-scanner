@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CardSet;
 use App\Models\MarketCard;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use TCGdex\Model\Card;
 use TCGdex\Model\CardResume;
@@ -57,7 +58,7 @@ class TCGdexLookupService
 
         if ($mappedData['is_old_card']) {
             Log::info("Carta vecchia");
-            $result = $this->searchAndMatch($localId, $mappedData['card_name'], $totalCards, true);
+            $result = $this->searchAndMatch($localId, $mappedData['card_name'], $totalCards, true, $mappedData['language_card']);
             if (!$result) {
                 return $mappedData;
             }
@@ -68,7 +69,7 @@ class TCGdexLookupService
             $set = CardSet::where('card_set_abbreviation', $mappedData['set_code'])->first();
 
             if (!$set) {
-                $result = $this->searchAndMatch($localId, $mappedData['card_name'], $totalCards, false);
+                $result = $this->searchAndMatch($localId, $mappedData['card_name'], $totalCards, false, $mappedData['language_card']);
                 if (!$result) {
                     return $mappedData;
                 }
@@ -104,20 +105,27 @@ class TCGdexLookupService
     /**
      * Search for a card on TCGdex and match it to a local CardSet.
      */
-    public function searchAndMatch(string $localId, string $cardName, string $totalCards, bool $isOldCard): ?array
+    public function searchAndMatch(string $localId, string $cardName, string $totalCards, bool $isOldCard, string $lang = 'it'): ?array
     {
         // Converto il card name in un formato utf8
 
         $cardName = str_replace("’", "'", $cardName);
         // $cardName = mb_convert_encoding($cardName, 'UTF-8', mb_detect_encoding($cardName, 'UTF-8, ISO-8859-1', true));
-        $tcg = new TCGdex();
+        if (strtolower($lang) == "it") {
+            Log::info("Imposto la lingua di ricerca a Italiano per TCGDex");
+            $tcg = new TCGdex('it');
+        } else {
+            Log::info("Imposto la lingua di ricerca a Inglese per TCGDex");
+            $tcg = new TCGdex('en');
+        }
         $query = Query::create()
-            ->equal('localId', $localId)
+            ->equal('localId', explode("/", $localId)[0])
             ->contains('name', $cardName)
             ->sort('hp', 'desc')
             ->paginate(1, 20);
 
         $listCards = $tcg->card->list($query);
+
         Log::alert("Riscontri su TCGDex: (#{$localId}) {$cardName} -> " . count($listCards));
 
         if (count($listCards) === 0) {
@@ -128,7 +136,19 @@ class TCGdexLookupService
             /** @var Card $tcgCard */
             $tcgCard = $listCards[0]->toCard();
             Log::info("Card: " . json_encode($tcgCard));
-            $abbreviation = $tcgCard->set->toSet()->abbreviation->official;
+
+            $tcgSetData = $tcgCard->set->toSet();
+
+
+            if ((Carbon::createFromFormat("Y-m-d", $tcgSetData->releaseDate)) < Carbon::createFromDate(2024, 01, 01)) {
+                $isOldCard = true;
+                Log::info("Il set della carta ha come data: " . $tcgSetData->releaseDate . " isOld: " . ($isOldCard ? 'Si' : 'No'));
+            }
+
+            $abbreviation = $isOldCard
+                ? $tcgSetData->tcgOnline
+                : $tcgSetData->abbreviation->official;
+
             Log::info("Set identificato: " . $abbreviation);
 
             $set = CardSet::where('card_set_abbreviation', $abbreviation)->first();
@@ -157,6 +177,11 @@ class TCGdexLookupService
             if ($resumeLocalId == $localId && $tcgSetData->cardCount->official == $totalCards) {
                 Log::info("Match: {$tcgCard->name} in {$tcgSetData->name}");
 
+                if ((Carbon::createFromFormat("Y-m-d", $tcgSetData->releaseDate)) < Carbon::createFromDate(2024, 01, 01)) {
+                    $isOldCard = true;
+                    Log::info("Il set della carta ha come data: " . $tcgSetData->releaseDate . " isOld: " . ($isOldCard ? 'Si' : 'No'));
+                }
+
                 $abbreviation = $isOldCard
                     ? $tcgSetData->tcgOnline
                     : $tcgSetData->abbreviation->official;
@@ -164,6 +189,7 @@ class TCGdexLookupService
                 Log::info("Abbreviazione set: $abbreviation");
                 $set = CardSet::where('card_set_abbreviation', $abbreviation)->first();
                 if (!$set) {
+                    Log::warning("Set non trovato in db");
                     return null;
                 }
 

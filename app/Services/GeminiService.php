@@ -112,73 +112,133 @@ class GeminiService
         });
 
         return <<<TEXT
-      Sei un sistema OCR rigoroso per l'estrazione dati da carte Pokémon TCG.
-ATTENZIONE CRITICA: Se un dato non è fisicamente e testualmente presente, restituisci `"null"`.
-NON unire testi lontani tra loro. NON dedurre. NON interpretare. NON inventare dati.
+      # STEP 0: DETERMINA L'ERA DELLA CARTA (REGOLA VINCOLANTE)
 
----
+Osserva **ESCLUSIVAMENTE** l'angolo in basso a sinistra della carta.
 
-# --- STEP 0: DETERMINA L'ERA DELLA CARTA (REGOLA VINCOLANTE) ---
+## CARTA MODERNA (2023+)
 
-Osserva ESCLUSIVAMENTE l'angolo in basso a sinistra della carta.
+Se è presente **un piccolo riquadro nero o grigio contenente una sigla**  
+(es. `"MEG IT"`, `"OBFit"`, `"PFLit"`, ecc.)
 
-### CARTA MODERNA (2023+)
+**E**
 
-Se è presente un piccolo riquadro nero o grigio contenente una sigla (es. "MEG IT", "OBFit", "PFLit", ecc.)
-E l'anno di copyright in basso riporta **2023 o superiore**,
-→ È TASSATIVAMENTE una carta moderna.
+l'anno di copyright in basso riporta **2023 o superiore**
+
+→ È **TASSATIVAMENTE** una carta moderna.  
 → Segui il **PERCORSO B**.
 
-### CARTA VECCHIA (pre-2023)
+---
 
-Se NON è presente il riquadro con sigla nell'angolo in basso a sinistra
-E l'anno di copyright è precedente al 2023
-→ È una carta vecchia.
+## CARTA VECCHIA (pre-2023)
+
+Se **NON** è presente il riquadro con sigla nell'angolo in basso a sinistra
+
+**E**
+
+l'anno di copyright è **precedente al 2023**
+
+→ È una **carta vecchia**.  
 → Segui il **PERCORSO A**.
-
-Non usare il colore dei bordi come criterio decisionale.
 
 ---
 
-# ========== PERCORSO A: CARTA VECCHIA (pre-2023) ==========
+⚠️ **Non usare il colore dei bordi come criterio decisionale.**
 
-Estrai SOLO queste informazioni:
+---
+
+# PERCORSO A: CARTA VECCHIA (pre-2023)
+
+Estrai **SOLO** queste informazioni:
+
+---
 
 ## 1. NOME DELLA CARTA
-Il nome del Pokémon visibile in alto.
-Se la carta è ruotata, analizza tutte le direzioni.
-ECCEZIONE ALLA REGOLA "NON DEDURRE": Se il font presenta spaziature anomale che spezzano il nome di un Pokémon noto (es. "Magne mite", "Pika chu"), unisci le lettere per formare il nome corretto del Pokémon (es. "Magnemite", "Pikachu").
+
+Il nome del Pokémon visibile **in alto**.
+
+Se la carta è ruotata, analizza **tutte le direzioni**.
+
+### Eccezione alla regola "NON DEDURRE"
+
+Se il font presenta **spaziature anomale** che spezzano il nome di un Pokémon noto  
+(es. `"Magne mite"`, `"Pika chu"`)
+
+→ unisci le lettere per formare il nome corretto del Pokémon  
+(es. `"Magnemite"`, `"Pikachu"`).
+
+---
 
 ## 2. NUMERO DELLA CARTA
 
-**DOVE:**
-Cerca ESCLUSIVAMENTE nell'angolo in basso a sinistra,
-sulla stessa riga o immediatamente accanto al simbolo dell'espansione e al nome dell'illustratore.
+### Dove cercare
 
-Deve essere un blocco unico nel formato:
+Cerca **ESCLUSIVAMENTE nell'angolo in basso a sinistra**,  
+sulla stessa riga o immediatamente accanto:
 
-* "XX/YYY"
-* "XXX/YYY"
+- al **simbolo dell'espansione**
+- al **nome dell'illustratore**
 
-Esempio valido: `105/132`
+Deve essere **un blocco unico** nel formato:
 
-Non prendere MAI numeri:
 
-* al centro della carta
-* sotto l'illustrazione del Pokémon
-* preceduti da "No." o "N."
+XX/YYY
 
-Se non presente in quell'area precisa → `"null"`
+
+oppure
+
+
+XXX/YYY
+
+
+**Esempio valido**
+
+
+105/132
+
+
+### Non prendere MAI numeri:
+
+- al **centro della carta**
+- **sotto l'illustrazione** del Pokémon
+- preceduti da `"No."` o `"N."`
+
+Se **non presente in quell'area precisa** → `"null"`
 
 ---
 
-## OUTPUT JSON (Carta Vecchia)
+## 3. LINGUA DELLA CARTA
+
+Determina la lingua leggendo:
+
+- il testo degli attacchi
+- le etichette della salute  
+  - `"HP"` → inglese  
+  - `"PS"` → italiano
+- le scritte in basso  
+  - `"weakness"` vs `"debolezza"`
+
+Restituisci la **sigla della lingua in maiuscolo**.
+
+Esempi:
+
+
+IT
+EN
+FR
+JP
+
+
+---
+
+# OUTPUT JSON (Carta Vecchia)
 
 ```json
 {
   "card_identity": {
     "pokemon_name": "Testo",
     "set_number": "Formato XX/YYY o null",
+    "language": "Sigla lingua o null",
     "illustrator": null,
     "anno_carta": "anno visibile in basso"
   },
@@ -190,91 +250,116 @@ Se non presente in quell'area precisa → `"null"`
   },
   "is_old_card": true
 }
-```
-
----
-
-# ========== PERCORSO B: CARTA MODERNA (2023+) ==========
-
-## --- DATABASE SET CONOSCIUTI ---
-
+PERCORSO B: CARTA MODERNA (2023+)
+DATABASE SET CONOSCIUTI
 $jsonSets
+1. NOME DELLA CARTA
 
----
-
-## 1. NOME DELLA CARTA
 Il nome del Pokémon visibile in alto.
+
 Se la carta è ruotata, analizza tutte le direzioni.
-ECCEZIONE ALLA REGOLA "NON DEDURRE": Se il font presenta spaziature anomale che spezzano il nome di un Pokémon noto (es. "Magne mite", "Pika chu"), unisci le lettere per formare il nome corretto del Pokémon (es. "Magnemite", "Pikachu").
 
----
+Eccezione alla regola "NON DEDURRE"
 
-## 2. NUMERO DELLA CARTA
+Se il font presenta spaziature anomale che spezzano il nome di un Pokémon noto
+(es. "Magne mite", "Pika chu")
 
-**DOVE:**
+→ unisci le lettere per formare il nome corretto del Pokémon
+(es. "Magnemite", "Pikachu").
+
+2. NUMERO DELLA CARTA
+Dove cercare
+
 Cerca ESCLUSIVAMENTE nell'angolo in basso a sinistra,
 sulla stessa riga o immediatamente accanto:
 
-* al simbolo dell'espansione
-* al nome dell'illustratore
+al simbolo dell'espansione
+
+al nome dell'illustratore
 
 Deve essere un blocco unico nel formato:
 
-* "XX/YYY"
-* "XXX/YYY"
+XX/YYY
 
-Esempio valido: `27/100`
+oppure
 
+XXX/YYY
+
+Esempio valido
+
+27/100
 Non prendere MAI numeri:
 
-* al centro della carta
-* sotto il disegno del Pokémon
-* preceduti da "No." o "N."
+al centro della carta
 
-Se non presente in quell'area precisa → `"null"`
+sotto il disegno del Pokémon
 
----
+preceduti da "No." o "N."
 
-## 3. ILLUSTRATORE
+Se non presente in quell'area precisa → "null"
+
+3. ILLUSTRATORE
 
 Cerca "Illus." o "Ill." nella stessa fascia inferiore.
+
 Estrai il nome subito dopo.
-Se assente → `"null"`.
 
----
+Se assente → "null".
 
-# 4. RILEVAZIONE DEL SET — METODO A DOPPIA VERIFICA
-
-### PASSO 1
+4. RILEVAZIONE DEL SET E DELLA LINGUA
+PASSO 1
 
 Estrai il denominatore dal numero carta.
-Esempio: `27/100` → totale = 100
 
-### PASSO 2
+Esempio:
+
+27/100 → totale = 100
+PASSO 2
 
 Osserva il simbolo accanto al numero carta.
-Descrivilo brevemente in `"set_symbol_description"`.
 
----
+Descrivilo brevemente in:
 
-# 5. REGOLA SULLA SIGLA DEL SET
+set_symbol_description
+PASSO 3 (LINGUA)
 
-Se il codice stampato è ad esempio `"PFLit"`:
+Determina la lingua analizzando:
 
-* `"raw_printed_code"` = `"PFLit"`
-* `"set_abbreviation"` = `"PFL"` (rimuovi sempre suffisso lingua: it, en, es, ecc.)
-* `"set_name"` = nome completo del set
-* `"is_new_set"` = false
+il testo degli attacchi (HP vs PS)
 
----
+oppure il suffisso letterale del codice stampato
 
-# OUTPUT JSON (Carta Moderna)
+Esempio:
 
-```json
+PFLit → "it" indica italiano
+
+Restituisci la sigla in maiuscolo:
+
+IT
+EN
+5. REGOLA SULLA SIGLA DEL SET
+
+Se il codice stampato è ad esempio:
+
+PFLit
+
+Allora:
+
+raw_printed_code = "PFLit"
+set_abbreviation = "PFL"
+set_name = nome completo del set
+is_new_set = false
+
+⚠️ Rimuovi sempre il suffisso della lingua (it, en, es, ecc.).
+
+La sigla del set deve essere pulita.
+
+OUTPUT JSON (Carta Moderna)
 {
   "card_identity": {
     "pokemon_name": "Testo",
     "set_number": "Formato XX/YYY o null",
+    "language": "Sigla lingua o null",
     "illustrator": "Nome o null",
     "anno_carta": "anno visibile in basso"
   },
@@ -286,7 +371,6 @@ Se il codice stampato è ad esempio `"PFLit"`:
     "is_new_set": false
   }
 }
-```
 TEXT;
     }
 
@@ -311,6 +395,7 @@ TEXT;
         $setDetails = $geminiData['set_details'] ?? [];
 
         return [
+            'language_card' => $cardIdentity['language'],
             'is_valid_card' => true,
             'is_old_card' => ((int)($cardIdentity['anno_carta'] ?? 0)) < 2023,
             'card_name' => $cardIdentity['pokemon_name'] ?? null,

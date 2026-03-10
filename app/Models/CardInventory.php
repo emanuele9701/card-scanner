@@ -14,6 +14,7 @@ class CardInventory extends Model
         'user_id',
         'quantity',
         'rarity_variant',
+        'language_card',
         'condition',
         'notes'
     ];

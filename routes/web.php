@@ -233,6 +233,7 @@ Route::get('/sistemo_tutto', function () {
                 }
             }
         }
+        die;
     }
 });
 

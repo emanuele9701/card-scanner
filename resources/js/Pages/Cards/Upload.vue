@@ -82,6 +82,7 @@ async function saveCard(cardRow, index) {
         const postData = {
             card_id: cardRow.card_id,
             card_name: cardRow.name,
+            language_card: cardRow.language,
             type: cardRow.type,
             set_number: cardRow.card_number,
             illustrator: cardRow.illustrator,
@@ -191,6 +192,7 @@ async function saveSelectedCards() {
     let dataToSave = cardsToSave.map(cardRow => ({
         card_id: cardRow.card_id,
         card_name: cardRow.name,
+        language_card: cardRow.language_card,
         type: cardRow.type,
         set_number: cardRow.card_number,
         illustrator: cardRow.illustrator,
@@ -321,6 +323,7 @@ onMounted(() => {
                 card_number: null,
                 illustrator: null,
                 status: 'loading',
+                language: "",
                 error: null,
                 filename: file.name,
                 isEditing: false,
@@ -353,6 +356,7 @@ onMounted(() => {
                     image_url: response.data.image_url || row.image_url,
                     name: response.data.name,
                     type: response.data.type,
+                    language: response.data.language_card ?? "",
                     set: response.data.set,
                     set_id: response.data.set_id,
                     set_code: response.data.set_code,
@@ -536,7 +540,7 @@ function toggleCheckbox(index) {
                                         <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
                                         <span v-else-if="row.status === 'error'" class="text-muted">—</span>
                                         <span v-else-if="row.status === 'done' && !row.isEditing" class="card-name">{{
-                                            row.name ?? '—' }}</span>
+                                            row.name + "(" + row.language + ")" ?? '—' }}</span>
                                         <span v-else-if="row.status === 'done' && row.isEditing" class="card-name">
                                             <input v-model="row.name" class="form-control form-control-md">
                                         </span>

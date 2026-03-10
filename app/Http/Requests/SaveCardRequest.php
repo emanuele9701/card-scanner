@@ -40,6 +40,7 @@ class SaveCardRequest extends FormRequest
             'illustrator' => 'nullable|string',
             'card_set_id' => 'nullable|exists:card_sets,id',
             'game' => 'required|string',
+            'language_card' => 'nullable|string',
             'market_card_id' => 'nullable|exists:market_cards,id',
             'pricing' => 'nullable|array',
         ];

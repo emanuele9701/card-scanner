@@ -201,7 +201,7 @@ class CardUploadController extends Controller
             if (isset($mappedData['game']) && preg_match('/Pokemon/i', $mappedData['game'])) {
                 $mappedData['game'] = 'Pokemon';
             }
-            if ($mappedData['card_set_id']) {
+            if (isset($mappedData['card_set_id'])) {
                 $setCard = CardSet::findOrFail($mappedData['card_set_id']);
                 $mappedData['set_code']             = $setCard->card_set_abbreviation;
                 $mappedData['set_info']['set_name'] = $setCard->name;
@@ -216,6 +216,7 @@ class CardUploadController extends Controller
                 'message' => 'Riconoscimento completato!',
                 'data'    => [
                     'card_id'           => $card->id,
+                    'language_card'     => $mappedData['language_card'],
                     'image_url'         => $card->getImageUrl(),
                     'name'              => $mappedData['card_name']             ?? null,
                     'type'              => $mappedData['type']                  ?? null,
@@ -369,7 +370,7 @@ class CardUploadController extends Controller
         $parts = explode('/', $card->set_number);
         [$localId, $totalCards] = count($parts) === 2 ? $parts : [$card->set_number, 0];
 
-        $dataService = $tcgdexService->searchAndMatch($localId, $card->card_name, $totalCards, false);
+        $dataService = $tcgdexService->searchAndMatch($localId, $card->card_name, $totalCards, false, $request['language_card']);
 
         /**
          * @var Card $tcgCard
@@ -428,7 +429,7 @@ class CardUploadController extends Controller
         }
 
         // Auto-create CardInventory for this card
-        $this->createCardInventory($card);
+        $this->createCardInventory($card, $request['language_card']);
 
 
         // Aggiorno i set dell'utente
@@ -487,7 +488,7 @@ class CardUploadController extends Controller
         }
 
         foreach ($pricing as $provider => $price) {
-            if(!is_array($price)) continue;
+            if (!is_array($price)) continue;
 
             if (strtolower($provider) == 'cardmarket') {
                 $this->TCGGenerateCardMarketsPrice($marketCard, $price);
@@ -579,7 +580,7 @@ class CardUploadController extends Controller
     /**
      * Auto-create CardInventory for a newly saved card
      */
-    private function createCardInventory(PokemonCard $card): void
+    private function createCardInventory(PokemonCard $card, string $language_card = "-"): void
     {
         try {
             $existingInventory = \App\Models\CardInventory::where('pokemon_card_id', $card->id)
@@ -608,6 +609,7 @@ class CardUploadController extends Controller
 
             \App\Models\CardInventory::create([
                 'pokemon_card_id' => $card->id,
+                'language_card' => $language_card,
                 'user_id' => $card->user_id,
                 'quantity' => 1,
                 'rarity_variant' => $rarityVariant,
