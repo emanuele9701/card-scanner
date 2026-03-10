@@ -153,7 +153,7 @@ class TCGdexLookupService
             $tcgSetData = $tcgCard->set->toSet();
 
             Log::info("Check: {$tcgCard->name} in {$tcgSetData->name} localId:{$resumeLocalId} cardCount:{$tcgSetData->cardCount->total}");
-
+            // dd($resumeLocalId == $localId, $tcgSetData->cardCount->official ,$totalCards);
             if ($resumeLocalId == $localId && $tcgSetData->cardCount->official == $totalCards) {
                 Log::info("Match: {$tcgCard->name} in {$tcgSetData->name}");
 
