@@ -183,7 +183,6 @@ Route::middleware('auth')->group(function () {
     // Admin / Utility Routes
     Route::get('/admin/reset-database', [AdminController::class, 'resetDatabase'])->name('admin.reset-database');
 });
-
 Route::get('/sistemo_tutto', function () {
     // Recupero le marketcard che non hanno un prices
     $marketCards = MarketCard::doesntHave('prices')->get();

@@ -56,7 +56,7 @@ class ImportCardSetPokemon extends Command
 
 
             $abbreviation = $set['abbreviation'];
-            if ($set['name'] == 'Neo Genesis') dd($set);
+            // if ($set['name'] == 'Neo Genesis') dd($set);
 
             $setCard = CardSet::updateOrCreate(
                 [
