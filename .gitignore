@@ -27,3 +27,6 @@ composer.lock
 package-lock.json
 composer.lock
 package-lock.json
+
+# Proxy cache
+storage/app/proxy_cache.json

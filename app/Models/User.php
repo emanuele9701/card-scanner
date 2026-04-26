@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -106,5 +107,13 @@ class User extends Authenticatable
     public function cardSets()
     {
         return $this->belongsToMany(CardSet::class, 'card_set_user');
+    }
+    
+    /**
+     * Le espansioni (scraper) associate all'utente.
+     */
+    public function scrapingExpansions(): BelongsToMany
+    {
+        return $this->belongsToMany(ScrapingExpansion::class);
     }
 }

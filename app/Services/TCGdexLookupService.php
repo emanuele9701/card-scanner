@@ -109,8 +109,8 @@ class TCGdexLookupService
     {
         // Converto il card name in un formato utf8
 
-        $cardName = str_replace("’", "'", $cardName);
-        // $cardName = mb_convert_encoding($cardName, 'UTF-8', mb_detect_encoding($cardName, 'UTF-8, ISO-8859-1', true));
+        // $cardName = str_replace("’", "'", $cardName);
+        $cardName = mb_convert_encoding($cardName, 'UTF-8', mb_detect_encoding($cardName, 'UTF-8, ISO-8859-1', true));
         if (strtolower($lang) == "it") {
             Log::info("Imposto la lingua di ricerca a Italiano per TCGDex");
             $tcg = new TCGdex('it');
@@ -125,6 +125,14 @@ class TCGdexLookupService
             ->paginate(1, 20);
 
         $listCards = $tcg->card->list($query);
+
+        $query = Query::create()
+            ->equal('localId', explode("/", $localId)[0])
+            // ->contains('name', $cardName)
+            ->sort('hp', 'desc')
+            ->paginate(1, 20);
+
+        $listCards = array_merge($listCards, $tcg->card->list($query));
 
         Log::alert("Riscontri su TCGDex: (#{$localId}) {$cardName} -> " . count($listCards));
 

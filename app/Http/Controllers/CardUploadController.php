@@ -356,7 +356,7 @@ class CardUploadController extends Controller
             'set_number' => $request['set_number'] ?? '-',
             'illustrator' => $request['illustrator'] ?? '-',
             'flavor_text' => $request['flavor_text'] ?? '-',
-            'card_set_id' => $request['card_set_id'] ?? '-',
+            'card_set_id' => $request['card_set_id'] ?? null,
             'game' => $request['game'] ? $request['game'] : null,
             'game_id' => $gameId,
             'status' => PokemonCard::STATUS_COMPLETED,
@@ -556,7 +556,7 @@ class CardUploadController extends Controller
     private function TCGGenerateTcgPlayerPrice(MarketCard $marketCard, array $price): void
     {
         $providerPrice = ProviderPrice::where('name', 'TCG Player')->first();
-
+        
         $importDate = (date_create_from_format('Y-m-d', explode("T", $price['updated'])[0]))->format("Y-m-d");
         unset($price['updated'], $price['unit']);
         foreach ($price as $printing => $value) {

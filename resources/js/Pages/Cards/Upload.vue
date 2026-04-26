@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { ref, onMounted, onBeforeUnmount } from 'vue';
+import * as bootstrap from 'bootstrap';
 import { Head } from '@inertiajs/vue3';
 import Dropzone from 'dropzone';
 import axios from 'axios';
@@ -18,11 +19,18 @@ const props = defineProps({
     sets: Object
 });
 
+
 // ---- State ----
 const dropzoneRef = ref(null);
 const results = ref([]);    // array of { image_url, name, type, set, card_number, illustrator, status, error }
 const localChangeRow = {};
 const isProcessing = ref(false);
+
+// ---- Edit Modal state ----
+const editingRow = ref(null);
+const editingIndex = ref(null);
+const editModalRef = ref(null);
+let bsModal = null;
 
 // FIX: counter to track parallel uploads and avoid premature isProcessing = false
 let activeUploads = 0;
@@ -152,8 +160,32 @@ async function retrySelectedCards() {
 }
 
 function editRow(cardRow, index) {
-    cardRow.isEditing = true;
+    // Save a snapshot for potential cancel
     localChangeRow[cardRow.card_id] = JSON.parse(JSON.stringify(results.value[index]));
+    editingRow.value = cardRow;
+    editingIndex.value = index;
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(editModalRef.value);
+    }
+    bsModal.show();
+}
+
+function saveFromModal() {
+    if (editingRow.value !== null && editingIndex.value !== null) {
+        saveLocalCard(editingRow.value, editingIndex.value);
+    }
+    bsModal.hide();
+    editingRow.value = null;
+    editingIndex.value = null;
+}
+
+function cancelFromModal() {
+    if (editingRow.value !== null && editingIndex.value !== null) {
+        deleteChangesCard(editingRow.value, editingIndex.value);
+    }
+    bsModal.hide();
+    editingRow.value = null;
+    editingIndex.value = null;
 }
 
 async function deleteRow(row) {
@@ -192,7 +224,7 @@ async function saveSelectedCards() {
     let dataToSave = cardsToSave.map(cardRow => ({
         card_id: cardRow.card_id,
         card_name: cardRow.name,
-        language_card: cardRow.language_card,
+        language_card: cardRow.language,
         type: cardRow.type,
         set_number: cardRow.card_number,
         illustrator: cardRow.illustrator,
@@ -539,26 +571,17 @@ function toggleCheckbox(index) {
                                     <td>
                                         <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
                                         <span v-else-if="row.status === 'error'" class="text-muted">—</span>
-                                        <span v-else-if="row.status === 'done' && !row.isEditing" class="card-name">{{
-                                            row.name + "(" + row.language + ")" ?? '—' }}</span>
-                                        <span v-else-if="row.status === 'done' && row.isEditing" class="card-name">
-                                            <input v-model="row.name" class="form-control form-control-md">
-                                        </span>
+                                        <span v-else-if="row.status === 'done'" class="card-name">{{
+                                            row.name + " (" + row.language + ")" ?? '—' }}</span>
                                         <span v-else class="text-muted">-</span>
                                     </td>
 
                                     <!-- Type -->
                                     <td>
                                         <span v-if="row.status === 'loading'" class="skeleton skeleton-chip"></span>
-                                        <span v-else-if="row.type && !row.isEditing" class="type-chip"
+                                        <span v-else-if="row.type" class="type-chip"
                                             :style="{ background: typeColor(row.type) }">
                                             {{ row.type }}
-                                        </span>
-                                        <span v-else-if="row.type && row.isEditing" class="type-chip">
-                                            <select v-model="row.type" class="form-select form-select-md">
-                                                <option v-for="value in typeOptions" :value="value.value">{{ value.label
-                                                }}</option>
-                                            </select>
                                         </span>
                                         <span v-else class="text-muted">—</span>
                                     </td>
@@ -566,36 +589,21 @@ function toggleCheckbox(index) {
                                     <!-- Set -->
                                     <td>
                                         <span v-if="row.status === 'loading'" class="skeleton skeleton-text"></span>
-                                        <span v-else-if="!row.isEditing && row.status === 'done'" class="set-name">{{
-                                            row.set ?? '—' }}</span>
-                                        <select v-else-if="row.isEditing && row.status === 'done'" v-model="row.set_id"
-                                            class="form-select form-select-md">
-                                            <option v-for="value in setOptions" :value="value.id" :key="value.id">{{
-                                                value.name }}
-                                            </option>
-                                        </select>
+                                        <span v-else-if="row.status === 'done'" class="set-name">{{ row.set ?? '—' }}</span>
                                         <span v-else class="set-name">{{ row.set ?? '—' }}</span>
                                     </td>
 
                                     <!-- Card number -->
                                     <td>
                                         <span v-if="row.status === 'loading'" class="skeleton skeleton-short"></span>
-                                        <span v-else-if="row.status === 'done' && !row.isEditing">{{ row.card_number ??
-                                            '—' }}</span>
-                                        <span v-else-if="row.status === 'done' && row.isEditing">
-                                            <input v-model="row.card_number" class="form-control form-control-sm">
-                                        </span>
+                                        <span v-else-if="row.status === 'done'">{{ row.card_number ?? '—' }}</span>
                                         <code v-else class="card-number">{{ row.card_number ?? '—' }}</code>
                                     </td>
 
                                     <!-- Illustrator -->
                                     <td>
                                         <span v-if="row.status === 'loading'" class="skeleton skeleton-short"></span>
-                                        <span v-else-if="row.status === 'done' && !row.isEditing">{{ row.illustrator ??
-                                            '—' }}</span>
-                                        <span v-else-if="row.status === 'done' && row.isEditing">
-                                            <input v-model="row.illustrator" class="form-control form-control-md">
-                                        </span>
+                                        <span v-else-if="row.status === 'done'">{{ row.illustrator ?? '—' }}</span>
                                         <code v-else class="card-number">{{ row.illustrator ?? '—' }}</code>
                                     </td>
 
@@ -630,30 +638,18 @@ function toggleCheckbox(index) {
 
                                     <td class="col-action d-flex flex-column gap-3" v-if="!row.isSave && !row.isSaving">
                                         <span style="cursor: pointer;" class="text-center bg-success p-1"
-                                            v-if="row.status === 'done' && !row.isEditing">
+                                            v-if="row.status === 'done'">
                                             <font-awesome-icon :icon="['fad', 'save']" @click="saveCard(row, index)" />
                                         </span>
 
                                         <span style="cursor: pointer;" class="text-center bg-primary p-1"
-                                            v-if="row.status === 'done' && !row.isEditing">
+                                            v-if="row.status === 'done'">
                                             <font-awesome-icon :icon="['fas', 'pencil']" @click="editRow(row, index)" />
                                         </span>
 
                                         <span style="cursor: pointer;" class="text-center bg-danger p-1"
-                                            v-if="row.status === 'done' && !row.isEditing">
+                                            v-if="row.status === 'done'">
                                             <font-awesome-icon :icon="['fas', 'trash']" @click="deleteRow(row)" />
-                                        </span>
-
-                                        <span style="cursor: pointer;" class="text-center bg-success  p-1"
-                                            v-if="row.status === 'done' && row.isEditing">
-                                            <font-awesome-icon :icon="['fas', 'check']"
-                                                @click="saveLocalCard(row, index)" />
-                                        </span>
-
-                                        <span style="cursor: pointer;" class="text-center bg-danger p-1"
-                                            v-if="row.status === 'done' && row.isEditing">
-                                            <font-awesome-icon :icon="['fas', 'times']"
-                                                @click="deleteChangesCard(row, index)" />
                                         </span>
                                     </td>
 
@@ -666,6 +662,96 @@ function toggleCheckbox(index) {
             </transition>
 
         </div>
+
+        <!-- ── Edit Card Modal ── -->
+        <div class="modal fade" id="editCardModal" ref="editModalRef" tabindex="-1" aria-labelledby="editCardModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content bg-dark text-light border border-secondary">
+
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title" id="editCardModalLabel">
+                            ✏️ Modifica Carta
+                            <span v-if="editingRow" class="ms-2 text-muted fs-6">{{ editingRow.name }}</span>
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" @click="cancelFromModal" aria-label="Chiudi"></button>
+                    </div>
+
+                    <div class="modal-body" v-if="editingRow">
+                        <div class="row g-3">
+
+                            <!-- Anteprima + Nome -->
+                            <div class="col-md-3 d-flex justify-content-center align-items-start">
+                                <div class="card-thumb-wrapper" style="width:90px;height:125px;">
+                                    <img v-if="editingRow.image_url" :src="editingRow.image_url" class="card-thumb" :alt="editingRow.filename" />
+                                </div>
+                            </div>
+
+                            <div class="col-md-9">
+                                <div class="row g-3">
+
+                                    <!-- Nome -->
+                                    <div class="col-md-8">
+                                        <label class="form-label text-secondary small">Nome Carta</label>
+                                        <input v-model="editingRow.name" class="form-control form-control-sm bg-secondary text-light border-0" placeholder="Nome carta" />
+                                    </div>
+
+                                    <!-- Lingua -->
+                                    <div class="col-md-4">
+                                        <label class="form-label text-secondary small">Lingua</label>
+                                        <input v-model="editingRow.language" class="form-control form-control-sm bg-secondary text-light border-0" placeholder="es. IT, EN…" />
+                                    </div>
+
+                                    <!-- Tipo -->
+                                    <div class="col-md-6">
+                                        <label class="form-label text-secondary small">Tipo</label>
+                                        <select v-model="editingRow.type" class="form-select form-select-sm bg-secondary text-light border-0">
+                                            <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">
+                                                {{ opt.label }}
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Set -->
+                                    <div class="col-md-6">
+                                        <label class="form-label text-secondary small">Set</label>
+                                        <select v-model="editingRow.set_id" class="form-select form-select-sm bg-secondary text-light border-0">
+                                            <option v-for="opt in setOptions" :key="opt.id" :value="opt.id">
+                                                {{ opt.name }}
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <!-- N° Carta -->
+                                    <div class="col-md-6">
+                                        <label class="form-label text-secondary small">N° Carta</label>
+                                        <input v-model="editingRow.card_number" class="form-control form-control-sm bg-secondary text-light border-0" placeholder="es. 001/200" />
+                                    </div>
+
+                                    <!-- Illustratore -->
+                                    <div class="col-md-6">
+                                        <label class="form-label text-secondary small">Illustratore</label>
+                                        <input v-model="editingRow.illustrator" class="form-control form-control-sm bg-secondary text-light border-0" placeholder="Nome illustratore" />
+                                    </div>
+
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @click="cancelFromModal">
+                            <font-awesome-icon :icon="['fas', 'times']" /> Annulla
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" @click="saveFromModal">
+                            <font-awesome-icon :icon="['fas', 'check']" /> Salva modifiche
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
     </AppLayout>
 </template>
 

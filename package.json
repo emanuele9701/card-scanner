@@ -29,5 +29,24 @@
         "dropzone": "^6.0.0-beta.2",
         "sass": "^1.97.3",
         "ziggy-js": "^2.6.1"
-    }
+    },
+    "name": "card-scanner",
+    "version": "1.0.0",
+    "description": "> **AI-Powered Trading Card Collection Manager**   > Scan, organize, and track the value of your trading card collection with the power of Google Gemini AI.",
+    "main": "vite.config.js",
+    "directories": {
+        "doc": "docs",
+        "test": "tests"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/emanuele9701/card-scanner.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/emanuele9701/card-scanner/issues"
+    },
+    "homepage": "https://github.com/emanuele9701/card-scanner#readme"
 }

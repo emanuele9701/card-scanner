@@ -12,15 +12,7 @@ use App\Http\Controllers\CardMatchingController;
 use App\Http\Controllers\PokemonCardController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\AdminController;
-use App\Models\MarketCard;
-use App\Models\MarketPrice;
-use App\Models\ProviderPrice;
-use App\Services\TCGdexLookupService;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use TCGdex\Model\Card;
-use TCGdex\Query;
-use TCGdex\TCGdex;
 
 /*
 |--------------------------------------------------------------------------
@@ -114,10 +106,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/cards/{card}/unmatch', [CardMatchingController::class, 'unmatch'])->name('matching.unmatch');
     });
 
-    // API Test Page
-    Route::get('/test/api', function () {
-        return inertia('Test/ApiTest');
-    })->name('test.api');
 
     // Log viewer
     Route::get('/logs', function () {
@@ -183,134 +171,3 @@ Route::middleware('auth')->group(function () {
     // Admin / Utility Routes
     Route::get('/admin/reset-database', [AdminController::class, 'resetDatabase'])->name('admin.reset-database');
 });
-Route::get('/sistemo_tutto', function () {
-    // Recupero le marketcard che non hanno un prices
-    $marketCards = MarketCard::doesntHave('prices')->get();
-    Log::info("Trovate " . count($marketCards) . " market cards senza prezzi associati");
-    $tcgdexService = app(TCGdexLookupService::class);
-    foreach ($marketCards as $marketCard) {
-        // Creo un nuovo record di MarketPrice con prezzo 0
-        $cardGame = $marketCard->pokemonCards;
-
-        if (!$cardGame) {
-            continue; // Salta se non c'è una carta Pokemon associata
-        }
-
-        $setCard = $cardGame->cardSet;
-
-        if (!$setCard) {
-            continue; // Salta se non c'è un set associato
-        }
-        $totalCards = explode("/", $cardGame->set_number)[1] ?? 0;
-        Log::info("Processing MarketCard ID: {$marketCard->id} - {$marketCard->product_name}, Total Cards in Set: {$totalCards}");
-        // Recupero informazioni su tcgdex
-        $match = $tcgdexService->searchAndMatch(
-            $marketCard->card_number,
-            $marketCard->product_name,
-            $totalCards,
-            false
-        );
-        Log::info("Match per card {$marketCard->id} - {$marketCard->product_name}: " . json_encode($match ?? []));
-        // die;; // Rimuovi questo continue per abilitare l'importazione dei prezzi da TCGdex
-
-        if ($match && isset($match['tcg_card'])) {
-            /**
-             * @var Card $card
-             */
-            $card = $match['tcg_card'];
-
-            foreach (json_decode(json_encode($card->pricing), true) as $provider => $price) {
-
-                if (!is_array($price)) continue;
-
-                if (strtolower($provider) == 'cardmarket') {
-                    TCGGenerateCardMarketsPrice($marketCard, $price);
-                } else if (strtolower($provider) === 'tcgplayer') {
-                    TCGGenerateTcgPlayerPrice($marketCard, $price);
-                } else {
-                    Log::warning("Provider non gestito: $provider per card {$marketCard->id} - {$marketCard->product_name}");
-                }
-            }
-        }
-        die;
-    }
-});
-
-/**
- * From array tcg's pricing (cardmarket) array generate a MarketPrices data
- */
-function TCGGenerateCardMarketsPrice(MarketCard $marketCard, array $price): void
-{
-    $return = [];
-    $providerPrice = ProviderPrice::where('name', 'CardMarket')->first();
-
-    if (!$providerPrice) {
-        return;
-    }
-    $importDate = (date_create_from_format('Y-m-d', explode("T", $price['updated'])[0]))->format("Y-m-d");
-    if (MarketPrice::where('market_card_id', $marketCard->id)->where('import_date', $importDate)->exists()) return;
-
-    $return[] = [
-        'external_product_id' => $price['idProduct'],
-        'market_card_id' => $marketCard->id,
-        'provider_id' => $providerPrice->id,
-        'condition' => 'Near Mint',
-        'printing' => 'Standard',
-        'low_price' => $price['low'],
-        'trend' => $price['trend'],
-        'avg1' => $price['avg1'],
-        'avg7' => $price['avg7'],
-        'avg30' => $price['avg30'],
-        'unit_divisa' => 'eur',
-        'market_price' => $price['trend'],
-        'import_date' => $importDate
-    ];
-
-    if (!empty($price['trend-holo'])) {
-        $return[] = [
-            'external_product_id' => $price['idProduct'],
-            'market_card_id' => $marketCard->id,
-            'provider_id' => $providerPrice->id,
-            'condition' => 'Near Mint',
-            'printing' => 'Holo',
-            'low_price' => $price['low-holo'] ?? 0,
-            'trend' => $price['trend-holo'],
-            'avg1' => $price['avg1-holo'],
-            'avg7' => $price['avg7-holo'],
-            'avg30' => $price['avg30-holo'],
-            'unit_divisa' => 'eur',
-            'market_price' => $price['trend'],
-            'import_date' => $importDate
-        ];
-    }
-    foreach ($return as $key => $value) {
-        MarketPrice::create($value);
-    }
-}
-
-/**
- * From array tcg's pricing (cardmarket) array generate a MarketPrices data
- */
-function TCGGenerateTcgPlayerPrice(MarketCard $marketCard, array $price): void
-{
-    $providerPrice = ProviderPrice::where('name', 'TCG Player')->first();
-
-    $importDate = (date_create_from_format('Y-m-d', explode("T", $price['updated'])[0]))->format("Y-m-d");
-    unset($price['updated'], $price['unit']);
-    foreach ($price as $printing => $value) {
-        $return = [
-            'external_product_id' => $value['productId'],
-            'market_card_id' => $marketCard->id,
-            'provider_id' => $providerPrice->id,
-            'condition' => 'Near Mint',
-            'printing' => $printing,
-            'low_price' => $value['lowPrice'],
-            'high_price' => $value['highPrice'],
-            'mid_price' => $value['midPrice'],
-            'market_price' => $value['marketPrice'],
-            'unit_divisa' => 'dol',
-            'import_date' => $importDate
-        ];
-        MarketPrice::create($return);
-    }
-}

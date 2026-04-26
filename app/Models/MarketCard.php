@@ -21,6 +21,7 @@ class MarketCard extends Model
         'game',
         'game_id',
         'is_supplemental',
+        'scraping_card_id',
     ];
 
     protected $casts = [
@@ -33,6 +34,14 @@ class MarketCard extends Model
     public function game(): BelongsTo
     {
         return $this->belongsTo(Game::class);
+    }
+
+    /**
+     * Get the linked scraping card (Cardmarket data)
+     */
+    public function scrapingCard(): BelongsTo
+    {
+        return $this->belongsTo(ScrapingCard::class);
     }
 
     /**

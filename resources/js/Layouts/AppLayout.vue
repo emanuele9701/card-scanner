@@ -69,7 +69,7 @@ const logout = () => {
               :class="['nav-link', { active: currentUrl === '/cards' || currentUrl.startsWith('/cards?') }]">
               <i class="bi bi-collection-fill"></i> Collezione
             </a>
-            <Link href="/collection/value" :class="['nav-link', { active: isActive('/collection') }]">
+            <!-- <Link href="/collection/value" :class="['nav-link', { active: isActive('/collection') }]">
               <i class="bi bi-currency-dollar"></i> Valore
             </Link>
             <Link href="/matching" :class="['nav-link', { active: isActive('/matching') }]">
@@ -77,7 +77,7 @@ const logout = () => {
             </Link>
             <a href="/market-data" :class="['nav-link', { active: isActive('/market-data') }]">
               <i class="bi bi-cloud-upload"></i> Market Data
-            </a>
+            </a> -->
           </div>
 
           <!-- User Dropdown (Desktop) -->

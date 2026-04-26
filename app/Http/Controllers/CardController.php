@@ -148,30 +148,34 @@ class CardController extends Controller
         $marketCard = $card->getRelation('marketCard');
         $inventary = $card->getRelation('inventory')->toArray();
 
-        $marketCard->load(['prices'], function ($query) {
-            $query->orderBy('import_date', 'desc');
-        });
-
-        $valoreComplessivo = 0;
-
-        $prices = $marketCard->getRelation('prices');
         $out = [];
-        array_map(function ($item) use ($prices, &$out, &$valoreComplessivo) {
+        if ($marketCard) {
+            $marketCard->load(['prices'], function ($query) {
+                $query->orderBy('import_date', 'desc');
+            });
 
-            $cardPrices = [];
-            foreach ($prices as $price) {
-                if ($price->printing === $item['rarity_variant']) {
-                    $cardPrices = [
-                        'provider_name' => $price->provider->name ?? 'Unknown',
-                        'market_price' => $price->market_price,
-                        'import_date' => $price->import_date->toDateString(),
-                        'unit' => MarketPrice::UNITS_DIVISA[$price->unit_divisa] ?? $price->unit_divisa,
-                    ];
-                    $out[] = array_merge($item, $cardPrices);
-                    $valoreComplessivo += $item['quantity'] * $price->market_price;
+            $valoreComplessivo = 0;
+
+            $prices = $marketCard->getRelation('prices');
+            array_map(function ($item) use ($prices, &$out, &$valoreComplessivo) {
+
+                $cardPrices = [];
+                foreach ($prices as $price) {
+                    if ($price->printing === $item['rarity_variant']) {
+                        $cardPrices = [
+                            'provider_name' => $price->provider->name ?? 'Unknown',
+                            'market_price' => $price->market_price,
+                            'import_date' => $price->import_date->toDateString(),
+                            'unit' => MarketPrice::UNITS_DIVISA[$price->unit_divisa] ?? $price->unit_divisa,
+                        ];
+                        $out[] = array_merge($item, $cardPrices);
+                        $valoreComplessivo += $item['quantity'] * $price->market_price;
+                    }
                 }
-            }
-        }, $inventary);
+            }, $inventary);
+        }
+
+
 
 
         return response()->json([
