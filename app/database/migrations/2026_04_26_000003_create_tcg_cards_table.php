@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('illustrator')->nullable();
             $table->string('rarity')->nullable();
             $table->json('variants')->nullable();
-            $table->string('dexId')->nullable()->comment('Numero di carta nel mazzo');
+            $table->integer('dexId')->nullable()->comment('Numero di carta nel mazzo');
             $table->json('types')->nullable()->comment('Tipo della carta');
             $table->string('evolve_from')->nullable()->comment('Carta da cui si evolve');
             $table->string('level_stage')->nullable()->comment('Stato di evoluzione');
