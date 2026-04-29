@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('card_id')->constrained('tcg_cards')->cascadeOnDelete();
+            $table->foreignId('set_id')->constrained('tcg_sets')->cascadeOnDelete();
+            $table->foreignId('serie_id')->constrained('tcg_series')->cascadeOnDelete();
             $table->unsignedInteger('quantity')->default(1);
             $table->json('variants')->nullable()->comment('Varianti possedute (normal, holo, reverse, ecc.)');
             $table->string('condition')->default('NM')->comment('Condizione: NM, LP, MP, HP, DMG');

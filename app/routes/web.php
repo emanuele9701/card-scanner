@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CardController;
 use App\Http\Controllers\AuthWebController;
 use App\Http\Controllers\CollezioniController;
 use Illuminate\Support\Facades\Route;
@@ -27,5 +28,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/mie', fn () => view('collezioni.mie'))->name('mie');
         Route::get('/disponibili', [CollezioniController::class, 'disponibili'])->name('disponibili');
         Route::get('/set/{set}', [CollezioniController::class, 'showSet'])->name('set');
+        Route::post('/cards/{card}', [CollezioniController::class, 'addCardToCollection'])
+    ->name('cards.addToCollection');
+
+    });
+
+    Route::middleware('auth')->prefix('api')->group(function () {
+        Route::get('/cards/{card}', [CardController::class, 'show'])->name('card.show');
     });
 });

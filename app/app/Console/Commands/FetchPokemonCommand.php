@@ -21,7 +21,7 @@ class FetchPokemonCommand extends Command
      */
     public function handle()
     {
-        $languages = ['it', 'en'];
+        $languages = ['en','it'];
         foreach ($languages as $language) {
             $this->info("Language: " . $language);
             $tcg = new TCGdex($language);
@@ -113,6 +113,7 @@ class FetchPokemonCommand extends Command
                         TCGCardPrice::createPrices($tcgCard->id, $card->pricing->cardmarket, $language);
                     }
                 }
+                die;
             }
         }
     }

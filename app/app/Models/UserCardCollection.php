@@ -15,6 +15,8 @@ class UserCardCollection extends Model implements HasMedia
 
     protected $fillable = [
         'user_id',
+        'set_id',
+        'serie_id',
         'card_id',
         'quantity',
         'variants',
@@ -77,5 +79,20 @@ class UserCardCollection extends Model implements HasMedia
     public function card()
     {
         return $this->belongsTo(TCGCard::class, 'card_id', 'id');
+    }
+
+    /**
+     * Relazione con il set TCG.
+     */
+    public function set()
+    {
+        return $this->belongsTo(TCGSet::class, 'set_id', 'id');
+    }
+    /**
+     * Relazione con il set TCG.
+     */
+    public function serie()
+    {
+        return $this->belongsTo(TCGSeries::class, 'serie_id', 'id');
     }
 }
