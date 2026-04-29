@@ -4,96 +4,226 @@
 @section('meta_description', 'Accedi al tuo account Card Scanner per gestire la tua collezione.')
 
 @section('content')
-<div class="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
+    <style>
+        .login-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            animation: blob 8s infinite ease-in-out;
+        }
 
-    {{-- Animated background blobs --}}
-    <div class="pointer-events-none absolute inset-0 overflow-hidden">
-        <div class="animate-blob absolute -left-32 -top-32 h-96 w-96 rounded-full bg-red-500/10 blur-3xl"></div>
-        <div class="animate-blob animation-delay-2000 absolute -right-32 top-1/3 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl"></div>
-        <div class="animate-blob animation-delay-4000 absolute -bottom-32 left-1/3 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl"></div>
-    </div>
+        @keyframes blob {
 
-    {{-- Login Card --}}
-    <div class="relative z-10 w-full max-w-md">
+            0%,
+            100% {
+                transform: scale(1) translate(0, 0);
+            }
 
-        {{-- Logo --}}
-        <div class="mb-8 flex flex-col items-center">
-            <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 shadow-2xl shadow-red-500/30">
-                <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="2" y1="12" x2="22" y2="12"/>
-                    <circle cx="12" cy="12" r="3"/>
-                </svg>
+            33% {
+                transform: scale(1.1) translate(20px, -10px);
+            }
+
+            66% {
+                transform: scale(0.95) translate(-15px, 15px);
+            }
+        }
+
+        .animation-delay-2 {
+            animation-delay: 2s;
+        }
+
+        .animation-delay-4 {
+            animation-delay: 4s;
+        }
+
+        .login-card {
+            background-color: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        .login-input {
+            background-color: rgba(255, 255, 255, 0.04) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 0.75rem !important;
+            color: #fff !important;
+            padding: 0.75rem 1rem 0.75rem 2.75rem !important;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .login-input::placeholder {
+            color: #4b5563;
+        }
+
+        .login-input:focus {
+            background-color: rgba(255, 255, 255, 0.06) !important;
+            border-color: rgba(239, 68, 68, 0.4) !important;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+            outline: none;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 0.875rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6b7280;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .btn-login {
+            background: linear-gradient(135deg, #ef4444, #e11d48);
+            border: none;
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
+            transition: all 0.3s;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .btn-login:hover {
+            color: #fff;
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.35);
+            filter: brightness(1.1);
+        }
+
+        .btn-login:active {
+            transform: scale(0.98);
+        }
+
+        .btn-login .shine {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.7s;
+        }
+
+        .btn-login:hover .shine {
+            transform: translateX(100%);
+        }
+
+        .logo-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #ef4444, #e11d48);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+        }
+
+        .error-box {
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 0.75rem;
+        }
+    </style>
+
+    <div class="position-relative d-flex align-items-center justify-content-center overflow-hidden px-3 py-5 min-vh-100">
+
+        {{-- Animated background blobs --}}
+        <div class="position-absolute inset-0 overflow-hidden w-100 h-100" style="pointer-events:none;">
+            <div class="login-blob" style="width:384px;height:384px;background:rgba(239,68,68,0.1);top:-8rem;left:-8rem;">
             </div>
-            <h1 class="text-2xl font-bold tracking-tight text-white">Card Scanner</h1>
-            <p class="mt-1 text-sm text-gray-500">Accedi alla tua collezione</p>
+            <div class="login-blob animation-delay-2"
+                style="width:384px;height:384px;background:rgba(99,102,241,0.1);top:33%;right:-8rem;"></div>
+            <div class="login-blob animation-delay-4"
+                style="width:384px;height:384px;background:rgba(16,185,129,0.1);bottom:-8rem;left:33%;"></div>
         </div>
 
-        {{-- Card --}}
-        <div class="rounded-2xl border border-white/[0.08] bg-gray-900/60 p-8 shadow-2xl shadow-black/40 backdrop-blur-xl">
+        {{-- Login Card --}}
+        <div class="position-relative" style="z-index:10; width:100%; max-width:448px;">
 
-            {{-- Error Messages --}}
-            @if($errors->any())
-                <div id="login-errors" class="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
-                    @foreach($errors->all() as $error)
-                        <p class="text-sm font-medium text-red-400">{{ $error }}</p>
-                    @endforeach
-                </div>
-            @endif
-
-            <form method="POST" action="{{ route('login') }}" id="login-form" class="space-y-5">
-                @csrf
-
-                {{-- Email --}}
-                <div>
-                    <label for="email" class="mb-1.5 block text-sm font-medium text-gray-300">Email</label>
-                    <div class="relative">
-                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                            <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                      d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/>
-                            </svg>
-                        </div>
-                        <input type="email" name="email" id="email" required autocomplete="email" autofocus
-                               value="{{ old('email') }}"
-                               placeholder="nome@esempio.com"
-                               class="block w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white placeholder-gray-600 shadow-sm transition-all duration-200 focus:border-red-500/40 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-red-500/20">
-                    </div>
-                </div>
-
-                {{-- Password --}}
-                <div>
-                    <label for="password" class="mb-1.5 block text-sm font-medium text-gray-300">Password</label>
-                    <div class="relative">
-                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                            <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                            </svg>
-                        </div>
-                        <input type="password" name="password" id="password" required autocomplete="current-password"
-                               placeholder="••••••••"
-                               class="block w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white placeholder-gray-600 shadow-sm transition-all duration-200 focus:border-red-500/40 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-red-500/20">
-                    </div>
-                </div>
-
-                {{-- Submit --}}
-                <button type="submit" id="login-submit"
-                        class="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-red-500 to-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/30 hover:brightness-110 active:scale-[0.98]">
-                    <span class="relative z-10">Accedi</span>
-                    <svg class="relative z-10 h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+            {{-- Logo --}}
+            <div class="d-flex flex-column align-items-center mb-4">
+                <div class="logo-icon mb-3">
+                    <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="2" y1="12" x2="22" y2="12" />
+                        <circle cx="12" cy="12" r="3" />
                     </svg>
-                    {{-- Shine effect --}}
-                    <div class="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full"></div>
-                </button>
-            </form>
-        </div>
+                </div>
+                <h1 class="text-white fw-bold mb-1" style="font-size:1.5rem; letter-spacing:-0.02em;">Card Scanner</h1>
+                <p class="text-secondary mb-0" style="font-size:0.875rem;">Accedi alla tua collezione</p>
+            </div>
 
-        {{-- Footer --}}
-        <p class="mt-6 text-center text-xs text-gray-600">
-            &copy; {{ date('Y') }} Card Scanner — Tutti i diritti riservati
-        </p>
+            {{-- Card --}}
+            <div class="login-card p-4 p-sm-5">
+
+                {{-- Error Messages --}}
+                @if ($errors->any())
+                    <div id="login-errors" class="error-box px-3 py-3 mb-4">
+                        @foreach ($errors->all() as $error)
+                            <p class="mb-0 fw-medium" style="font-size:0.875rem; color:#f87171;">{{ $error }}</p>
+                        @endforeach
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('login') }}" id="login-form">
+                    @csrf
+
+                    {{-- Email --}}
+                    <div class="mb-3">
+                        <label for="email" class="form-label text-light fw-medium"
+                            style="font-size:0.875rem;">Email</label>
+                        <div class="position-relative">
+                            <span class="input-icon">
+                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                                </svg>
+                            </span>
+                            <input type="email" name="email" id="email" required autocomplete="email" autofocus
+                                value="{{ old('email') }}" placeholder="nome@esempio.com" class="form-control login-input">
+                        </div>
+                    </div>
+
+                    {{-- Password --}}
+                    <div class="mb-4">
+                        <label for="password" class="form-label text-light fw-medium"
+                            style="font-size:0.875rem;">Password</label>
+                        <div class="position-relative">
+                            <span class="input-icon">
+                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                            </span>
+                            <input type="password" name="password" id="password" required autocomplete="current-password"
+                                placeholder="••••••••" class="form-control login-input">
+                        </div>
+                    </div>
+
+                    {{-- Submit --}}
+                    <button type="submit" id="login-submit"
+                        class="btn-login w-100 d-flex align-items-center justify-content-center gap-2">
+                        <span class="position-relative" style="z-index:1;">Accedi</span>
+                        <svg class="position-relative" style="z-index:1;" width="16" height="16" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                        <div class="shine"></div>
+                    </button>
+                </form>
+            </div>
+
+            {{-- Footer --}}
+            <p class="text-center mt-4 mb-0" style="font-size:0.75rem; color:#4b5563;">
+                &copy; {{ date('Y') }} Card Scanner — Tutti i diritti riservati
+            </p>
+        </div>
     </div>
-</div>
 @endsection
