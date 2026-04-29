@@ -113,6 +113,7 @@
 </head>
 
 <body class="min-vh-100 d-flex flex-column">
+    @include('partials._card–modal')
 
     {{-- ─── Navbar ─────────────────────────────────────────────────────── --}}
     <nav id="main-navbar" class="navbar sticky-top border-bottom">
@@ -203,7 +204,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script>
         function toggleDropdown() {
             const menu = document.getElementById('dropdown-menu');

@@ -31,17 +31,22 @@
 
         <div class="todo-box d-flex align-items-center justify-content-center p-5">
             <div class="d-flex flex-column align-items-center gap-3 text-center">
-                <div class="todo-icon-wrap">
-                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#818cf8"
-                        stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-white fw-semibold mb-1" style="font-size:1.25rem;">TODO</p>
-                    <p class="text-secondary mb-0" style="font-size:0.875rem;">Le tue collezioni appariranno qui.</p>
-                </div>
+                @empty($collezioni)
+                    <div class="todo-icon-wrap">
+                        <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#818cf8"
+                            stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-white fw-semibold mb-1" style="font-size:1.25rem;">Non hai collezioni salvata</p>
+                    </div>
+                @endempty
+                @if (!empty($collezioni))
+                    @foreach ($collezioni as $collezione)
+                    @endforeach
+                @endif
             </div>
         </div>
 

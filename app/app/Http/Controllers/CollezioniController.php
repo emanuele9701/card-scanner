@@ -10,6 +10,25 @@ use Illuminate\View\View;
 
 class CollezioniController extends Controller
 {
+
+    public function index() {
+        $user = Auth::user();
+
+        $collections = $user->collection;
+        if($collections->count() <= 0) {
+            return view('collezioni.mie',[
+                'collezioni' => []
+            ]);
+        }
+
+        $collections->load('set','serie');
+
+        return view('collezioni.mie',[
+                'collezioni' => $collections
+            ]
+        );
+    }
+
     /**
      * Mostra tutti i set disponibili raggruppati per serie.
      */

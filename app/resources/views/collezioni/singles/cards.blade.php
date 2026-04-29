@@ -85,20 +85,28 @@
         transition: all 0.2s;
     }
 
-    .card-checkbox.unselected {
+    .card-checkbox[data-selected="false"] {
         border-color: rgba(255, 255, 255, 0.2);
         background-color: rgba(5, 20, 36, 0.6);
         opacity: 0;
     }
 
-    .card-item:hover .card-checkbox.unselected {
+    .card-item:hover .card-checkbox[data-selected="false"] {
         opacity: 1;
     }
 
-    .card-checkbox.selected {
+    .card-checkbox[data-selected="true"] {
         border-color: #fbb400;
         background-color: #fbb400;
         opacity: 1;
+    }
+
+    .card-checkmark {
+        display: none;
+    }
+
+    .card-checkbox[data-selected="true"] .card-checkmark {
+        display: block;
     }
 
     .card-image-area {
@@ -255,10 +263,9 @@
 
         {{-- Checkbox (solo se non raccolta) --}}
         @if (!$isCollected)
-            <div @click.stop="toggleSelect({{ $card->id }})"
-                :class="isSelected({{ $card->id }}) ? 'selected' : 'unselected'" class="card-checkbox">
-                <svg x-show="isSelected({{ $card->id }})" width="12" height="12" viewBox="0 0 12 12"
-                    fill="none">
+            <div id="card-cb-{{ $card->id }}" data-selected="false" class="card-checkbox"
+                onclick="event.stopPropagation(); cardToggleSelect({{ $card->id }})">
+                <svg class="card-checkmark" width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M2 6l3 3 5-5" stroke="#422c00" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round" />
                 </svg>
@@ -300,11 +307,12 @@
             {{-- Overlay hover --}}
             <div class="card-hover-overlay">
                 <button class="btn-card-detail"
-                    @click.stop="openModal({{ json_encode(['id' => $card->id, 'name' => $card->name, 'image' => $card->url_image]) }})">
+                    onclick="event.stopPropagation(); openModal({{ json_encode(['id' => $card->id, 'name' => $card->name, 'image' => $card->url_image]) }})">
                     Vedi dettagli
                 </button>
                 @if (!$isCollected)
-                    <button class="btn-card-add" @click.stop="addToCollection([{{ $card->id }}])">
+                    <button class="btn-card-add"
+                        onclick="event.stopPropagation(); addToCollection([{{ $card->id }}])">
                         + Aggiungi
                     </button>
                 @endif
@@ -326,3 +334,17 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function() {
+        if (window.cardToggleSelect) return;
+        window.cardToggleSelect = function(cardId) {
+            var cb = document.getElementById('card-cb-' + cardId);
+            if (!cb) return;
+            var nowSelected = cb.dataset.selected !== 'true';
+            cb.dataset.selected = nowSelected ? 'true' : 'false';
+            // Propaga al gestore globale della pagina se disponibile
+            if (typeof toggleSelect === 'function') toggleSelect(cardId, nowSelected);
+        };
+    })();
+</script>

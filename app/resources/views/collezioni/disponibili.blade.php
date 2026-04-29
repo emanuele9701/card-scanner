@@ -4,6 +4,7 @@
 @section('meta_description', 'Sfoglia tutte le collezioni di carte disponibili, organizzate per serie.')
 
 @section('content')
+
     <style>
         .set-card {
             display: flex;

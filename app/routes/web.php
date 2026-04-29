@@ -25,7 +25,7 @@ Route::middleware('auth')->group(function () {
 
     // Collezioni
     Route::prefix('collezioni')->name('collezioni.')->group(function () {
-        Route::get('/mie', fn () => view('collezioni.mie'))->name('mie');
+        Route::get('/mie', [CollezioniController::class, 'index'])->name('mie');
         Route::get('/disponibili', [CollezioniController::class, 'disponibili'])->name('disponibili');
         Route::get('/set/{set}', [CollezioniController::class, 'showSet'])->name('set');
         Route::post('/cards/{card}', [CollezioniController::class, 'addCardToCollection'])
