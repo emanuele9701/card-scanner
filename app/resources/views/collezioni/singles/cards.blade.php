@@ -1,4 +1,4 @@
-@php
+﻿@php
     $isCollected = $card->isCollected ?? false;
 
     $rarityConfig = match (strtolower($card->rarity ?? '')) {
@@ -31,32 +31,24 @@
 
 <style>
     .card-item {
-        width: 144px;
+        width: 100%;
         position: relative;
         display: flex;
         flex-direction: column;
         overflow: hidden;
         border-radius: 1.5rem;
         cursor: pointer;
-        aspect-ratio: 2.5/4;
-        background: linear-gradient(135deg, #1c2b3c, #122131);
+        aspect-ratio: 1.05 / 1.35;
+        max-height: 380px;
+        background: linear-gradient(135deg, #142135 0%, #0b1522 100%);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        transition: all 0.3s ease-out;
+        transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
     }
 
     .card-item:hover {
         transform: translateY(-6px) scale(1.02);
-        box-shadow: 0 0 28px rgba(251, 180, 0, 0.25), 0 12px 40px rgba(0, 0, 0, 0.55);
-        border-color: rgba(255, 255, 255, 0.14);
-    }
-
-    .card-item:hover .card-hover-overlay {
-        opacity: 1;
-    }
-
-    .card-item:hover .card-symbol-img {
-        opacity: 1;
-        transform: scale(1.1);
+        box-shadow: 0 28px 60px rgba(0, 0, 0, 0.28), 0 6px 22px rgba(36, 56, 86, 0.28);
+        border-color: rgba(255, 255, 255, 0.16);
     }
 
     .card-glass-highlight {
@@ -65,44 +57,42 @@
         inset: 0;
         z-index: 10;
         border-radius: 1.5rem;
-        background: linear-gradient(135deg, rgba(255, 179, 177, 0.04), transparent);
+        background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 28%);
     }
 
     .card-checkbox {
         position: absolute;
-        left: 10px;
-        top: 10px;
+        left: 12px;
+        top: 12px;
         z-index: 30;
-        width: 24px;
-        height: 24px;
-        cursor: pointer;
+        width: 26px;
+        height: 26px;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 6px;
-        border: 1px solid;
-        backdrop-filter: blur(8px);
-        transition: all 0.2s;
-    }
-
-    .card-checkbox[data-selected="false"] {
-        border-color: rgba(255, 255, 255, 0.2);
-        background-color: rgba(5, 20, 36, 0.6);
+        border-radius: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background-color: rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(10px);
         opacity: 0;
+        transition: opacity 0.25s ease, transform 0.25s ease;
     }
 
-    .card-item:hover .card-checkbox[data-selected="false"] {
+    .card-item:hover .card-checkbox {
         opacity: 1;
+        transform: translateY(-1px);
     }
 
     .card-checkbox[data-selected="true"] {
         border-color: #fbb400;
-        background-color: #fbb400;
+        background-color: rgba(251, 180, 0, 0.22);
         opacity: 1;
     }
 
     .card-checkmark {
         display: none;
+        width: 14px;
+        height: 14px;
     }
 
     .card-checkbox[data-selected="true"] .card-checkmark {
@@ -111,49 +101,58 @@
 
     .card-image-area {
         position: relative;
-        min-height: 160px;
+        min-height: 140px;
         flex: 1;
         overflow: hidden;
-        background: linear-gradient(to bottom, #0d1c2d, #1c2b3c);
-    }
-
-    .card-symbol-img {
-        width: 300px;
-        object-fit: cover;
-        opacity: 0.65;
-        transition: opacity 0.3s, transform 0.3s;
-    }
-
-    .card-number-badge {
-        position: absolute;
-        left: 10px;
-        top: 10px;
-        z-index: 20;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        background-color: rgba(5, 20, 36, 0.7);
-        padding: 2px 6px;
-        font-family: monospace;
-        font-size: 10px;
-        letter-spacing: 0.1em;
-        color: rgba(212, 228, 250, 0.5);
-        backdrop-filter: blur(8px);
-    }
-
-    .card-collected-badge {
-        position: absolute;
-        right: 10px;
-        top: 10px;
-        z-index: 20;
-        width: 24px;
-        height: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 50%;
-        border: 1px solid rgba(251, 180, 0, 0.4);
-        background-color: rgba(251, 180, 0, 0.12);
-        backdrop-filter: blur(8px);
+        background: linear-gradient(180deg, rgba(15, 28, 47, 0.9) 0%, rgba(6, 15, 28, 0.98) 100%);
+    }
+
+    .card-symbol-img {
+        width: 100%;
+        height: auto;
+        max-height: 240px;
+        object-fit: contain;
+        opacity: 0.95;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .card-item:hover .card-symbol-img {
+        transform: scale(1.05);
+        opacity: 1;
+    }
+
+    .card-number-badge,
+    .card-collected-badge {
+        position: absolute;
+        z-index: 20;
+        border-radius: 0.85rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: rgba(5, 20, 36, 0.72);
+        padding: 4px 8px;
+        font-size: 10px;
+        color: rgba(212, 228, 250, 0.8);
+        backdrop-filter: blur(10px);
+    }
+
+    .card-number-badge {
+        left: 12px;
+        top: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+        letter-spacing: 0.12em;
+    }
+
+    .card-collected-badge {
+        right: 12px;
+        top: 12px;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        display: grid;
+        place-items: center;
+        background-color: rgba(251, 180, 0, 0.18);
     }
 
     .card-hover-overlay {
@@ -164,104 +163,121 @@
         flex-direction: column;
         align-items: center;
         justify-content: flex-end;
-        gap: 8px;
-        background: linear-gradient(to top, rgba(5, 20, 36, 0.9) 0%, rgba(5, 20, 36, 0.4) 50%, transparent 100%);
-        padding: 12px;
+        padding: 16px;
+        gap: 10px;
+        background: linear-gradient(180deg, transparent 45%, rgba(5, 20, 36, 0.84) 100%);
         opacity: 0;
-        transition: opacity 0.3s;
+        transition: opacity 0.25s ease;
+    }
+
+    .card-item:hover .card-hover-overlay {
+        opacity: 1;
+    }
+
+    .btn-card-detail,
+    .btn-card-add {
+        width: 100%;
+        border-radius: 0.95rem;
+        padding: 10px 0;
+        font-size: 0.77rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        border: 1px solid transparent;
+        cursor: pointer;
     }
 
     .btn-card-detail {
-        width: 100%;
-        border-radius: 0.75rem;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background-color: rgba(255, 255, 255, 0.1);
-        padding: 8px 0;
-        font-size: 0.75rem;
-        font-weight: 600;
         color: #d4e4fa;
-        backdrop-filter: blur(8px);
-        cursor: pointer;
-        transition: background-color 0.2s;
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.12);
     }
 
     .btn-card-detail:hover {
-        background-color: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.14);
     }
 
     .btn-card-add {
-        width: 100%;
-        border-radius: 0.75rem;
-        background-color: #fbb400;
-        padding: 8px 0;
-        font-size: 0.75rem;
-        font-weight: 700;
-        color: #422c00;
-        border: none;
-        cursor: pointer;
-        transition: background-color 0.2s;
+        background: #fbb400;
+        color: #1b1100;
+        border-color: rgba(255, 255, 255, 0.08);
+        position: relative;
+        overflow: hidden;
     }
 
     .btn-card-add:hover {
-        background-color: #ffd795;
+        background: #ffd795;
+    }
+
+    .btn-card-add.loading {
+        pointer-events: none;
+        opacity: 0.75;
+    }
+
+    .btn-card-loader {
+        display: inline-block;
+        font-size: 0.8rem;
+        line-height: 1;
+        margin-left: 0.5rem;
+    }
+
+    .btn-card-loader.visually-hidden {
+        display: none;
     }
 
     .card-footer-area {
         position: relative;
         z-index: 20;
         border-top: 1px solid rgba(255, 255, 255, 0.06);
-        background-color: rgba(5, 20, 36, 0.85);
-        padding: 12px 14px;
+        background-color: rgba(5, 20, 36, 0.86);
+        padding: 16px 14px;
         backdrop-filter: blur(16px);
     }
 
     .card-name {
-        font-size: 13px;
+        font-size: 0.95rem;
         font-weight: 700;
-        color: #d4e4fa;
-        white-space: nowrap;
+        color: #edf2ff;
+        margin-bottom: 0.6rem;
+        line-height: 1.3;
         overflow: hidden;
         text-overflow: ellipsis;
-        margin-bottom: 6px;
-        line-height: 1.3;
+        white-space: nowrap;
     }
 
     .card-rarity-chip {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: 0.35rem;
         border-radius: 9999px;
-        padding: 2px 8px;
-        font-size: 10px;
-        font-weight: 600;
+        padding: 0.35rem 0.7rem;
+        font-size: 0.67rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(12px);
     }
 
     .card-rarity-dot {
         width: 6px;
         height: 6px;
+        border-radius: 9999px;
         flex-shrink: 0;
-        border-radius: 50%;
     }
 
     .card-type-label {
-        font-size: 10px;
-        font-weight: 600;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: rgba(212, 228, 250, 0.35);
+        color: rgba(212, 228, 250, 0.72);
     }
 </style>
 
 <div class="col">
     <div data-card-id="{{ $card->id }}" class="card-item">
-
-        {{-- Glass highlight --}}
         <div class="card-glass-highlight"></div>
 
-        {{-- Checkbox (solo se non raccolta) --}}
         @if (!$isCollected)
             <div id="card-cb-{{ $card->id }}" data-selected="false" class="card-checkbox"
                 onclick="event.stopPropagation(); cardToggleSelect({{ $card->id }})">
@@ -272,9 +288,7 @@
             </div>
         @endif
 
-        {{-- Area immagine --}}
         <div class="card-image-area">
-
             @if ($card->url_image)
                 <img src="{{ $card->url_image }}/low.png" alt="{{ $card->name }}" class="card-symbol-img"
                     loading="lazy">
@@ -289,12 +303,10 @@
                 </div>
             @endif
 
-            {{-- Badge numero --}}
             <div class="card-number-badge">
                 #{{ str_pad($card->dexId, 3, '0', STR_PAD_LEFT) }}
             </div>
 
-            {{-- Badge raccolta --}}
             @if ($isCollected)
                 <div class="card-collected-badge">
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -304,25 +316,22 @@
                 </div>
             @endif
 
-            {{-- Overlay hover --}}
             <div class="card-hover-overlay">
-                <button class="btn-card-detail"
-                    onclick="event.stopPropagation(); openModal({{ json_encode(['id' => $card->id, 'name' => $card->name, 'image' => $card->url_image]) }})">
+                <button type="button" class="btn-card-detail d-inline-flex justify-content-center align-items-center text-decoration-none" onclick="event.stopPropagation(); openModal({{ json_encode(['id' => $card->id, 'name' => $card->name, 'image' => $card->url_image]) }})">
                     Vedi dettagli
                 </button>
                 @if (!$isCollected)
-                    <button class="btn-card-add"
-                        onclick="event.stopPropagation(); addToCollection([{{ $card->id }}])">
-                        + Aggiungi
+                    <button type="button" class="btn-card-add w-100" onclick="event.stopPropagation(); addToCollection(this, {{ $card->id }})">
+                        <span class="btn-card-add-text">+ Aggiungi</span>
+                        <span class="btn-card-loader visually-hidden">Caricamento...</span>
                     </button>
                 @endif
             </div>
         </div>
 
-        {{-- Footer --}}
         <div class="card-footer-area">
             <p class="card-name">{{ $card->name }}</p>
-            <div class="d-flex align-items-center justify-content-between gap-1">
+            <div class="d-flex align-items-center justify-content-between gap-1 mb-2">
                 <span class="card-rarity-chip" style="{{ $rarityConfig['chip_style'] }}">
                     <span class="card-rarity-dot" style="{{ $rarityConfig['dot_style'] }}"></span>
                     {{ $rarityConfig['label'] }}
@@ -331,6 +340,11 @@
                     <span class="card-type-label">{{ $card->type }}</span>
                 @endif
             </div>
+            <div style="display:flex; justify-content:space-between; gap:10px; font-size:12px; color:#8c909f;">
+                <span>{{ $card->evolve_from ? 'Evolve da ' . $card->evolve_from : 'Base' }}</span>
+                <span>€ {{ number_format(optional($card->prices->sortByDesc('updated_at')->first())->avg ?? 0, 2, ',', '.') }}</span>
+            </div>
+            <div style="margin-top:10px; font-size:11px; color:#8c909f;">Illus. {{ $card->illustrator ?? '—' }}</div>
         </div>
     </div>
 </div>
@@ -343,7 +357,6 @@
             if (!cb) return;
             var nowSelected = cb.dataset.selected !== 'true';
             cb.dataset.selected = nowSelected ? 'true' : 'false';
-            // Propaga al gestore globale della pagina se disponibile
             if (typeof toggleSelect === 'function') toggleSelect(cardId, nowSelected);
         };
     })();

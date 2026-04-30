@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\UserSetting;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
@@ -37,5 +38,40 @@ class User extends Authenticatable
     public function collection()
     {
         return $this->hasMany(UserCardCollection::class, 'user_id', 'id');
+    }
+
+    /**
+     * Impostazioni dell'utente.
+     */
+    public function settings()
+    {
+        return $this->hasMany(UserSetting::class, 'user_id', 'id');
+    }
+
+    /**
+     * Restituisce il valore di una specifica impostazione.
+     */
+    public function getSetting(string $key, $default = null)
+    {
+        return $this->settings()->where('key', $key)->value('value') ?? $default;
+    }
+
+    /**
+     * Salva un'impostazione dell'utente.
+     */
+    public function setSetting(string $key, string $value)
+    {
+        return $this->settings()->updateOrCreate(
+            ['user_id' => $this->id, 'key' => $key],
+            ['value' => $value]
+        );
+    }
+
+    /**
+     * Lingua preferita dell'utente.
+     */
+    public function getLanguageAttribute(): string
+    {
+        return $this->getSetting('language', config('app.locale'));
     }
 }

@@ -16,6 +16,8 @@ class UserCardCollectionController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $language = $request->input('language', $request->user()?->language ?? app()->getLocale());
+
         $query = UserCardCollection::where('user_id', $request->user()->id)
             ->with(['card.set', 'media']);
 
@@ -31,10 +33,10 @@ class UserCardCollectionController extends Controller
             $query->where('condition', $request->input('condition'));
         }
 
-        // Filtro per lingua della carta
-        if ($request->has('language')) {
-            $query->whereHas('card', function ($q) use ($request) {
-                $q->where('language', $request->input('language'));
+        // Filtro per lingua della carta.
+        if ($language) {
+            $query->whereHas('card', function ($q) use ($language) {
+                $q->where('language', $language);
             });
         }
 

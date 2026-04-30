@@ -113,6 +113,7 @@ class FetchPokemonCommand extends Command
                         TCGCardPrice::createPrices($tcgCard->id, $card->pricing->cardmarket, $language);
                     }
                 }
+                die;
             }
         }
     }

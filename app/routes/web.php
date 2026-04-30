@@ -3,6 +3,7 @@
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\AuthWebController;
 use App\Http\Controllers\CollezioniController;
+use App\Http\Controllers\UserSettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,11 +30,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/disponibili', [CollezioniController::class, 'disponibili'])->name('disponibili');
         Route::get('/set/{set}', [CollezioniController::class, 'showSet'])->name('set');
         Route::post('/cards/{card}', [CollezioniController::class, 'addCardToCollection'])
-    ->name('cards.addToCollection');
-
+            ->name('cards.addToCollection');
     });
 
-    Route::middleware('auth')->prefix('api')->group(function () {
-        Route::get('/cards/{card}', [CardController::class, 'show'])->name('card.show');
+    Route::prefix('cards')->name('cards.')->group(function () {
+        Route::get('/search', [CardController::class, 'search'])->name('search');
+        Route::get('/{card}', [CardController::class, 'show'])->name('show');
     });
+
+    // Impostazioni utente
+    Route::get('/settings', [UserSettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings', [UserSettingsController::class, 'update'])->name('settings.update');
 });
