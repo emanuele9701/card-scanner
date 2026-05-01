@@ -159,90 +159,66 @@
     <div class="container py-5" style="max-width: 1280px;">
 
         {{-- Page Header --}}
-        <div class="mb-5">
-            <h1 class="text-white fw-bold mb-1" style="font-size:1.875rem; letter-spacing:-0.02em;">Collezioni disponibili
-            </h1>
-            <p class="text-secondary mb-0" style="font-size:0.875rem;">Esplora tutti i set organizzati per serie</p>
+        @php
+            $hasActiveFilters = request()->filled('search') || request()->filled('year') || (request()->has('sort') && request('sort') !== 'desc');
+        @endphp
+
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <h1 class="text-white fw-bold mb-1" style="font-size:1.875rem; letter-spacing:-0.02em;">Collezioni disponibili</h1>
+                <p class="text-secondary mb-0" style="font-size:0.875rem;">Esplora tutti i set di carte</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-outline-light {{ $hasActiveFilters ? '' : 'collapsed' }}" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#filterDrawer" aria-expanded="{{ $hasActiveFilters ? 'true' : 'false' }}" aria-controls="filterDrawer">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="bi bi-funnel me-1" viewBox="0 0 16 16">
+                        <path
+                            d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .4.8l-4.5 6.5V13.5a.5.5 0 0 1-.8.4L7 10.7l-2.1 3.2a.5.5 0 0 1-.8-.4V8.8L1.6 1.8A.5.5 0 0 1 1.5 1.5z" />
+                    </svg>
+                    Filtri
+                </button>
+            </div>
         </div>
 
-        @forelse ($series as $serie)
-            {{-- Serie Section --}}
-            <section class="mb-5" id="serie-{{ $serie->id }}">
+        {{-- Filter Drawer --}}
+        <div class="collapse mb-4 {{ $hasActiveFilters ? 'show' : '' }}" id="filterDrawer">
+            <div class="card card-body filter-card border" style="background: rgba(12, 19, 33, 0.96); border-color: rgba(255, 255, 255, 0.08);">
+                <form id="filter-form" method="GET" action="{{ route('collezioni.disponibili') }}">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label for="search" class="form-label text-secondary small text-uppercase">Nome set</label>
+                            <input id="search" name="search" type="text"
+                                class="form-control bg-dark text-white border-secondary" value="{{ request('search') }}"
+                                placeholder="Cerca nome set..." />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="year" class="form-label text-secondary small text-uppercase">Anno</label>
+                            <select id="year" name="year" class="form-select bg-dark text-white border-secondary">
+                                <option value="">Tutti gli anni</option>
+                                @foreach ($years as $y)
+                                    <option value="{{ $y }}" @selected(request('year') == $y)>{{ $y }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="sort" class="form-label text-secondary small text-uppercase">Ordina</label>
+                            <select id="sort" name="sort" class="form-select bg-dark text-white border-secondary">
+                                <option value="desc" @selected(request('sort', 'desc') === 'desc')>Anno decrescente</option>
+                                <option value="asc" @selected(request('sort') === 'asc')>Anno crescente</option>
+                            </select>
+                        </div>
+                        <div class="col-12 d-flex justify-content-between align-items-center gap-2 mt-3">
+                            <button type="submit" class="btn btn-primary px-4 fw-bold">Applica</button>
+                            <a href="{{ route('collezioni.disponibili') }}" class="btn btn-outline-secondary">Reset</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
 
-                {{-- Serie Header --}}
-                <div class="d-flex align-items-center gap-3 mb-4 mt-3">
-                    @if ($serie->logo)
-                        <img src="{{ $serie->logo }}.png" alt="{{ $serie->name }}" class="serie-logo">
-                    @endif
-                    <h2 class="text-white fw-bold mb-0" style="font-size:1.25rem;">{{ $serie->name }}</h2>
-                    <span class="serie-badge">{{ $serie->sets->count() }} set</span>
-                </div>
-
-                {{-- Sets Grid --}}
-                <div class="sets-grid">
-                    @foreach ($serie->sets as $set)
-                        <a href="{{ route('collezioni.set', $set) }}" id="set-card-{{ $set->id }}" class="set-card">
-
-                            {{-- Left — Symbol Panel --}}
-                            <div class="set-symbol-panel">
-                                @if ($set->symbol)
-                                    <img src="{{ $set->symbol }}.png" alt="{{ $set->name }}" class="set-symbol-img">
-                                @else
-                                    <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#4b5563"
-                                        stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                                    </svg>
-                                @endif
-                            </div>
-
-                            {{-- Right — Info --}}
-                            <div class="set-info">
-                                <div style="min-width:0;">
-                                    <p class="set-name">{{ $set->name }}</p>
-
-                                    <p class="set-meta">
-                                        @if ($set->card_total)
-                                            <span class="d-inline-flex align-items-center gap-1">
-                                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24"
-                                                    stroke="currentColor" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                                </svg>
-                                                {{ $set->card_total }} carte
-                                            </span>
-                                        @endif
-                                        @if ($set->card_official)
-                                            <span style="color:#374151;">·</span>
-                                            <span>{{ $set->card_official }} ufficiali</span>
-                                        @endif
-                                    </p>
-
-                                    @if ($set->release_date)
-                                        <p class="set-meta-date">
-                                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                            {{ $set->release_date->translatedFormat('d M Y') }}
-                                        </p>
-                                    @endif
-                                </div>
-
-                                {{-- Arrow --}}
-                                <svg class="set-arrow" width="16" height="16" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </div>
-                        </a>
-                    @endforeach
-                </div>
-            </section>
-
-        @empty
-            {{-- Empty State --}}
+        {{-- Sets Grid --}}
+        @if ($sets->isEmpty())
             <div class="empty-box d-flex align-items-center justify-content-center p-5">
                 <div class="d-flex flex-column align-items-center gap-3 text-center">
                     <div class="empty-icon-wrap">
@@ -253,13 +229,75 @@
                         </svg>
                     </div>
                     <div>
-                        <p class="text-white fw-semibold mb-1" style="font-size:1.25rem;">Nessuna collezione disponibile</p>
-                        <p class="text-secondary mb-0" style="font-size:0.875rem;">I set verranno visualizzati qui una volta
-                            importati.</p>
+                        <p class="text-white fw-semibold mb-1" style="font-size:1.25rem;">Nessuna collezione trovata</p>
+                        <p class="text-secondary mb-0" style="font-size:0.875rem;">Prova a modificare i filtri di ricerca.</p>
                     </div>
                 </div>
             </div>
-        @endforelse
+        @else
+            <div class="sets-grid">
+                @foreach ($sets as $set)
+                    <a href="{{ route('collezioni.set', $set) }}" id="set-card-{{ $set->id }}" class="set-card">
+                        {{-- Left — Symbol Panel --}}
+                        <div class="set-symbol-panel">
+                            @if ($set->symbol)
+                                <img src="{{ $set->symbol }}.png" alt="{{ $set->name }}" class="set-symbol-img">
+                            @else
+                                <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#4b5563"
+                                    stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                                </svg>
+                            @endif
+                        </div>
 
+                        {{-- Right — Info --}}
+                        <div class="set-info">
+                            <div style="min-width:0;">
+                                <p class="set-name">{{ $set->name }}</p>
+                                
+                                @if($set->serie)
+                                    <div class="serie-badge mt-1 d-inline-block">{{ $set->serie->name }}</div>
+                                @endif
+
+                                <p class="set-meta mt-1">
+                                    @if ($set->card_total)
+                                        <span class="d-inline-flex align-items-center gap-1">
+                                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                            </svg>
+                                            {{ $set->card_total }} carte
+                                        </span>
+                                    @endif
+                                </p>
+
+                                @if ($set->release_date)
+                                    <p class="set-meta-date">
+                                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        {{ $set->release_date->translatedFormat('d M Y') }}
+                                    </p>
+                                @endif
+                            </div>
+
+                            {{-- Arrow --}}
+                            <svg class="set-arrow" width="16" height="16" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+
+            <div class="mt-4 d-flex justify-content-center">
+                {{ $sets->links('pagination::bootstrap-5') }}
+            </div>
+        @endif
     </div>
 @endsection

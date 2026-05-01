@@ -19,6 +19,11 @@
             font-family: 'Inter', sans-serif;
         }
 
+        /* Fix Tailwind CSS conflict with Bootstrap's collapse */
+        .collapse.show {
+            visibility: visible !important;
+        }
+
         /* Navbar */
         #main-navbar {
             background-color: rgba(3, 7, 18, 0.8) !important;
@@ -114,6 +119,7 @@
 
 <body class="min-vh-100 d-flex flex-column">
     @include('partials._card–modal')
+    @include('partials._manage-collection-modal')
 
     {{-- ─── Navbar ─────────────────────────────────────────────────────── --}}
     <nav id="main-navbar" class="navbar sticky-top border-bottom">

@@ -12,8 +12,8 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use TCGdex\TCGdex;
 
-#[Signature('app:fetch-pokemon-command')]
-#[Description('Command description')]
+#[Signature('app:fetch-pokemon')]
+#[Description('Aggiorna database carte Pokemon')]
 class FetchPokemonCommand extends Command
 {
     /**
@@ -21,7 +21,7 @@ class FetchPokemonCommand extends Command
      */
     public function handle()
     {
-        $languages = ['en','it'];
+        $languages = ['it','en'];
         foreach ($languages as $language) {
             $this->info("Language: " . $language);
             $tcg = new TCGdex($language);

@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 @section('title', $set->name)
 @section('meta_description', 'Dettaglio del set ' . $set->name)
 
@@ -48,6 +48,10 @@
     </style>
 
     <main class="set-detail-shell">
+        @php
+            $hasActiveFilters = request()->filled('search') || request()->filled('type') || request()->filled('stage') || (request()->has('sort') && request('sort') !== 'dex_asc') || (request()->has('per_page') && request('per_page') != 10);
+        @endphp
+
         <div class="container">
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb bg-transparent p-0 mb-0">
@@ -65,7 +69,7 @@
                     <p class="text-secondary mb-0">Serie {{ $set->serie?->name ?? 'Senza serie' }} • {{ $cards->total() }} carte</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#filterDrawer" aria-expanded="false" aria-controls="filterDrawer">
+                    <button class="btn btn-outline-light {{ $hasActiveFilters ? '' : 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#filterDrawer" aria-expanded="{{ $hasActiveFilters ? 'true' : 'false' }}" aria-controls="filterDrawer">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-funnel" viewBox="0 0 16 16">
                             <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .4.8l-4.5 6.5V13.5a.5.5 0 0 1-.8.4L7 10.7l-2.1 3.2a.5.5 0 0 1-.8-.4V8.8L1.6 1.8A.5.5 0 0 1 1.5 1.5z"/>
                         </svg>
@@ -81,7 +85,7 @@
                 </div>
             </div>
 
-            <div class="collapse mb-4" id="filterDrawer">
+            <div class="collapse mb-4 {{ $hasActiveFilters ? 'show' : '' }}" id="filterDrawer">
                 <div class="card card-body filter-card border">
                     <form id="filter-form" method="GET" action="{{ route('collezioni.set', ['set' => $set->id]) }}">
                         <input type="hidden" name="page" value="1" id="filter-page" />
