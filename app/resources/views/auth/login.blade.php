@@ -1,7 +1,7 @@
 @extends('layouts.guest')
 
-@section('title', 'Accedi')
-@section('meta_description', 'Accedi al tuo account Card Scanner per gestire la tua collezione.')
+@section('title', __('Accedi'))
+@section('meta_description', __('Accedi al tuo account Card Scanner per gestire la tua collezione.'))
 
 @section('content')
     <style>
@@ -155,7 +155,7 @@
                     </svg>
                 </div>
                 <h1 class="text-white fw-bold mb-1" style="font-size:1.5rem; letter-spacing:-0.02em;">Card Scanner</h1>
-                <p class="text-secondary mb-0" style="font-size:0.875rem;">Accedi alla tua collezione</p>
+                <p class="text-secondary mb-0" style="font-size:0.875rem;">{{ __('Accedi alla tua collezione') }}</p>
             </div>
 
             {{-- Card --}}
@@ -176,7 +176,7 @@
                     {{-- Email --}}
                     <div class="mb-3">
                         <label for="email" class="form-label text-light fw-medium"
-                            style="font-size:0.875rem;">Email</label>
+                            style="font-size:0.875rem;">{{ __('Email') }}</label>
                         <div class="position-relative">
                             <span class="input-icon">
                                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -193,7 +193,7 @@
                     {{-- Password --}}
                     <div class="mb-4">
                         <label for="password" class="form-label text-light fw-medium"
-                            style="font-size:0.875rem;">Password</label>
+                            style="font-size:0.875rem;">{{ __('Password') }}</label>
                         <div class="position-relative">
                             <span class="input-icon">
                                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -210,7 +210,7 @@
                     {{-- Submit --}}
                     <button type="submit" id="login-submit"
                         class="btn-login w-100 d-flex align-items-center justify-content-center gap-2">
-                        <span class="position-relative" style="z-index:1;">Accedi</span>
+                        <span class="position-relative" style="z-index:1;">{{ __('Accedi') }}</span>
                         <svg class="position-relative" style="z-index:1;" width="16" height="16" fill="none"
                             viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -222,7 +222,7 @@
 
             {{-- Footer --}}
             <p class="text-center mt-4 mb-0" style="font-size:0.75rem; color:#4b5563;">
-                &copy; {{ date('Y') }} Card Scanner — Tutti i diritti riservati
+                &copy; {{ date('Y') }} Card Scanner — {{ __('Tutti i diritti riservati') }}
             </p>
         </div>
     </div>

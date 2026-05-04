@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Card Scanner') — Card Scanner</title>
-    <meta name="description" content="@yield('meta_description', 'Gestisci la tua collezione di carte collezionabili.')">
+    <meta name="description" content="@yield('meta_description', __('Gestisci la tua collezione di carte collezionabili.'))">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
@@ -153,7 +153,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" />
                         </svg>
-                        Dashboard
+                        {{ __('Dashboard') }}
                     </a>
 
                     {{-- Collezioni Dropdown --}}
@@ -166,7 +166,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                             </svg>
-                            Collezioni
+                            {{ __('Collezioni') }}
                             <svg class="dropdown-chevron" id="dropdown-chevron" width="12" height="12"
                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
@@ -184,7 +184,7 @@
                                             d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                                     </svg>
                                 </div>
-                                Le mie collezioni
+                                {{ __('Le mie collezioni') }}
                             </a>
                             <a href="{{ route('collezioni.disponibili') }}" class="nav-dropdown-item">
                                 <div class="nav-dropdown-icon" style="background-color: rgba(16,185,129,0.1);">
@@ -194,7 +194,7 @@
                                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                     </svg>
                                 </div>
-                                Collezioni disponibili
+                                {{ __('Collezioni disponibili') }}
                             </a>
                         </div>
                     </div>
@@ -207,7 +207,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 008.5 4.6 1.65 1.65 0 0010 3.09V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 8.5a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
                         </svg>
-                        Impostazioni
+                        {{ __('Impostazioni') }}
                     </a>
 
                 </div>
@@ -239,6 +239,25 @@
                 chevron.classList.remove('rotated');
             }
         });
+    </script>
+
+    <script>
+        window.__trans = {
+            loading: @json(__('Caricamento...')),
+            sending: @json(__('Invio...')),
+            added: @json(__('Aggiunta!')),
+            error: @json(__('Errore')),
+            add: @json(__('Aggiungi')),
+            remove: @json(__('Rimuovi')),
+            no_abilities: @json(__('Nessuna abilità')),
+            no_price: @json(__('Nessun prezzo disponibile')),
+            no_copies: @json(__('Nessuna copia in collezione.')),
+            confirm_remove_copy: @json(__('Vuoi rimuovere questa copia?')),
+            confirm_remove_card: @json(__('Vuoi rimuovere completamente questa carta dalla tua collezione?')),
+            confirm_remove_mass: @json(__('Vuoi rimuovere :count carte dalla tua collezione?')),
+            save_error: @json(__('Errore durante il salvataggio.')),
+            add_error: @json(__('Errore durante l\'aggiunta'))
+        };
     </script>
 </body>
 

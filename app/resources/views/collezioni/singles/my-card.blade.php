@@ -31,7 +31,6 @@
     $totalValue = 0;
     $totalQty = 0;
     $conditions = [];
-    $allVariants = [];
     
     foreach($card->collectors as $copy) {
         $totalQty += $copy->quantity;
@@ -41,9 +40,6 @@
         
         $isHolo = false;
         if (is_array($copy->variants) && count($copy->variants) > 0) {
-            foreach($copy->variants as $v) {
-                if(!in_array($v, $allVariants)) $allVariants[] = $v;
-            }
             $isHolo = in_array('holo', array_map('strtolower', $copy->variants)) || in_array('reverse', array_map('strtolower', $copy->variants));
         }
         
@@ -52,7 +48,44 @@
     }
     
     $conditionsText = implode(', ', $conditions);
-    $variantsText = implode(', ', $allVariants);
+    
+    // Compute Variant Badges
+    $variantBadges = [];
+    $vMap = [
+        'reverse' => ['R', 'bg-info text-dark'],
+        'holo' => ['H', 'bg-warning text-dark'],
+        'firstedition' => ['1°', 'bg-danger text-white'],
+        'normal' => ['N', 'bg-secondary text-white']
+    ];
+    
+    $isMissingTab = ($tab ?? 'owned') === 'missing';
+    $isDoppieTab = ($tab ?? 'owned') === 'doppie';
+
+    $listToMap = [];
+    if ($isMissingTab) {
+        $listToMap = $card->missing_variants ?? [];
+    } elseif ($isDoppieTab) {
+        $listToMap = array_keys($card->doppie_variants ?? []);
+    } else {
+        $listToMap = $card->owned_variants ?? [];
+    }
+    
+    if(empty($listToMap)) $listToMap = ['normal'];
+    
+    foreach($listToMap as $v) {
+        $vLow = strtolower(str_replace(' ', '', $v));
+        $extraInfo = '';
+        if ($isDoppieTab && isset($card->doppie_variants[$vLow])) {
+            $extraInfo = '<span class="ms-1 fw-bold" style="font-size: 0.5rem; opacity: 0.9;">x' . $card->doppie_variants[$vLow] . '</span>';
+        }
+        
+        if (isset($vMap[$vLow])) {
+            $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center ' . $vMap[$vLow][1] . '" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>' . $vMap[$vLow][0] . '</span>' . $extraInfo . '</span>';
+        } else {
+            $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center bg-light text-dark" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>'.strtoupper(substr($v, 0, 1)).'</span>' . $extraInfo . '</span>';
+        }
+    }
+    $variantsHtml = implode(' ', $variantBadges);
 @endphp
 
 <style>
@@ -296,22 +329,33 @@
                 #{{ str_pad($card->dexId, 3, '0', STR_PAD_LEFT) }}
             </div>
 
-            <div class="card-qty-badge">
-                x{{ $totalQty }}
-            </div>
+            @if(!$isMissingTab && $totalQty > 0)
+                <div class="card-qty-badge">
+                    x{{ $totalQty }}
+                </div>
+            @endif
 
             <div class="card-hover-overlay">
-                <button type="button" class="btn-card-manage d-inline-flex justify-content-center align-items-center text-decoration-none mb-2" onclick="event.stopPropagation(); openManageModal({{ $card->id }}, '{{ addslashes($card->name) }}')">
-                    Gestisci Copie
-                </button>
-                <div class="d-flex gap-2 w-100">
-                    <button type="button" class="btn-card-detail flex-grow-1 d-inline-flex justify-content-center align-items-center text-decoration-none" onclick="event.stopPropagation(); openModal({{ json_encode(['id' => $card->id, 'name' => $card->name, 'image' => $card->url_image]) }})">
-                        Dettagli
+                @if($isMissingTab)
+                    <button type="button" class="btn-card-manage d-inline-flex justify-content-center align-items-center text-decoration-none mb-2" onclick="event.stopPropagation(); openManageModal({{ $card->id }}, '{{ addslashes($card->name) }}')">
+                        {{ __('+ Aggiungi') }}
                     </button>
-                    <button type="button" title="Rimuovi tutta la carta" class="btn-card-detail flex-shrink-0 d-inline-flex justify-content-center align-items-center text-danger" style="width: 42px; padding: 0; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.25);" onclick="event.stopPropagation(); removeEntireCard({{ $card->id }}, this)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    <button type="button" class="btn-card-detail w-100 d-inline-flex justify-content-center align-items-center text-decoration-none" onclick="event.stopPropagation(); openModal({{ json_encode(['id' => $card->id, 'name' => $card->name, 'image' => $card->url_image]) }})">
+                        {{ __('Dettagli') }}
                     </button>
-                </div>
+                @else
+                    <button type="button" class="btn-card-manage d-inline-flex justify-content-center align-items-center text-decoration-none mb-2" onclick="event.stopPropagation(); openManageModal({{ $card->id }}, '{{ addslashes($card->name) }}')">
+                        {{ __('Gestisci Copie') }}
+                    </button>
+                    <div class="d-flex gap-2 w-100">
+                        <button type="button" class="btn-card-detail flex-grow-1 d-inline-flex justify-content-center align-items-center text-decoration-none" onclick="event.stopPropagation(); openModal({{ json_encode(['id' => $card->id, 'name' => $card->name, 'image' => $card->url_image]) }})">
+                            {{ __('Dettagli') }}
+                        </button>
+                        <button type="button" title="Rimuovi tutta la carta" class="btn-card-detail flex-shrink-0 d-inline-flex justify-content-center align-items-center text-danger" style="width: 42px; padding: 0; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.25);" onclick="event.stopPropagation(); removeEntireCard({{ $card->id }}, this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -327,18 +371,29 @@
                 @endif
             </div>
             
-            @if($variantsText)
-                <div style="font-size: 10px; color: rgba(212, 228, 250, 0.6); margin-bottom: 6px;" class="text-truncate" title="{{ $variantsText }}">
-                    Var: {{ $variantsText }}
+            @if($variantsHtml)
+                <div style="margin-bottom: 6px;" class="d-flex flex-wrap gap-1 align-items-center">
+                    <span style="font-size: 10px; color: rgba(212, 228, 250, 0.6);">{{ $isMissingTab ? __('Mancano:') : ($isDoppieTab ? __('Doppie:') : __('Possiedi:')) }}</span>
+                    {!! $variantsHtml !!}
                 </div>
             @else
                 <div style="font-size: 10px; color: transparent; margin-bottom: 6px;">&nbsp;</div>
             @endif
 
-            <div style="display:flex; justify-content:space-between; gap:10px; font-size:12px; color:#8c909f;">
-                <span>Valore totale</span>
-                <span style="color: #f59e0b; font-weight: 600;">€ {{ number_format($totalValue, 2, ',', '.') }}</span>
-            </div>
+            @if(!$isMissingTab)
+                <div style="display:flex; justify-content:space-between; gap:10px; font-size:12px; color:#8c909f;">
+                    <span>{{ __('Valore totale') }}</span>
+                    <span style="color: #f59e0b; font-weight: 600;">€ {{ number_format($totalValue, 2, ',', '.') }}</span>
+                </div>
+            @else
+                @php
+                    $singlePrice = $price->trend ?? $price->avg ?? 0;
+                @endphp
+                <div style="display:flex; justify-content:space-between; gap:10px; font-size:12px; color:#8c909f;">
+                    <span>{{ __('Valore stimato') }}</span>
+                    <span style="color: #f59e0b; font-weight: 600;">€ {{ number_format($singlePrice, 2, ',', '.') }}</span>
+                </div>
+            @endif
         </div>
     </div>
 </div>

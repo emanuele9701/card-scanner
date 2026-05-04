@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Le mie collezioni')
-@section('meta_description', 'Visualizza e gestisci le tue collezioni di carte.')
+@section('title', __('Le mie collezioni'))
+@section('meta_description', __('Visualizza e gestisci le tue collezioni di carte.'))
 
 @section('custom_style')
     <style>
@@ -252,7 +252,7 @@
         <div class="row g-4 mb-5">
             <div class="col-12 col-md-4">
                 <div class="stat-box h-100">
-                    <div class="stat-title">TOTAL VALUE</div>
+                    <div class="stat-title">{{ __('VALORE TOTALE') }}</div>
                     <div class="stat-value text-warning">
                         € {{ number_format($totalValue, 2, ',', '.') }}
                     </div>
@@ -261,7 +261,7 @@
             
             <div class="col-12 col-md-4">
                 <div class="stat-box h-100">
-                    <div class="stat-title">TOTAL CARDS</div>
+                    <div class="stat-title">{{ __('CARTE TOTALI') }}</div>
                     <div class="stat-value">
                         {{ number_format($ownedCards, 0, ',', '.') }}
                         <span style="font-size: 14px; color: var(--text-muted); font-weight: 400;">/ {{ number_format($totalSlots, 0, ',', '.') }}</span>
@@ -274,14 +274,14 @@
 
             <div class="col-12 col-md-4">
                 <div class="stat-box h-100">
-                    <div class="stat-title">COMPLETED SETS</div>
+                    <div class="stat-title">{{ __('SET COMPLETATI') }}</div>
                     <div class="stat-value">
                         {{ $completedSets }}
-                        <span style="font-size: 14px; color: var(--text-muted); font-weight: 400;">Sets</span>
+                        <span style="font-size: 14px; color: var(--text-muted); font-weight: 400;">{{ __('Set') }}</span>
                     </div>
                     <div style="font-size: 12px; color: var(--text-muted); margin-top: 10px; display: flex; align-items: center; gap: 6px;">
                         <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Master collection status
+                        {{ __('Stato collezione Master') }}
                     </div>
                 </div>
             </div>
@@ -295,7 +295,7 @@
             
             <div class="series-header">
                 <h2 class="series-title">{{ $serieName }}</h2>
-                <a href="#" class="view-all">View all</a>
+                <a href="#" class="view-all">{{ __('Vedi tutti') }}</a>
             </div>
 
             <div class="row g-4">
@@ -306,7 +306,7 @@
 
                         $ownedQty = $setItems->sum('quantity');
                         $uniqueOwnedQty = $setItems->unique('card_id')->count();
-                        $cardTotal = $set->card_official ?? $set->card_total ?? 0;
+                        $cardTotal = $set->card_total ?? 0;
                         $progress = $cardTotal > 0 ? min(100, round($uniqueOwnedQty / $cardTotal * 100)) : 0;
                         
                         $totalValueSet = $setItems->reduce(function ($carry, $item) {
@@ -337,15 +337,15 @@
                                 <div class="set-header">
                                     <h3 class="set-name">{{ $set->name }}</h3>
                                     @if($set->symbol)
-                                        <div class="set-badge">{{ strtoupper(str_replace('/img/symbols/', '', str_replace('.png', '', $set->symbol))) }}</div>
+                                        <div class="set-badge"><img src="{{ $set->symbol }}.png" alt="{{ __('Simbolo') }}" style="height: 1.5rem; object-fit: contain;"></div>
                                     @else
-                                        <div class="set-badge">N/A</div>
+                                        <div class="set-badge">{{ __('N/D') }}</div>
                                     @endif
                                 </div>
 
                                 <div class="progress-section">
                                     <div class="progress-header">
-                                        <span>Collection</span>
+                                        <span>{{ __('Collezione') }}</span>
                                         <span class="progress-text-white">{{ $uniqueOwnedQty }} / {{ $cardTotal }}</span>
                                     </div>
                                     <div class="progress-bar-container">
@@ -354,7 +354,7 @@
                                 </div>
 
                                 <div class="set-footer">
-                                    <span class="est-value-label">EST. VALUE</span>
+                                    <span class="est-value-label">{{ __('VALORE STIMATO') }}</span>
                                     <span class="est-value-amount">€ {{ number_format($totalValueSet, 2, ',', '.') }}</span>
                                 </div>
                             </div>
@@ -364,8 +364,8 @@
             </div>
         @empty
             <div class="text-center py-5">
-                <p class="text-muted">Nessuna collezione salvata. Inizia ad aggiungere set alla tua collezione.</p>
-                <a href="{{ route('collezioni.disponibili') }}" class="btn btn-primary mt-3" style="background-color: var(--accent); border: none;">Sfoglia Set</a>
+                <p class="text-muted">{{ __('Nessuna collezione salvata. Inizia ad aggiungere set alla tua collezione.') }}</p>
+                <a href="{{ route('collezioni.disponibili') }}" class="btn btn-primary mt-3" style="background-color: var(--accent); border: none;">{{ __('Sfoglia Set') }}</a>
             </div>
         @endforelse
 

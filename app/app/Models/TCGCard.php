@@ -55,4 +55,20 @@ class TCGCard extends Model
     {
         return $this->hasMany(UserCardCollection::class, 'card_id', 'id');
     }
+
+    /**
+     * Ritorna un array con le stringhe delle varianti effettivamente prodotte per questa carta.
+     */
+    public function getProducedVariantsAttribute(): array
+    {
+        $produced = [];
+        if (is_array($this->variants)) {
+            foreach ($this->variants as $key => $value) {
+                if ($value === true) {
+                    $produced[] = $key;
+                }
+            }
+        }
+        return $produced;
+    }
 }

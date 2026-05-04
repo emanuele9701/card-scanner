@@ -20,6 +20,11 @@ Route::middleware('guest')->group(function () {
 });
 
 // ── Authenticated ───────────────────────────────────────────────────────
+Route::get('/test-variants', function() {
+    $card = \App\Models\TCGCard::whereNotNull('variants')->first();
+    return response()->json($card->variants);
+});
+
 Route::middleware('auth')->group(function () {
     Route::get('/', fn () => redirect()->route('dashboard'));
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

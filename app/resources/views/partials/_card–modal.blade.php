@@ -147,22 +147,22 @@
                 <div class="col-12 col-md-8">
                     <dl class="row g-0" style="font-size:0.875rem;">
 
-                        <dt class="col-5 modal-detail-label">Dex ID</dt>
+                        <dt class="col-5 modal-detail-label">{{ __('Dex ID') }}</dt>
                         <dd class="col-7 modal-detail-value" id="cm-dex"></dd>
 
-                        <dt class="col-5 modal-detail-label">Tipo</dt>
+                        <dt class="col-5 modal-detail-label">{{ __('Tipo') }}</dt>
                         <dd class="col-7 modal-detail-value" id="cm-types"></dd>
 
-                        <dt class="col-5 modal-detail-label">Stage</dt>
+                        <dt class="col-5 modal-detail-label">{{ __('Stage') }}</dt>
                         <dd class="col-7 modal-detail-value" id="cm-stage"></dd>
 
-                        <dt class="col-5 modal-detail-label">Abilità</dt>
+                        <dt class="col-5 modal-detail-label">{{ __('Abilità') }}</dt>
                         <dd class="col-7 modal-detail-value" id="cm-abilities"></dd>
 
-                        <dt class="col-5 modal-detail-label">Varianti</dt>
+                        <dt class="col-5 modal-detail-label">{{ __('Varianti') }}</dt>
                         <dd class="col-7 modal-detail-value" id="cm-variants"></dd>
 
-                        <dt class="col-5 modal-detail-label">Ultimo prezzo</dt>
+                        <dt class="col-5 modal-detail-label">{{ __('Ultimo prezzo') }}</dt>
                         <dd class="col-7 modal-detail-value" id="cm-price"></dd>
 
                     </dl>
@@ -176,18 +176,18 @@
                 <h3 class="fw-semibold mb-3"
                     style="font-size:0.875rem; color:rgba(212,228,250,0.6);
                            text-transform:uppercase; letter-spacing:0.05em;">
-                    Storico prezzi
+                    {{ __('Storico prezzi') }}
                 </h3>
                 <div style="overflow-x:auto;">
                     <table class="w-100" style="font-size:0.8125rem; border-collapse:collapse;">
                         <thead>
                             <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
-                                <th class="modal-th">Data</th>
-                                <th class="modal-th">Trend</th>
-                                <th class="modal-th">Media 1g</th>
-                                <th class="modal-th">Media 7g</th>
-                                <th class="modal-th">Media 30g</th>
-                                <th class="modal-th">Provider</th>
+                                <th class="modal-th">{{ __('Data') }}</th>
+                                <th class="modal-th">{{ __('Trend') }}</th>
+                                <th class="modal-th">{{ __('Media 1g') }}</th>
+                                <th class="modal-th">{{ __('Media 7g') }}</th>
+                                <th class="modal-th">{{ __('Media 30g') }}</th>
+                                <th class="modal-th">{{ __('Provider') }}</th>
                             </tr>
                         </thead>
                         <tbody id="cm-prices-tbody"></tbody>
@@ -339,7 +339,7 @@
                             '</li>';
                     }).join('') + '</ul>';
             } else {
-                abEl.innerHTML = '<span style="color:rgba(212,228,250,0.4);">Nessuna abilità</span>';
+                abEl.innerHTML = '<span style="color:rgba(212,228,250,0.4);">' + (window.__trans ? window.__trans.no_abilities : 'Nessuna abilità') + '</span>';
             }
 
             /* Varianti */
@@ -388,7 +388,7 @@
                 tbody.innerHTML =
                     '<tr><td colspan="6" class="modal-td" ' +
                     'style="text-align:center;color:rgba(212,228,250,0.3);padding:1.5rem 0;">' +
-                    'Nessun prezzo disponibile</td></tr>';
+                    (window.__trans ? window.__trans.no_price : 'Nessun prezzo disponibile') + '</td></tr>';
             }
         }
 

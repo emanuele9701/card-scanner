@@ -65,18 +65,18 @@ class DashboardController extends Controller
 
         // Prepara le statistiche per ogni set posseduto
         $setsStats = $userSets->map(function ($userSet) use ($setValue) {
-            $officialCards = $userSet->set->card_official ?? 0;
-            $completionPercentage = $officialCards > 0 
-                ? min(100, round(($userSet->unique_cards / $officialCards) * 100, 1)) 
+            $cardTotal = $userSet->set->card_total ?? 0;
+            $completionPercentage = $cardTotal > 0 
+                ? min(100, round(($userSet->unique_cards / $cardTotal) * 100, 1)) 
                 : 0;
 
             return [
                 'set_id' => $userSet->set_id,
                 'name' => $userSet->set->name ?? 'Sconosciuto',
-                'symbol' => $userSet->set->symbol ?? null,
+                'symbol' => ($userSet->set->logo ?? $userSet->set->symbol) ?? null,
                 'unique_cards' => $userSet->unique_cards,
                 'total_quantity' => $userSet->total_quantity,
-                'official_cards' => $officialCards,
+                'official_cards' => $cardTotal,
                 'completion_percentage' => $completionPercentage,
                 'estimated_value' => $setValue[$userSet->set_id] ?? 0,
             ];

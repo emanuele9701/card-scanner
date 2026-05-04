@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Collezioni disponibili')
-@section('meta_description', 'Sfoglia tutte le collezioni di carte disponibili, organizzate per serie.')
+@section('title', __('Collezioni disponibili'))
+@section('meta_description', __('Sfoglia tutte le collezioni di carte disponibili, organizzate per serie.'))
 
 @section('content')
 
@@ -165,8 +165,8 @@
 
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
             <div>
-                <h1 class="text-white fw-bold mb-1" style="font-size:1.875rem; letter-spacing:-0.02em;">Collezioni disponibili</h1>
-                <p class="text-secondary mb-0" style="font-size:0.875rem;">Esplora tutti i set di carte</p>
+                <h1 class="text-white fw-bold mb-1" style="font-size:1.875rem; letter-spacing:-0.02em;">{{ __('Collezioni disponibili') }}</h1>
+                <p class="text-secondary mb-0" style="font-size:0.875rem;">{{ __('Esplora tutti i set di carte') }}</p>
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-outline-light {{ $hasActiveFilters ? '' : 'collapsed' }}" type="button" data-bs-toggle="collapse"
@@ -176,7 +176,7 @@
                         <path
                             d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .4.8l-4.5 6.5V13.5a.5.5 0 0 1-.8.4L7 10.7l-2.1 3.2a.5.5 0 0 1-.8-.4V8.8L1.6 1.8A.5.5 0 0 1 1.5 1.5z" />
                     </svg>
-                    Filtri
+                    {{ __('Filtri') }}
                 </button>
             </div>
         </div>
@@ -187,30 +187,30 @@
                 <form id="filter-form" method="GET" action="{{ route('collezioni.disponibili') }}">
                     <div class="row g-3">
                         <div class="col-12 col-md-4">
-                            <label for="search" class="form-label text-secondary small text-uppercase">Nome set</label>
+                            <label for="search" class="form-label text-secondary small text-uppercase">{{ __('Nome set') }}</label>
                             <input id="search" name="search" type="text"
                                 class="form-control bg-dark text-white border-secondary" value="{{ request('search') }}"
-                                placeholder="Cerca nome set..." />
+                                placeholder="{{ __('Cerca nome set...') }}" />
                         </div>
                         <div class="col-12 col-md-4">
-                            <label for="year" class="form-label text-secondary small text-uppercase">Anno</label>
+                            <label for="year" class="form-label text-secondary small text-uppercase">{{ __('Anno') }}</label>
                             <select id="year" name="year" class="form-select bg-dark text-white border-secondary">
-                                <option value="">Tutti gli anni</option>
+                                <option value="">{{ __('Tutti gli anni') }}</option>
                                 @foreach ($years as $y)
                                     <option value="{{ $y }}" @selected(request('year') == $y)>{{ $y }}</option>
                                 @endforeach
                             </select>
                         </div>
                         <div class="col-12 col-md-4">
-                            <label for="sort" class="form-label text-secondary small text-uppercase">Ordina</label>
+                            <label for="sort" class="form-label text-secondary small text-uppercase">{{ __('Ordina') }}</label>
                             <select id="sort" name="sort" class="form-select bg-dark text-white border-secondary">
-                                <option value="desc" @selected(request('sort', 'desc') === 'desc')>Anno decrescente</option>
-                                <option value="asc" @selected(request('sort') === 'asc')>Anno crescente</option>
+                                <option value="desc" @selected(request('sort', 'desc') === 'desc')>{{ __('Anno decrescente') }}</option>
+                                <option value="asc" @selected(request('sort') === 'asc')>{{ __('Anno crescente') }}</option>
                             </select>
                         </div>
                         <div class="col-12 d-flex justify-content-between align-items-center gap-2 mt-3">
-                            <button type="submit" class="btn btn-primary px-4 fw-bold">Applica</button>
-                            <a href="{{ route('collezioni.disponibili') }}" class="btn btn-outline-secondary">Reset</a>
+                            <button type="submit" class="btn btn-primary px-4 fw-bold">{{ __('Applica') }}</button>
+                            <a href="{{ route('collezioni.disponibili') }}" class="btn btn-outline-secondary">{{ __('Reset') }}</a>
                         </div>
                     </div>
                 </form>
@@ -229,8 +229,8 @@
                         </svg>
                     </div>
                     <div>
-                        <p class="text-white fw-semibold mb-1" style="font-size:1.25rem;">Nessuna collezione trovata</p>
-                        <p class="text-secondary mb-0" style="font-size:0.875rem;">Prova a modificare i filtri di ricerca.</p>
+                        <p class="text-white fw-semibold mb-1" style="font-size:1.25rem;">{{ __('Nessuna collezione trovata') }}</p>
+                        <p class="text-secondary mb-0" style="font-size:0.875rem;">{{ __('Prova a modificare i filtri di ricerca.') }}</p>
                     </div>
                 </div>
             </div>
@@ -268,7 +268,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round"
                                                     d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                             </svg>
-                                            {{ $set->card_total }} carte
+                                            {{ $set->card_total }} {{ __('carte') }}
                                         </span>
                                     @endif
                                 </p>

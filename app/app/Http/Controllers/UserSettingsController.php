@@ -34,6 +34,6 @@ class UserSettingsController extends Controller
         $user = Auth::user();
         $user->setSetting('language', $validated['language']);
 
-        return redirect()->route('settings.index')->with('success', 'Lingua preferita aggiornata.');
+        return redirect()->route('settings.index')->with('success', __('Lingua preferita aggiornata.'));
     }
 }

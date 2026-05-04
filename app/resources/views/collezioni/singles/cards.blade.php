@@ -1,4 +1,4 @@
-﻿@php
+@php
     $isCollected = $card->isCollected ?? false;
 
     $rarityConfig = match (strtolower($card->rarity ?? '')) {
@@ -318,12 +318,12 @@
 
             <div class="card-hover-overlay">
                 <button type="button" class="btn-card-detail d-inline-flex justify-content-center align-items-center text-decoration-none" onclick="event.stopPropagation(); openModal({{ json_encode(['id' => $card->id, 'name' => $card->name, 'image' => $card->url_image]) }})">
-                    Vedi dettagli
+                    {{ __('Vedi dettagli') }}
                 </button>
                 @if (!$isCollected)
                     <button type="button" class="btn-card-add w-100" onclick="event.stopPropagation(); addToCollection(this, {{ $card->id }})">
-                        <span class="btn-card-add-text">+ Aggiungi</span>
-                        <span class="btn-card-loader visually-hidden">Caricamento...</span>
+                        <span class="btn-card-add-text">{{ __('+ Aggiungi') }}</span>
+                        <span class="btn-card-loader visually-hidden">{{ __('Caricamento...') }}</span>
                     </button>
                 @endif
             </div>
@@ -341,7 +341,7 @@
                 @endif
             </div>
             <div style="display:flex; justify-content:space-between; gap:10px; font-size:12px; color:#8c909f;">
-                <span>{{ $card->evolve_from ? 'Evolve da ' . $card->evolve_from : 'Base' }}</span>
+                <span>{{ $card->evolve_from ? __('Evolve da') . ' ' . $card->evolve_from : __('Base') }}</span>
                 <span>€ {{ number_format(optional($card->prices->sortByDesc('updated_at')->first())->avg ?? 0, 2, ',', '.') }}</span>
             </div>
             <div style="margin-top:10px; font-size:11px; color:#8c909f;">Illus. {{ $card->illustrator ?? '—' }}</div>

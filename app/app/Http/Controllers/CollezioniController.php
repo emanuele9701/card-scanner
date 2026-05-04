@@ -42,7 +42,7 @@ class CollezioniController extends Controller
         $year = $request->input('year');
         $sort = $request->input('sort', 'desc');
 
-        $setsQuery = TCGSet::where('language', $language)->with('serie');
+        $setsQuery = TCGSet::where('language', $language)->has('cards')->with('serie');
 
         if ($search) {
             $setsQuery->where('name', 'like', '%' . $search . '%');
@@ -185,37 +185,103 @@ class CollezioniController extends Controller
         $stageFilter = $request->input('stage');
         $sort = $request->input('sort', 'dex_asc');
 
-        // Get user's cards for this set (distinct cards)
-        $userCardsQuery = \App\Models\TCGCard::where('set_id', $set->id)
-            ->whereHas('collectors', function($q) use ($user) {
-                $q->where('user_id', $user->id);
-            })
+        $tab = $request->input('tab', 'owned');
+
+        // Fetch all matching cards from DB based on filters
+        $allCardsQuery = \App\Models\TCGCard::where('set_id', $set->id)
             ->with(['prices', 'collectors' => function($q) use ($user) {
                 $q->where('user_id', $user->id);
             }]);
 
         if ($search) {
-            $userCardsQuery->where('name', 'like', '%' . $search . '%');
+            $allCardsQuery->where('name', 'like', '%' . $search . '%');
         }
 
         if ($typeFilter) {
-            $userCardsQuery->whereJsonContains('types', $typeFilter);
+            $allCardsQuery->whereJsonContains('types', $typeFilter);
         }
 
         if ($stageFilter) {
-            $userCardsQuery->where('level_stage', $stageFilter);
+            $allCardsQuery->where('level_stage', $stageFilter);
         }
 
         match ($sort) {
-            'name_desc' => $userCardsQuery->orderBy('name', 'desc'),
-            'name_asc' => $userCardsQuery->orderBy('name', 'asc'),
-            'rarity_desc' => $userCardsQuery->orderBy('rarity', 'desc'),
-            'rarity_asc' => $userCardsQuery->orderBy('rarity', 'asc'),
-            'dex_desc' => $userCardsQuery->orderBy('dexId', 'desc'),
-            default => $userCardsQuery->orderBy('dexId', 'asc'),
+            'name_desc' => $allCardsQuery->orderBy('name', 'desc'),
+            'name_asc' => $allCardsQuery->orderBy('name', 'asc'),
+            'rarity_desc' => $allCardsQuery->orderBy('rarity', 'desc'),
+            'rarity_asc' => $allCardsQuery->orderBy('rarity', 'asc'),
+            'dex_desc' => $allCardsQuery->orderBy('dexId', 'desc'),
+            default => $allCardsQuery->orderBy('dexId', 'asc'),
         };
 
-        $userCards = $userCardsQuery->paginate($perPage)->withQueryString();
+        $allCards = $allCardsQuery->get();
+
+        $ownedCards = collect();
+        $missingCards = collect();
+        $doppieCards = collect();
+
+        foreach ($allCards as $card) {
+            $produced = $card->produced_variants;
+            if (empty($produced)) {
+                $produced = ['normal'];
+            }
+
+            $ownedVariants = [];
+            $variantCounts = [];
+            foreach ($card->collectors as $coll) {
+                $v = is_array($coll->variants) && count($coll->variants) > 0 ? $coll->variants : ['normal'];
+                foreach ($v as $variantItem) {
+                    $variantItemLow = strtolower(trim($variantItem));
+                    $ownedVariants[] = $variantItemLow;
+                    if (!isset($variantCounts[$variantItemLow])) {
+                        $variantCounts[$variantItemLow] = 0;
+                    }
+                    $variantCounts[$variantItemLow] += $coll->quantity;
+                }
+            }
+            // Normalize variants to lowercase to avoid duplicates like 'Holo' and 'holo'
+            $ownedVariantsUnique = array_unique($ownedVariants);
+            $producedUnique = array_unique(array_map('strtolower', $produced));
+
+            $missingVariants = array_values(array_diff($producedUnique, $ownedVariantsUnique));
+
+            $doppieVariants = [];
+            foreach ($variantCounts as $var => $count) {
+                if ($count > 1) {
+                    $doppieVariants[$var] = $count;
+                }
+            }
+
+            $card->owned_variants = $ownedVariantsUnique;
+            $card->missing_variants = $missingVariants;
+            $card->doppie_variants = $doppieVariants;
+
+            if (count($ownedVariantsUnique) > 0) {
+                $ownedCards->push($card);
+            }
+            
+            if (count($missingVariants) > 0) {
+                $missingCards->push($card);
+            }
+
+            if (count($doppieVariants) > 0) {
+                $doppieCards->push($card);
+            }
+        }
+
+        $collectionToPaginate = match($tab) {
+            'missing' => $missingCards,
+            'doppie' => $doppieCards,
+            default => $ownedCards,
+        };
+        $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
+        $userCards = new \Illuminate\Pagination\LengthAwarePaginator(
+            $collectionToPaginate->forPage($currentPage, $perPage)->values(),
+            $collectionToPaginate->count(),
+            $perPage,
+            $currentPage,
+            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
 
         $allUserCardsForOptions = \App\Models\UserCardCollection::where('user_id', $user->id)
             ->where('set_id', $set->id)
@@ -225,16 +291,29 @@ class CollezioniController extends Controller
         $typeOptions = $allUserCardsForOptions->flatMap(fn ($c) => $c->card && is_array($c->card->types) ? $c->card->types : [])->unique()->sort()->values();
         $stageOptions = $allUserCardsForOptions->map(fn ($c) => $c->card ? $c->card->level_stage : null)->filter()->unique()->values();
 
+        $ownedTotal = $ownedCards->count();
+        $missingTotal = $missingCards->count();
+        $doppieTotal = $doppieCards->count();
+
         if ($request->boolean('ajax')) {
             return response()->json([
-                'html' => view('collezioni.partials.my-cards-grid', ['userCards' => $userCards])->render(),
+                'html' => view('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab])->render(),
                 'current_page' => $userCards->currentPage(),
                 'last_page' => $userCards->lastPage(),
                 'per_page' => $userCards->perPage(),
             ]);
         }
 
-        return view('collezioni.mie-set-detail', compact('set', 'userCards', 'typeOptions', 'stageOptions'));
+        return view('collezioni.mie-set-detail', compact(
+            'set', 
+            'userCards', 
+            'typeOptions', 
+            'stageOptions',
+            'tab',
+            'ownedTotal',
+            'missingTotal',
+            'doppieTotal'
+        ));
     }
 
     public function getCardCopies(TCGCard $card) {

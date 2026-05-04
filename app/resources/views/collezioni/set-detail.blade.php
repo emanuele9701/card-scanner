@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('title', $set->name)
-@section('meta_description', 'Dettaglio del set ' . $set->name)
+@section('meta_description', __('Dettaglio del set') . ' ' . $set->name)
 
 @section('content')
     <style>
@@ -55,7 +55,7 @@
         <div class="container">
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb bg-transparent p-0 mb-0">
-                    <li class="breadcrumb-item"><a class="text-decoration-none text-secondary" href="{{ route('collezioni.disponibili') }}">Collezioni</a></li>
+                    <li class="breadcrumb-item"><a class="text-decoration-none text-secondary" href="{{ route('collezioni.disponibili') }}">{{ __('Collezioni') }}</a></li>
                     @if ($set->serie)
                         <li class="breadcrumb-item"><a class="text-decoration-none text-secondary" href="#">{{ $set->serie->name }}</a></li>
                     @endif
@@ -66,21 +66,21 @@
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
                 <div>
                     <h1 class="h3 text-white mb-2">{{ $set->name }}</h1>
-                    <p class="text-secondary mb-0">Serie {{ $set->serie?->name ?? 'Senza serie' }} • {{ $cards->total() }} carte</p>
+                    <p class="text-secondary mb-0">{{ __('Serie') }} {{ $set->serie?->name ?? 'Senza serie' }} • {{ $cards->total() }} {{ __('carte') }}</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-outline-light {{ $hasActiveFilters ? '' : 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#filterDrawer" aria-expanded="{{ $hasActiveFilters ? 'true' : 'false' }}" aria-controls="filterDrawer">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-funnel" viewBox="0 0 16 16">
                             <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .4.8l-4.5 6.5V13.5a.5.5 0 0 1-.8.4L7 10.7l-2.1 3.2a.5.5 0 0 1-.8-.4V8.8L1.6 1.8A.5.5 0 0 1 1.5 1.5z"/>
                         </svg>
-                        Filtri
+                        {{ __('Filtri') }}
                     </button>
                     <button class="btn btn-outline-secondary disabled" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sort-down" viewBox="0 0 16 16">
                             <path d="M3.5 2.5a.5.5 0 0 1 .5.5v8.793l1.146-1.147a.5.5 0 1 1 .708.708l-2 2a.498.498 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L3 11.793V3a.5.5 0 0 1 .5-.5z"/>
                             <path d="M5 12.5a.5.5 0 0 0 .5.5h7.793l-1.147 1.146a.5.5 0 0 0 .708.708l2-2a.498.498 0 0 0 0-.708l-2-2a.5.5 0 0 0-.708.708L13.293 13H5.5a.5.5 0 0 0-.5.5z"/>
                         </svg>
-                        Ordina
+                        {{ __('Ordina') }}
                     </button>
                 </div>
             </div>
@@ -91,40 +91,40 @@
                         <input type="hidden" name="page" value="1" id="filter-page" />
                         <div class="row g-3">
                             <div class="col-12 col-md-6">
-                                <label for="search" class="form-label text-secondary small text-uppercase">Nome carta</label>
-                                <input id="search" name="search" type="text" class="form-control bg-dark text-white border-secondary" value="{{ request('search') }}" placeholder="Cerca nome carta..." />
+                                <label for="search" class="form-label text-secondary small text-uppercase">{{ __('Nome carta') }}</label>
+                                <input id="search" name="search" type="text" class="form-control bg-dark text-white border-secondary" value="{{ request('search') }}" placeholder="{{ __('Cerca nome carta...') }}" />
                             </div>
                             <div class="col-12 col-md-6">
-                                <label for="type" class="form-label text-secondary small text-uppercase">Tipo Pokémon</label>
+                                <label for="type" class="form-label text-secondary small text-uppercase">{{ __('Tipo Pokémon') }}</label>
                                 <select id="type" name="type" class="form-select bg-dark text-white border-secondary">
-                                    <option value="">Tutti i tipi</option>
+                                    <option value="">{{ __('Tutti i tipi') }}</option>
                                     @foreach ($typeOptions as $typeOption)
                                         <option value="{{ $typeOption }}" @selected(request('type') === $typeOption)>{{ $typeOption }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-12 col-md-6">
-                                <label for="stage" class="form-label text-secondary small text-uppercase">Stadio evolutivo</label>
+                                <label for="stage" class="form-label text-secondary small text-uppercase">{{ __('Stadio evolutivo') }}</label>
                                 <select id="stage" name="stage" class="form-select bg-dark text-white border-secondary">
-                                    <option value="">Tutti gli stadi</option>
+                                    <option value="">{{ __('Tutti gli stadi') }}</option>
                                     @foreach ($stageOptions as $stageOption)
                                         <option value="{{ $stageOption }}" @selected(request('stage') === $stageOption)>{{ $stageOption }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-12 col-md-6">
-                                <label for="sort" class="form-label text-secondary small text-uppercase">Ordina per</label>
+                                <label for="sort" class="form-label text-secondary small text-uppercase">{{ __('Ordina per') }}</label>
                                 <select id="sort" name="sort" class="form-select bg-dark text-white border-secondary">
-                                    <option value="dex_asc" @selected(request('sort') === 'dex_asc')>Numero carta</option>
-                                    <option value="dex_desc" @selected(request('sort') === 'dex_desc')>Numero carta (desc)</option>
-                                    <option value="name_asc" @selected(request('sort') === 'name_asc')>Nome A → Z</option>
-                                    <option value="name_desc" @selected(request('sort') === 'name_desc')>Nome Z → A</option>
-                                    <option value="rarity_asc" @selected(request('sort') === 'rarity_asc')>Rarità ascendente</option>
-                                    <option value="rarity_desc" @selected(request('sort') === 'rarity_desc')>Rarità discendente</option>
+                                    <option value="dex_asc" @selected(request('sort') === 'dex_asc')>{{ __('Numero carta') }}</option>
+                                    <option value="dex_desc" @selected(request('sort') === 'dex_desc')>{{ __('Numero carta (desc)') }}</option>
+                                    <option value="name_asc" @selected(request('sort') === 'name_asc')>{{ __('Nome A → Z') }}</option>
+                                    <option value="name_desc" @selected(request('sort') === 'name_desc')>{{ __('Nome Z → A') }}</option>
+                                    <option value="rarity_asc" @selected(request('sort') === 'rarity_asc')>{{ __('Rarità ascendente') }}</option>
+                                    <option value="rarity_desc" @selected(request('sort') === 'rarity_desc')>{{ __('Rarità discendente') }}</option>
                                 </select>
                             </div>
                             <div class="col-12 col-md-6">
-                                <label for="per_page" class="form-label text-secondary small text-uppercase">Carte per pagina</label>
+                                <label for="per_page" class="form-label text-secondary small text-uppercase">{{ __('Carte per pagina') }}</label>
                                 <select id="per_page" name="per_page" class="form-select bg-dark text-white border-secondary">
                                     <option value="10" @selected(request('per_page', 10) == 10)>10</option>
                                     <option value="15" @selected(request('per_page') == 15)>15</option>
@@ -132,8 +132,8 @@
                                 </select>
                             </div>
                             <div class="col-12 d-flex justify-content-between align-items-center gap-2">
-                                <button type="submit" class="btn btn-primary">Applica</button>
-                                <span class="badge rounded-pill bg-secondary text-white">{{ $cards->total() }} risultati</span>
+                                <button type="submit" class="btn btn-primary">{{ __('Applica') }}</button>
+                                <span class="badge rounded-pill bg-secondary text-white">{{ $cards->total() }} {{ __('risultati') }}</span>
                             </div>
                         </div>
                     </form>
@@ -148,7 +148,7 @@
 
                     <div class="d-flex justify-content-center mt-4">
                         <button id="load-more-btn" type="button" class="btn btn-outline-light px-4" @if($cards->currentPage() >= $cards->lastPage()) style="display:none;" @endif>
-                            Carica altre carte
+                            {{ __('Carica altre carte') }}
                         </button>
                     </div>
                 </div>
@@ -156,15 +156,15 @@
                 <div class="col-12 col-xl-4">
                     <div class="card summary-card h-100">
                         <div class="card-body">
-                            <h2 class="h5 text-white">Riepilogo set</h2>
-                            <p class="text-secondary">Controlla rapidamente il set e applica filtri sulla griglia.</p>
+                            <h2 class="h5 text-white">{{ __('Riepilogo set') }}</h2>
+                            <p class="text-secondary">{{ __('Controlla rapidamente il set e applica filtri sulla griglia.') }}</p>
                             <div class="list-group list-group-flush mt-4">
                                 <div class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between align-items-center border-0">
-                                    <span class="summary-label">Carte totali</span>
+                                    <span class="summary-label">{{ __('Carte totali') }}</span>
                                     <span class="summary-value">{{ strtoupper($set->card_total ?? '—') }}</span>
                                 </div>
                                 <div class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between align-items-center border-0">
-                                    <span class="summary-label">Lingua</span>
+                                    <span class="summary-label">{{ __('Lingua') }}</span>
                                     <span class="summary-value">{{ strtoupper($set->language) }}</span>
                                 </div>
                             </div>
@@ -241,15 +241,15 @@
 
                 var data = await response.json();
                 if (!response.ok || !data.esito) {
-                    throw new Error(data.message || 'Errore durante l\'aggiunta');
+                    throw new Error(data.message || (window.__trans ? window.__trans.add_error : 'Errore durante l\'aggiunta'));
                 }
 
-                if (textEl) textEl.textContent = 'Aggiunta!';
+                if (textEl) textEl.textContent = window.__trans ? window.__trans.added : 'Aggiunta!';
                 button.classList.add('btn-success');
                 button.classList.remove('btn-card-add');
                 button.disabled = true;
             } catch (error) {
-                if (textEl) textEl.textContent = 'Errore';
+                if (textEl) textEl.textContent = window.__trans ? window.__trans.error : 'Errore';
                 console.error('addToCollection:', error);
                 setTimeout(function() {
                     if (textEl) textEl.textContent = originalText;

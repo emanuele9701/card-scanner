@@ -2,7 +2,7 @@
     <div onclick="closeManageModal()" class="position-absolute inset-0 w-100 h-100"></div>
     <div class="card-modal-content p-4 position-relative" style="z-index:10; max-width: 600px;">
         <div class="d-flex align-items-center justify-content-between mb-4">
-            <h2 class="fw-bold mb-0" style="font-size:1.125rem; color:#d4e4fa;">Gestisci Copie: <span id="mcm-card-name"></span></h2>
+            <h2 class="fw-bold mb-0" style="font-size:1.125rem; color:#d4e4fa;">{{ __('Gestisci Copie') }}: <span id="mcm-card-name"></span></h2>
             <button onclick="closeManageModal()" class="btn-modal-close">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
@@ -15,7 +15,7 @@
         <div id="mcm-content" style="display:none;">
             <!-- Existing copies -->
             <div class="mb-4">
-                <h6 class="text-secondary text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 0.05em;">Copie in possesso</h6>
+                <h6 class="text-secondary text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 0.05em;">{{ __('Copie in possesso') }}</h6>
                 <div id="mcm-copies-list" class="d-flex flex-column gap-2">
                     <!-- Copies injected via JS -->
                 </div>
@@ -23,13 +23,13 @@
 
             <!-- Add new copy form -->
             <div class="p-3" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.75rem;">
-                <h6 class="text-white mb-3" style="font-size: 0.85rem;">Aggiungi nuova copia</h6>
+                <h6 class="text-white mb-3" style="font-size: 0.85rem;">{{ __('Aggiungi nuova copia') }}</h6>
                 <form id="mcm-add-form" onsubmit="event.preventDefault(); submitAddCopy();">
                     <input type="hidden" id="mcm-card-id" value="">
                     
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
-                            <label class="form-label text-secondary small">Condizione</label>
+                            <label class="form-label text-secondary small">{{ __('Condizione') }}</label>
                             <select id="mcm-condition" class="form-select bg-dark text-white border-secondary" required>
                                 <option value="NM">NM (Near Mint)</option>
                                 <option value="LP">LP (Lightly Played)</option>
@@ -39,11 +39,11 @@
                             </select>
                         </div>
                         <div class="col-12 col-md-6">
-                            <label class="form-label text-secondary small">Quantità</label>
+                            <label class="form-label text-secondary small">{{ __('Quantità') }}</label>
                             <input type="number" id="mcm-quantity" class="form-control bg-dark text-white border-secondary" value="1" min="1" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label text-secondary small">Varianti</label>
+                            <label class="form-label text-secondary small">{{ __('Varianti') }}</label>
                             <div class="d-flex flex-wrap gap-3 mt-1">
                                 <label class="d-flex align-items-center gap-1 text-white" style="font-size: 0.85rem;">
                                     <input type="checkbox" name="mcm-variants" value="holo" class="form-check-input mt-0"> Holo
@@ -57,7 +57,7 @@
                             </div>
                         </div>
                         <div class="col-12 text-end mt-3">
-                            <button type="submit" class="btn btn-sm px-4 fw-bold text-dark" style="background-color: #fbb400; border: none;">Aggiungi</button>
+                            <button type="submit" class="btn btn-sm px-4 fw-bold text-dark" style="background-color: #fbb400; border: none;">{{ __('Aggiungi') }}</button>
                         </div>
                     </div>
                 </form>
@@ -115,7 +115,7 @@
     function renderCopies(copies) {
         const list = document.getElementById('mcm-copies-list');
         if (!copies || copies.length === 0) {
-            list.innerHTML = '<div class="text-secondary small fst-italic">Nessuna copia in collezione.</div>';
+            list.innerHTML = '<div class="text-secondary small fst-italic">' + (window.__trans ? window.__trans.no_copies : 'Nessuna copia in collezione.') + '</div>';
             return;
         }
         
@@ -137,7 +137,7 @@
                             <input type="text" class="form-control text-center bg-dark text-white" value="${copy.quantity}" readonly>
                             <button class="btn btn-outline-secondary" type="button" onclick="updateQty(${copy.id}, ${copy.quantity + 1})">+</button>
                         </div>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCopy(${copy.id})" title="Rimuovi">
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCopy(${copy.id})" title="{{ __('Rimuovi') }}">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                         </button>
                     </div>
@@ -171,7 +171,7 @@
     };
 
     window.deleteCopy = async function(copyId) {
-        if(!confirm('Vuoi rimuovere questa copia?')) return;
+        if(!confirm(window.__trans ? window.__trans.confirm_remove_copy : 'Vuoi rimuovere questa copia?')) return;
         
         try {
             const res = await fetch(`/collezioni/copies/${copyId}`, {
@@ -219,7 +219,7 @@
                 document.getElementById('mcm-add-form').reset();
                 loadCopies(cardId);
             } else {
-                alert('Errore durante il salvataggio.');
+                alert(window.__trans ? window.__trans.save_error : 'Errore durante il salvataggio.');
             }
         } catch(e) {
             console.error('Save err', e);

@@ -2,7 +2,7 @@
     <div onclick="closeMissingCardsModal()" class="position-absolute inset-0 w-100 h-100"></div>
     <div class="card-modal-content p-4 position-relative" style="z-index:10; max-width: 800px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
         <div class="d-flex align-items-center justify-content-between mb-4 flex-shrink-0">
-            <h2 class="fw-bold mb-0" style="font-size:1.25rem; color:#d4e4fa;">Aggiungi Carte Mancanti</h2>
+            <h2 class="fw-bold mb-0" style="font-size:1.25rem; color:#d4e4fa;">{{ __('Aggiungi Carte Mancanti') }}</h2>
             <button onclick="closeMissingCardsModal()" class="btn-modal-close">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
@@ -17,12 +17,12 @@
                 <!-- Cards injected here -->
             </div>
             <div id="no-missing-cards" style="display:none;" class="text-center text-secondary py-5">
-                Hai completato questo set! Non ci sono carte mancanti.
+                {{ __('Hai completato questo set! Non ci sono carte mancanti.') }}
             </div>
         </div>
         
         <div class="mt-4 text-end flex-shrink-0">
-            <button class="btn btn-secondary" onclick="closeMissingCardsModal()">Chiudi e Aggiorna</button>
+            <button class="btn btn-secondary" onclick="closeMissingCardsModal()">{{ __('Chiudi e Aggiorna') }}</button>
         </div>
     </div>
 </div>
@@ -95,7 +95,7 @@
                             <div class="fw-bold text-truncate text-white" style="font-size: 0.85rem;" title="${card.name}">${card.name}</div>
                             <div class="text-secondary text-truncate" style="font-size: 0.75rem;">#${card.dexId} · ${card.rarity || 'Common'}</div>
                             <button class="btn btn-sm btn-warning fw-bold py-0 px-2 mt-1 w-100 text-dark" style="font-size: 0.7rem;" onclick="addMissingCard(${card.id}, this)">
-                                Aggiungi
+                                ${window.__trans ? window.__trans.add : 'Aggiungi'}
                             </button>
                         </div>
                     </div>
@@ -126,12 +126,12 @@
                 if (item) item.remove();
             } else {
                 btnEl.disabled = false;
-                btnEl.textContent = 'Aggiungi';
+                btnEl.textContent = window.__trans ? window.__trans.add : 'Aggiungi';
             }
         } catch(e) {
             console.error(e);
             btnEl.disabled = false;
-            btnEl.textContent = 'Aggiungi';
+            btnEl.textContent = window.__trans ? window.__trans.add : 'Aggiungi';
         }
     }
 </script>
