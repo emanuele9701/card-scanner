@@ -1,0 +1,11 @@
+output.json
+package-lock.json
+package.json
+parser.mjs
+test.php
+tmp.html
+app/jsScripts/storage/app/proxy_cache.json
+app/jsScripts/scraper-puppeteer.js
+app/jsScripts/scheda_tecnica_scraper.md
+app/composer.lock
+app/package-lock.json
