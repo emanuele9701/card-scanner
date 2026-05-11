@@ -14,7 +14,7 @@ return [
     */
 
     'commands' => [
-        App\Console\Commands\ScrapePendingUrlsCommand::class,
+
         App\Console\Commands\FetchPokemonCommand::class,
     ],
 

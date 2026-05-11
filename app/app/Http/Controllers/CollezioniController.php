@@ -31,6 +31,133 @@ class CollezioniController extends Controller
         ]);
     }
 
+    public function missingGlobal(Request $request)
+    {
+        $user = Auth::user();
+        $perPage = 20;
+        $page = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
+        
+        $collectedSetIds = \App\Models\UserCardCollection::where('user_id', $user->id)
+            ->select('set_id')
+            ->distinct()
+            ->pluck('set_id');
+
+        $allCardsQuery = \App\Models\TCGCard::whereIn('tcg_cards.set_id', $collectedSetIds)
+            ->with(['set', 'prices', 'collectors' => function($q) use ($user) {
+                $q->where('user_id', $user->id);
+            }]);
+            
+        $typeFilter = $request->input('type');
+        $stageFilter = $request->input('stage');
+        $setFilter = $request->input('set');
+        $serieFilter = $request->input('serie');
+
+        if ($search = $request->input('search')) {
+            $allCardsQuery->where('tcg_cards.name', 'like', '%' . $search . '%');
+        }
+
+        if ($typeFilter) {
+            $allCardsQuery->whereJsonContains('tcg_cards.types', $typeFilter);
+        }
+
+        if ($stageFilter) {
+            $allCardsQuery->where('tcg_cards.level_stage', $stageFilter);
+        }
+
+        if ($setFilter) {
+            $allCardsQuery->where('tcg_cards.set_id', $setFilter);
+        }
+
+        if ($serieFilter) {
+            $allCardsQuery->where('tcg_sets.serie_id', $serieFilter);
+        }
+
+        // Ordinamento globale per data di rilascio del set o dexId
+        $allCardsQuery->join('tcg_sets', 'tcg_cards.set_id', '=', 'tcg_sets.id')
+            ->orderBy('tcg_sets.release_date', 'desc')
+            ->orderBy('tcg_cards.dexId', 'asc')
+            ->select('tcg_cards.*');
+
+        // To extract available filter options across collected sets, we do a fast query on TCGCard
+        // We do this before the get() to get ALL options regardless of the current search filter
+        $optionsCards = \App\Models\TCGCard::whereIn('set_id', $collectedSetIds)->get();
+        $typeOptions = $optionsCards->flatMap(fn ($c) => is_array($c->types) ? $c->types : [])->unique()->sort()->values();
+        $stageOptions = $optionsCards->map(fn ($c) => $c->level_stage)->filter()->unique()->values();
+
+        $setOptions = \App\Models\TCGSet::whereIn('id', $collectedSetIds)->orderBy('release_date', 'desc')->get();
+        $serieIds = $setOptions->pluck('serie_id')->unique();
+        $serieOptions = \App\Models\TCGSeries::whereIn('id', $serieIds)->orderBy('id', 'desc')->get();
+
+        $allCards = $allCardsQuery->get();
+        $missingCards = collect();
+
+        foreach ($allCards as $card) {
+            $produced = $card->produced_variants;
+            if (empty($produced)) $produced = ['normal'];
+
+            $ownedVariants = [];
+            foreach ($card->collectors as $coll) {
+                $v = is_array($coll->variants) && count($coll->variants) > 0 ? $coll->variants : ['normal'];
+                $ownedVariants = array_merge($ownedVariants, $v);
+            }
+            $ownedVariantsUnique = array_unique(array_map('strtolower', $ownedVariants));
+            $producedUnique = array_unique(array_map('strtolower', $produced));
+
+            $missingVariants = array_values(array_diff($producedUnique, $ownedVariantsUnique));
+
+            if (count($missingVariants) > 0) {
+                $card->missing_variants = $missingVariants;
+                $missingCards->push($card);
+            }
+        }
+
+        $total = $missingCards->count();
+        $paginatedCards = $missingCards->forPage($page, $perPage)->values();
+        
+        $cardIds = $paginatedCards->pluck('id')->toArray();
+        $offersCounts = [];
+        
+        if (!empty($cardIds)) {
+            $offers = \Illuminate\Support\Facades\DB::table('tcg_card_offers')
+                ->whereIn('card_id', $cardIds)
+                ->select('card_id', 'is_holo', 'is_reverse_holo', 'card_special_type', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total_offers'))
+                ->groupBy('card_id', 'is_holo', 'is_reverse_holo', 'card_special_type')
+                ->get();
+                
+            foreach ($offers as $offer) {
+                $variant = 'normal';
+                if ($offer->is_holo) $variant = 'holo';
+                elseif ($offer->is_reverse_holo) $variant = 'reverse';
+                elseif (stripos($offer->card_special_type ?? '', 'First Edition') !== false) $variant = 'firstedition';
+                
+                $offersCounts[$offer->card_id][$variant] = ($offersCounts[$offer->card_id][$variant] ?? 0) + $offer->total_offers;
+            }
+        }
+        
+        foreach ($paginatedCards as $card) {
+            $card->offers_count_by_variant = $offersCounts[$card->id] ?? [];
+        }
+
+        $userCards = new \Illuminate\Pagination\LengthAwarePaginator(
+            $paginatedCards,
+            $total,
+            $perPage,
+            $page,
+            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
+
+        if ($request->boolean('ajax')) {
+            return response()->json([
+                'html' => view('collezioni.partials.mancanti-global-grid', ['userCards' => $userCards])->render(),
+                'current_page' => $userCards->currentPage(),
+                'last_page' => $userCards->lastPage(),
+                'per_page' => $userCards->perPage(),
+            ]);
+        }
+
+        return view('collezioni.mancanti-global', compact('userCards', 'total', 'typeOptions', 'stageOptions', 'setOptions', 'serieOptions'));
+    }
+
     /**
      * Mostra tutti i set disponibili raggruppati per serie.
      */
@@ -274,14 +401,82 @@ class CollezioniController extends Controller
             'doppie' => $doppieCards,
             default => $ownedCards,
         };
-        $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
-        $userCards = new \Illuminate\Pagination\LengthAwarePaginator(
-            $collectionToPaginate->forPage($currentPage, $perPage)->values(),
-            $collectionToPaginate->count(),
-            $perPage,
-            $currentPage,
-            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
-        );
+
+        $userCards = null;
+        $sellers = null;
+
+        if ($tab === 'sellers') {
+            $selectedCardsStr = $request->input('selected_cards');
+            
+            $ownedCardIds = \App\Models\UserCardCollection::where('user_id', $user->id)
+                ->where('set_id', $set->id)
+                ->pluck('card_id');
+                
+            $sellersQuery = \Illuminate\Support\Facades\DB::table('tcg_card_offers')
+                ->join('tcg_cards', 'tcg_card_offers.card_id', '=', 'tcg_cards.id')
+                ->where('tcg_cards.set_id', $set->id);
+
+            // Advanced filtering by missing variants and selected cards
+            $sellersQuery->where(function($q) use ($missingCards, $selectedCardsStr) {
+                $selectedIds = !empty($selectedCardsStr) ? array_filter(explode(',', $selectedCardsStr)) : [];
+                $addedConditions = 0;
+
+                foreach ($missingCards as $card) {
+                    if (!empty($selectedIds) && !in_array($card->id, $selectedIds)) {
+                        continue;
+                    }
+
+                    foreach ($card->missing_variants as $variant) {
+                        $q->orWhere(function($subQ) use ($card, $variant) {
+                            $subQ->where('tcg_card_offers.card_id', $card->id);
+                            if ($variant === 'holo') {
+                                $subQ->where('tcg_card_offers.is_holo', 1);
+                            } elseif ($variant === 'reverse') {
+                                $subQ->where('tcg_card_offers.is_reverse_holo', 1);
+                            } elseif ($variant === 'firstedition') {
+                                // Add logic for first edition if present in DB
+                                $subQ->where('tcg_card_offers.card_special_type', 'like', '%First Edition%');
+                            } elseif ($variant === 'normal') {
+                                $subQ->where(function($sq) {
+                                    $sq->whereNull('tcg_card_offers.is_holo')->orWhere('tcg_card_offers.is_holo', 0);
+                                })->where(function($sq) {
+                                    $sq->whereNull('tcg_card_offers.is_reverse_holo')->orWhere('tcg_card_offers.is_reverse_holo', 0);
+                                });
+                            }
+                        });
+                        $addedConditions++;
+                    }
+                }
+
+                // If no missing variants, return no results
+                if ($addedConditions === 0) {
+                    $q->whereRaw('1 = 0');
+                }
+            });
+
+            $sellersQuery->select(
+                'tcg_card_offers.seller_name',
+                'tcg_card_offers.seller_country',
+                \Illuminate\Support\Facades\DB::raw('COUNT(DISTINCT tcg_card_offers.card_id) as missing_cards_available'),
+                \Illuminate\Support\Facades\DB::raw('SUM(tcg_card_offers.price_eur) as total_price_sum')
+            )
+            ->groupBy('tcg_card_offers.seller_name', 'tcg_card_offers.seller_country')
+            ->orderByDesc('missing_cards_available');
+
+            $sellers = $sellersQuery->paginate($perPage)->withQueryString();
+            
+            // Just an empty paginator for userCards to avoid errors
+            $userCards = new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage);
+        } else {
+            $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
+            $userCards = new \Illuminate\Pagination\LengthAwarePaginator(
+                $collectionToPaginate->forPage($currentPage, $perPage)->values(),
+                $collectionToPaginate->count(),
+                $perPage,
+                $currentPage,
+                ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
+            );
+        }
 
         $allUserCardsForOptions = \App\Models\UserCardCollection::where('user_id', $user->id)
             ->where('set_id', $set->id)
@@ -296,12 +491,22 @@ class CollezioniController extends Controller
         $doppieTotal = $doppieCards->count();
 
         if ($request->boolean('ajax')) {
-            return response()->json([
-                'html' => view('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab])->render(),
-                'current_page' => $userCards->currentPage(),
-                'last_page' => $userCards->lastPage(),
-                'per_page' => $userCards->perPage(),
-            ]);
+            if ($tab === 'sellers') {
+                $html = view('collezioni.partials.sellers-grid', ['sellers' => $sellers, 'tab' => $tab])->render();
+                return response()->json([
+                    'html' => $html,
+                    'current_page' => $sellers->currentPage(),
+                    'last_page' => $sellers->lastPage(),
+                    'per_page' => $sellers->perPage(),
+                ]);
+            } else {
+                return response()->json([
+                    'html' => view('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab])->render(),
+                    'current_page' => $userCards->currentPage(),
+                    'last_page' => $userCards->lastPage(),
+                    'per_page' => $userCards->perPage(),
+                ]);
+            }
         }
 
         return view('collezioni.mie-set-detail', compact(
@@ -312,7 +517,8 @@ class CollezioniController extends Controller
             'tab',
             'ownedTotal',
             'missingTotal',
-            'doppieTotal'
+            'doppieTotal',
+            'sellers'
         ));
     }
 

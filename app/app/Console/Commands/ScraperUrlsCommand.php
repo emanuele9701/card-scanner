@@ -49,15 +49,12 @@ class ScraperUrlsCommand extends Command
             $this->info("⏳ Esecuzione script Node.js in corso (potrebbe richiedere fino a 60-90 secondi)...");
 
             // Eseguiamo il processo. Aumentiamo il timeout perché FlareSolverr + Puppeteer + sleep possono impiegare tempo
-            $result = Process::timeout(120)->run(['node', $scriptPath, $fullUrl]);
-
-
-            // Stampiamo i log intermedi generati dallo script JS (log con console.error finiscono su stderr)
-            if ($result->errorOutput()) {
-                $this->comment("--- Log dello script Node.js ---");
-                $this->line(trim($result->errorOutput()));
-                $this->comment("--------------------------------");
-            }
+            $result = Process::timeout(120)->run(['node', $scriptPath, $fullUrl], function (string $type, string $output) {
+                if ($type === 'err') {
+                    // Stampiamo i log intermedi generati dallo script JS in tempo reale
+                    $this->output->write($output);
+                }
+            });
 
             if (! $result->successful()) {
                 $this->error("❌ Errore critico nell'esecuzione dello script Node.js per {$fullUrl}");
@@ -96,7 +93,7 @@ class ScraperUrlsCommand extends Command
                 // Se ci sono altre pagine, le aggiungiamo alla lista se non sono già state aggiunte. 
                 if((int) $dataCards['maxPages'] > 1 && $urlMapping->type === UrlMappingType::ListCard && !empty($dataCards['paginationUrls'])) {
                     foreach($dataCards['paginationUrls'] as $url) {
-                        $urlMappingNew = UrlMapping::pending()->where('url_path', $url)->first();
+                        $urlMappingNew = UrlMapping::where('url_path', $url)->where('site_name',$urlMapping->site_name)->where('type', UrlMappingType::ListCard)->first();
                         if(empty($urlMappingNew)) {
                             UrlMapping::create([
                                 'url_path' => $url,

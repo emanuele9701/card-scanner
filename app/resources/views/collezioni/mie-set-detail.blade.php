@@ -185,16 +185,30 @@
                                 {{ __('Doppie') }} <span class="badge {{ ($tab ?? 'owned') === 'doppie' ? 'bg-white text-success' : 'bg-secondary text-white' }} ms-2">{{ $doppieTotal ?? 0 }}</span>
                             </a>
                         </li>
+                        <li class="nav-item ms-2">
+                            <a class="nav-link {{ ($tab ?? 'owned') === 'sellers' ? 'active bg-info text-dark' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'sellers', 'page' => 1]) }}">
+                                {{ __('Migliori Offerte') }}
+                            </a>
+                        </li>
                     </ul>
 
-                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="cards-grid">
-                        @include('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab ?? 'owned'])
-                    </div>
+                    @if(($tab ?? 'owned') === 'sellers')
+                        <div class="row g-4" id="cards-grid">
+                            @include('collezioni.partials.sellers-grid', ['sellers' => $sellers, 'tab' => $tab ?? 'owned'])
+                        </div>
+                    @else
+                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="cards-grid">
+                            @include('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab ?? 'owned'])
+                        </div>
+                    @endif
 
                     <div class="d-flex justify-content-center mt-4">
+                        @php
+                            $paginator = ($tab ?? 'owned') === 'sellers' ? ($sellers ?? null) : $userCards;
+                        @endphp
                         <button id="load-more-btn" type="button" class="btn btn-outline-light px-4"
-                            @if ($userCards->currentPage() >= $userCards->lastPage()) style="display:none;" @endif>
-                            {{ __('Carica altre carte') }}
+                            @if ($paginator && $paginator->currentPage() >= $paginator->lastPage()) style="display:none;" @endif>
+                            {{ __('Carica altro') }}
                         </button>
                     </div>
                 </div>
@@ -240,13 +254,23 @@
 
     <!-- Mass Action Bar -->
     <div id="mass-action-bar" class="fixed-bottom p-3 d-flex justify-content-center" style="pointer-events: none; z-index: 1040; transition: transform 0.3s ease; transform: translateY(100%);">
-        <div class="card bg-danger text-white shadow-lg border-0" style="pointer-events: auto; max-width: 400px; border-radius: 2rem;">
-            <div class="card-body d-flex align-items-center gap-3 py-2 px-4">
-                <span class="fw-bold"><span id="mass-selected-count">0</span> {{ __('carte selezionate') }}</span>
-                <button class="btn btn-light btn-sm text-danger fw-bold rounded-pill" onclick="massRemoveSelected()">{{ __('Elimina') }}</button>
-                <button class="btn btn-sm text-white text-opacity-75" onclick="clearSelection()">{{ __('Annulla') }}</button>
+        @if(($tab ?? 'owned') === 'missing')
+            <div class="card bg-info text-dark shadow-lg border-0" style="pointer-events: auto; max-width: 450px; border-radius: 2rem;">
+                <div class="card-body d-flex align-items-center gap-3 py-2 px-4">
+                    <span class="fw-bold"><span id="mass-selected-count">0</span> {{ __('carte selezionate') }}</span>
+                    <button class="btn btn-dark btn-sm text-info fw-bold rounded-pill" onclick="massFindSellers()">🔍 {{ __('Trova Venditori') }}</button>
+                    <button class="btn btn-sm text-dark text-opacity-75" onclick="clearSelection()">{{ __('Annulla') }}</button>
+                </div>
             </div>
-        </div>
+        @else
+            <div class="card bg-danger text-white shadow-lg border-0" style="pointer-events: auto; max-width: 400px; border-radius: 2rem;">
+                <div class="card-body d-flex align-items-center gap-3 py-2 px-4">
+                    <span class="fw-bold"><span id="mass-selected-count">0</span> {{ __('carte selezionate') }}</span>
+                    <button class="btn btn-light btn-sm text-danger fw-bold rounded-pill" onclick="massRemoveSelected()">{{ __('Elimina') }}</button>
+                    <button class="btn btn-sm text-white text-opacity-75" onclick="clearSelection()">{{ __('Annulla') }}</button>
+                </div>
+            </div>
+        @endif
     </div>
 
     <div id="cards-pagination" data-current-page="{{ $userCards->currentPage() }}"
@@ -354,6 +378,16 @@
                 if(cardItem) cardItem.style.borderColor = 'rgba(255, 255, 255, 0.08)';
             });
             updateMassActionBar();
+        };
+
+        window.massFindSellers = function() {
+            if (selectedCards.size === 0) return;
+            const ids = Array.from(selectedCards).join(',');
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', 'sellers');
+            url.searchParams.set('selected_cards', ids);
+            url.searchParams.set('page', '1');
+            window.location.href = url.toString();
         };
 
         window.massRemoveSelected = async function() {

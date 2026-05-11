@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
     // Collezioni
     Route::prefix('collezioni')->name('collezioni.')->group(function () {
         Route::get('/mie', [CollezioniController::class, 'index'])->name('mie');
+        Route::get('/mancanti', [CollezioniController::class, 'missingGlobal'])->name('mancanti');
         Route::get('/mie/set/{set}', [CollezioniController::class, 'showMySet'])->name('mie.set');
         Route::get('/disponibili', [CollezioniController::class, 'disponibili'])->name('disponibili');
         Route::get('/set/{set}', [CollezioniController::class, 'showSet'])->name('set');
