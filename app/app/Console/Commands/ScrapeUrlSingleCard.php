@@ -63,7 +63,7 @@ class ScrapeUrlSingleCard extends Command
             $this->info("--------------------------------------------------");
             $this->info("🔄 Scraping Singola Carta URL ID: {$urlMapping->id} | Path: {$urlMapping->url_path}");
 
-            $fullUrl = $this->buildFullUrl($urlMapping->site_name, $urlMapping->url_path) . "?sellerCountry=17&language=5&minCondition=2";
+            $fullUrl = $this->buildFullUrl($urlMapping->site_name, $urlMapping->url_path) . "?sellerCountry=17&sellerType=1&language=5&minCondition=2";
 
             $this->info("🌍 Full URL: {$fullUrl}");
             $this->info("⏳ Esecuzione script Node.js (Modalità: single_card)...");
