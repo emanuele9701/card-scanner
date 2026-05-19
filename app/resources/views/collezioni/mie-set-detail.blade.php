@@ -152,9 +152,9 @@
                                     </label>
                                 <select id="per_page" name="per_page"
                                     class="form-select bg-dark text-white border-secondary">
-                                    <option value="10" @selected(request('per_page', 10) == 10)>10</option>
-                                    <option value="15" @selected(request('per_page') == 15)>15</option>
-                                    <option value="20" @selected(request('per_page') == 20)>20</option>
+                                    <option value="100" @selected(request('per_page', 100) == 100)>100</option>
+                                    <option value="200" @selected(request('per_page') == 200)>200</option>
+                                    <option value="300" @selected(request('per_page') == 300)>300</option>
                                 </select>
                             </div>
                             <div class="col-12 d-flex justify-content-between align-items-center gap-2">
@@ -197,6 +197,12 @@
                             @include('collezioni.partials.sellers-grid', ['sellers' => $sellers, 'tab' => $tab ?? 'owned'])
                         </div>
                     @else
+                        <div class="d-flex justify-content-end mb-3">
+                            <div class="form-check form-switch d-flex align-items-center gap-2 bg-dark p-2 px-3 rounded-pill border border-secondary shadow-sm">
+                                <input class="form-check-input mt-0" type="checkbox" id="selectAllVisible" onchange="toggleSelectAllVisible(this)" style="cursor: pointer;">
+                                <label class="form-check-label text-white small fw-bold text-uppercase" for="selectAllVisible" style="cursor: pointer;">{{ __('Seleziona Tutte Visibili') }}</label>
+                            </div>
+                        </div>
                         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="cards-grid">
                             @include('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab ?? 'owned'])
                         </div>
@@ -205,9 +211,10 @@
                     <div class="d-flex justify-content-center mt-4">
                         @php
                             $paginator = ($tab ?? 'owned') === 'sellers' ? ($sellers ?? null) : $userCards;
+                            $isPaginator = $paginator instanceof \Illuminate\Pagination\LengthAwarePaginator;
                         @endphp
                         <button id="load-more-btn" type="button" class="btn btn-outline-light px-4"
-                            @if ($paginator && $paginator->currentPage() >= $paginator->lastPage()) style="display:none;" @endif>
+                            @if (!$isPaginator || ($isPaginator && $paginator->currentPage() >= $paginator->lastPage())) style="display:none;" @endif>
                             {{ __('Carica altro') }}
                         </button>
                     </div>
@@ -377,7 +384,19 @@
                 const cardItem = cb.closest('.card-item');
                 if(cardItem) cardItem.style.borderColor = 'rgba(255, 255, 255, 0.08)';
             });
+            const selectAllToggle = document.getElementById('selectAllVisible');
+            if(selectAllToggle) selectAllToggle.checked = false;
             updateMassActionBar();
+        };
+
+        window.toggleSelectAllVisible = function(checkbox) {
+            const isChecked = checkbox.checked;
+            document.querySelectorAll('.mass-select-checkbox').forEach(cb => {
+                if (cb.checked !== isChecked) {
+                    cb.checked = isChecked;
+                    handleCardSelection(cb);
+                }
+            });
         };
 
         window.massFindSellers = function() {

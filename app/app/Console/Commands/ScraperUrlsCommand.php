@@ -100,6 +100,8 @@ class ScraperUrlsCommand extends Command
                                 'site_name' => $urlMapping->site_name,
                                 'type' => UrlMappingType::ListCard,
                             ]);
+                        } else {
+                            $urlMappingNew->update(['status' => UrlMappingStatus::Pending]);
                         }
                     }
                 }
@@ -116,6 +118,8 @@ class ScraperUrlsCommand extends Command
                             'site_name' => $urlMapping->site_name,
                             'type' => UrlMappingType::SingleCard,
                         ]);
+                    } else {
+                        $urlMappingCard->update(['status' => UrlMappingStatus::Pending]);
                     }
                 }
 

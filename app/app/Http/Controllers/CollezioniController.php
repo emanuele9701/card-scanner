@@ -301,16 +301,16 @@ class CollezioniController extends Controller
             }
         }
 
-        $perPage = (int) $request->input('per_page', 10);
-        $allowedPerPage = [10, 15, 20];
+        $perPage = (int) $request->input('per_page', 100);
+        $allowedPerPage = [100, 200, 300];
         if (! in_array($perPage, $allowedPerPage, true)) {
-            $perPage = 10;
+            $perPage = 100;
         }
 
         $search = $request->input('search');
         $typeFilter = $request->input('type');
         $stageFilter = $request->input('stage');
-        $sort = $request->input('sort', 'dex_asc');
+        $sort = $request->input('sort', 'name_desc');
 
         $tab = $request->input('tab', 'owned');
 
@@ -455,18 +455,133 @@ class CollezioniController extends Controller
             });
 
             $sellersQuery->select(
+                'tcg_card_offers.id',
+                'tcg_card_offers.card_id',
                 'tcg_card_offers.seller_name',
                 'tcg_card_offers.seller_country',
-                \Illuminate\Support\Facades\DB::raw('COUNT(DISTINCT tcg_card_offers.card_id) as missing_cards_available'),
-                \Illuminate\Support\Facades\DB::raw('SUM(tcg_card_offers.price_eur) as total_price_sum')
-            )
-            ->groupBy('tcg_card_offers.seller_name', 'tcg_card_offers.seller_country')
-            ->orderByDesc('missing_cards_available');
+                'tcg_card_offers.price_eur',
+                'tcg_card_offers.is_holo',
+                'tcg_card_offers.is_reverse_holo',
+                'tcg_card_offers.card_special_type',
+                'tcg_cards.name as card_name',
+                'tcg_cards.url_image'
+            );
 
-            $sellers = $sellersQuery->paginate($perPage)->withQueryString();
+            $sellersQuery->orderBy('card_name', 'asc');
+
+            $rawOffers = $sellersQuery->get();
+
+            // 1. Definiamo i target: (card_id, variant) che stiamo cercando
+            $targetKeys = [];
+            $targetInfo = [];
+            $selectedIds = !empty($selectedCardsStr) ? array_filter(explode(',', $selectedCardsStr)) : [];
+            foreach ($missingCards as $card) {
+                if (!empty($selectedIds) && !in_array($card->id, $selectedIds)) continue;
+                foreach ($card->missing_variants as $variant) {
+                    $key = $card->id . '_' . $variant;
+                    $targetKeys[$key] = true;
+                    $targetInfo[$key] = [
+                        'card_id' => $card->id,
+                        'name' => $card->name,
+                        'variant' => $variant,
+                        'image' => is_string($card->images) ? json_decode($card->images, true)['small'] ?? null : ($card->images['small'] ?? null)
+                    ];
+                }
+            }
+
+            // 2. Mappiamo le offerte. Per ogni venditore e target, teniamo l'offerta più economica
+            $sellerInventories = [];
+            foreach ($rawOffers as $offer) {
+                $variant = 'normal';
+                if ($offer->is_holo) $variant = 'holo';
+                elseif ($offer->is_reverse_holo) $variant = 'reverse';
+                elseif (stripos($offer->card_special_type ?? '', 'First Edition') !== false) $variant = 'firstedition';
+                
+                $key = $offer->card_id . '_' . $variant;
+                if (!isset($targetKeys[$key])) continue;
+
+                $seller = $offer->seller_name;
+                if (!isset($sellerInventories[$seller])) {
+                    $sellerInventories[$seller] = [
+                        'name' => $seller,
+                        'country' => $offer->seller_country,
+                        'offers' => []
+                    ];
+                }
+
+                if (!isset($sellerInventories[$seller]['offers'][$key]) || $offer->price_eur < $sellerInventories[$seller]['offers'][$key]->price_eur) {
+                    // Aggiorna con l'offerta più bassa o aggiungi la prima
+                    // Aggiungiamo anche le info della carta per la view
+                    $offer->target_key = $key;
+                    $offer->card_image = $offer->url_image;
+                    $offer->variant_name = $variant;
+                    $sellerInventories[$seller]['offers'][$key] = $offer;
+                }
+            }
+
+            // 3. Algoritmo Greedy Set Cover
+            $optimalCart = [];
+            $uncoveredTargets = $targetKeys;
+
+            while (!empty($uncoveredTargets)) {
+                $bestSeller = null;
+                $bestCoverageCount = 0;
+                $bestPrice = PHP_FLOAT_MAX;
+                $bestCoveredKeys = [];
+
+                foreach ($sellerInventories as $sellerName => $inventory) {
+                    $coveredKeys = [];
+                    $priceSum = 0;
+                    foreach ($inventory['offers'] as $key => $offer) {
+                        if (isset($uncoveredTargets[$key])) {
+                            $coveredKeys[] = $key;
+                            $priceSum += $offer->price_eur;
+                        }
+                    }
+
+                    $coverageCount = count($coveredKeys);
+                    if ($coverageCount > 0) {
+                        if ($coverageCount > $bestCoverageCount || ($coverageCount === $bestCoverageCount && $priceSum < $bestPrice)) {
+                            $bestCoverageCount = $coverageCount;
+                            $bestPrice = $priceSum;
+                            $bestSeller = $sellerName;
+                            $bestCoveredKeys = $coveredKeys;
+                        }
+                    }
+                }
+
+                if ($bestSeller === null) {
+                    break; // Nessun venditore può coprire le carte rimanenti
+                }
+
+                // Aggiungiamo il venditore al carrello
+                $bundleOffers = [];
+                foreach ($bestCoveredKeys as $key) {
+                    $bundleOffers[] = $sellerInventories[$bestSeller]['offers'][$key];
+                    unset($uncoveredTargets[$key]); // Rimuoviamo il target
+                }
+
+                $optimalCart[] = (object) [
+                    'seller_name' => $bestSeller,
+                    'seller_country' => $sellerInventories[$bestSeller]['country'],
+                    'total_price' => $bestPrice,
+                    'cards' => $bundleOffers
+                ];
+            }
+
+            $uncoveredCardsInfo = [];
+            foreach (array_keys($uncoveredTargets) as $key) {
+                $uncoveredCardsInfo[] = (object) $targetInfo[$key];
+            }
+
+            $sellers = collect($optimalCart); // Use it as $sellers for the view
             
             // Just an empty paginator for userCards to avoid errors
             $userCards = new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage);
+            
+            // Pass uncovering info via request or direct view variables (we'll adapt the view)
+            view()->share('optimalCart', $optimalCart);
+            view()->share('uncoveredCards', $uncoveredCardsInfo);
         } else {
             $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
             $userCards = new \Illuminate\Pagination\LengthAwarePaginator(

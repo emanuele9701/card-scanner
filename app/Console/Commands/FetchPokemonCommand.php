@@ -12,8 +12,8 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use TCGdex\TCGdex;
 
-#[Signature('app:fetch-pokemon-command')]
-#[Description('Command description')]
+#[Signature('app:fetch-pokemon')]
+#[Description('Popola il DB delle carte')]
 class FetchPokemonCommand extends Command
 {
     /**
@@ -87,7 +87,8 @@ class FetchPokemonCommand extends Command
                         $tcgCard = TCGCard::where('card_id', $card->id)->where('set_id', $tcgSet->id)->first();
                         if ($tcgCard) {
                             $this->info("Aggiorno Prezzi: " . $tcgCard->name . " ({$tcgCard->card_id}) ");
-                            TCGCardPrice::createPrices($tcgCard->id, $card->pricing->cardmarket, $language);
+                            TCGCardPrice::createPrices($tcgCard->id, $card->pricing->cardmarket ?? null, $language);
+                            TCGCardPrice::createTcgPlayerPrices($tcgCard->id, $card->pricing->tcgplayer ?? null, $language);
                             continue;
                         }
 
@@ -109,8 +110,13 @@ class FetchPokemonCommand extends Command
                         // Abilities
                         TCGCardAbility::createAbilities($tcgCard->id, array_merge($card->abilities ?? [], $card->attacks ?? []), $language);
 
-                        // Prices
-                        TCGCardPrice::createPrices($tcgCard->id, $card->pricing->cardmarket, $language);
+                        
+
+                        // Prices — CardMarket
+                        TCGCardPrice::createPrices($tcgCard->id, $card->pricing->cardmarket ?? null, $language);
+
+                        // Prices — TCGPlayer
+                        TCGCardPrice::createTcgPlayerPrices($tcgCard->id, $card->pricing->tcgplayer ?? null, $language);
                     }
                 }
                 die;

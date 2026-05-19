@@ -339,7 +339,8 @@
                             '</li>';
                     }).join('') + '</ul>';
             } else {
-                abEl.innerHTML = '<span style="color:rgba(212,228,250,0.4);">' + (window.__trans ? window.__trans.no_abilities : 'Nessuna abilità') + '</span>';
+                abEl.innerHTML = '<span style="color:rgba(212,228,250,0.4);">' + (window.__trans ? window.__trans
+                    .no_abilities : 'Nessuna abilità') + '</span>';
             }
 
             /* Varianti */
@@ -366,8 +367,8 @@
             var tbody = document.getElementById('cm-prices-tbody');
             if (card.prices && card.prices.length) {
                 tbody.innerHTML = card.prices.map(function(p) {
-                    var d = p.updated_at ?
-                        new Date(p.updated_at).toLocaleDateString('it-IT', {
+                    var d = p.created_at ?
+                        new Date(p.created_at).toLocaleDateString('it-IT', {
                             day: '2-digit',
                             month: 'short',
                             year: 'numeric'
