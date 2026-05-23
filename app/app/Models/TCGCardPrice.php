@@ -80,7 +80,7 @@ class TCGCardPrice extends Model
     public static function createTcgPlayerPrices($idCard, $pricing, $language)
     {
         if (!$pricing) return;
-
+        
         $price = new TCGCardPrice();
         $price->card_id = $idCard;
         $price->provider = 'tcgplayer';

@@ -20,7 +20,11 @@ class FetchPokemonCommand extends Command
      * Execute the console command.
      */
     public function handle()
-    {
+    {   
+        $pricings = [
+            'cardmarket' => [],
+            'tcgplayer' => []
+        ];
         $languages = ['it','en'];
         foreach ($languages as $language) {
             $this->info("Language: " . $language);
@@ -106,6 +110,9 @@ class FetchPokemonCommand extends Command
                         $tcgCard->language = $language;
                         $tcgCard->save();
 
+                        $pricings['cardmarket'][$tcgCard->id][] = $card->pricing->cardmarket;
+                        $pricings['tcgplayer'][$tcgCard->id][] = $card->pricing->tcgplayer;
+
                         // Abilities
                         TCGCardAbility::createAbilities($tcgCard->id, array_merge($card->abilities ?? [], $card->attacks ?? []), $language);
 
@@ -113,7 +120,10 @@ class FetchPokemonCommand extends Command
                         TCGCardPrice::createPrices($tcgCard->id, $card->pricing->cardmarket, $language);
                     }
                 }
+                $this->info("Salvo i prezzi...");
+                file_put_contents("Pricings_{$language}.json",json_encode($pricings,JSON_PRETTY_PRINT));
             }
         }
+        
     }
 }
