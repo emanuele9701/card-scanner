@@ -1,28 +1,72 @@
 @php
-    $rarityConfig = match (strtolower($card->rarity ?? '')) {
-        'ultra rare', 'ultra-rare', 'secret rare' => [
-            'label' => 'Ultra Rare',
-            'chip_style' =>
-                'background-color:rgba(255,179,177,0.08); border:1px solid rgba(255,179,177,0.3); color:#ffb3b1;',
-            'dot_style' => 'background-color:#ffb3b1;',
+    // Normalizza il valore di rarità in minuscolo per il matching
+    $rarityRaw = strtolower(trim($card->rarity ?? ''));
+
+    $rarityConfig = match (true) {
+
+        // ── Hyper / Secret / Shiny ────────────────────────────────────────────
+        in_array($rarityRaw, [
+            'hyper rare', 'rara iper',                         // EN / IT
+            'secret rare', 'segreto rara',                     // EN / IT
+            'shiny rare', 'one shiny',                         // EN
+            'special illustration rare', 'rara illustrazione speciale', // EN / IT
+        ]) => [
+            'label'      => 'Secret',
+            'chip_style' => 'background:linear-gradient(90deg,rgba(255,100,200,0.15),rgba(255,179,177,0.08)); border:1px solid rgba(255,100,200,0.4); color:#ff64c8;',
+            'dot_style'  => 'background-color:#ff64c8;',
         ],
-        'rare', 'rare holo' => [
-            'label' => $card->rarity === 'rare holo' ? 'Rare Holo' : 'Rare',
-            'chip_style' =>
-                'background-color:rgba(255,215,149,0.08); border:1px solid rgba(255,215,149,0.3); color:#ffd795;',
-            'dot_style' => 'background-color:#ffd795;',
+
+        // ── Ultra Rare / Double Rare ──────────────────────────────────────────
+        in_array($rarityRaw, [
+            'ultra rare', 'ultra-rare', 'ultrarara',           // EN / IT
+            'double rare', 'rara doppia',                      // EN / IT
+            'two star', 'deux étoiles', 'deux √©toiles',       // EN / FR
+        ]) => [
+            'label'      => 'Ultra Rare',
+            'chip_style' => 'background-color:rgba(255,179,177,0.08); border:1px solid rgba(255,179,177,0.3); color:#ffb3b1;',
+            'dot_style'  => 'background-color:#ffb3b1;',
         ],
-        'uncommon' => [
-            'label' => 'Uncommon',
-            'chip_style' =>
-                'background-color:rgba(105,212,244,0.08); border:1px solid rgba(105,212,244,0.25); color:#69d4f4;',
-            'dot_style' => 'background-color:#69d4f4;',
+
+        // ── Rare Holo / V / VMAX / Illustration Rare / Diamonds ──────────────
+        in_array($rarityRaw, [
+            'rare holo', 'holo rare', 'olografica rara',       // EN / IT
+            'holo rare v', 'olografica rara v',
+            'holo rare vmax', 'olografica rara vmax',
+            'illustration rare', 'rara illustrazione',         // EN / IT
+            'three diamond', 'trois diamant',                  // EN / FR
+            'four diamond',
+            'one star', 'une étoile', 'une √©toile',           // EN / FR
+        ]) => [
+            'label'      => 'Rare Holo',
+            'chip_style' => 'background-color:rgba(255,215,149,0.12); border:1px solid rgba(255,215,149,0.4); color:#ffd795;',
+            'dot_style'  => 'background-color:#ffd795;',
         ],
+
+        // ── Rare (base) / One/Two Diamond ────────────────────────────────────
+        in_array($rarityRaw, [
+            'rare', 'rara',                                    // EN / IT
+            'one diamond', 'une diamant',                      // EN / FR
+            'two diamond', 'deux diamant',                     // EN / FR
+        ]) => [
+            'label'      => 'Rare',
+            'chip_style' => 'background-color:rgba(255,215,149,0.06); border:1px solid rgba(255,215,149,0.25); color:#e8c56a;',
+            'dot_style'  => 'background-color:#e8c56a;',
+        ],
+
+        // ── Uncommon ─────────────────────────────────────────────────────────
+        in_array($rarityRaw, [
+            'uncommon', 'non comune',                          // EN / IT
+        ]) => [
+            'label'      => 'Uncommon',
+            'chip_style' => 'background-color:rgba(105,212,244,0.08); border:1px solid rgba(105,212,244,0.25); color:#69d4f4;',
+            'dot_style'  => 'background-color:#69d4f4;',
+        ],
+
+        // ── Common / None / fallback ──────────────────────────────────────────
         default => [
-            'label' => 'Common',
-            'chip_style' =>
-                'background-color:rgba(212,228,250,0.06); border:1px solid rgba(212,228,250,0.15); color:#a0b4cc;',
-            'dot_style' => 'background-color:#a0b4cc;',
+            'label'      => in_array($rarityRaw, ['none', 'nessuna', '']) ? '—' : 'Common',
+            'chip_style' => 'background-color:rgba(212,228,250,0.06); border:1px solid rgba(212,228,250,0.15); color:#a0b4cc;',
+            'dot_style'  => 'background-color:#a0b4cc;',
         ],
     };
 
