@@ -218,6 +218,14 @@
                         <div class="shine"></div>
                     </button>
                 </form>
+
+                {{-- Link alla Registrazione --}}
+                <p class="text-center mt-4 mb-0" style="font-size:0.875rem; color:#9ca3af;">
+                    {{ __('Non hai un account?') }}
+                    <a href="{{ route('register') }}" style="color:#ef4444; text-decoration:none; font-weight:500; transition:color 0.2s;"
+                       onmouseover="this.style.color='#f87171'; this.style.textDecoration='underline';"
+                       onmouseout="this.style.color='#ef4444'; this.style.textDecoration='none';">{{ __('Registrati') }}</a>
+                </p>
             </div>
 
             {{-- Footer --}}
