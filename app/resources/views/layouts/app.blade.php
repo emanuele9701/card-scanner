@@ -113,6 +113,21 @@
         .dropdown-chevron.rotated {
             transform: rotate(180deg);
         }
+
+        .nav-user-avatar {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #ef4444, #e11d48);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+        }
     </style>
     @yield('custom_style')
 </head>
@@ -209,16 +224,77 @@
                         </div>
                     </div>
 
-                    <a href="{{ route('settings.index') }}" class="nav-link-custom {{ request()->routeIs('settings.*') ? 'active' : '' }}">
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7z" />
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 008.5 4.6 1.65 1.65 0 0010 3.09V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 8.5a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-                        </svg>
-                        {{ __('Impostazioni') }}
-                    </a>
+                    {{-- User Dropdown --}}
+                    <div class="position-relative" id="nav-user-dropdown">
+                        <button type="button" id="nav-user-btn"
+                            class="nav-link-custom border-0 bg-transparent {{ request()->routeIs('profile.*', 'settings.*') ? 'active' : '' }}"
+                            onclick="toggleUserDropdown()">
+                            <div class="nav-user-avatar">
+                                {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+                            </div>
+                            <span class="d-none d-sm-inline">{{ Auth::user()->name }}</span>
+                            <svg class="dropdown-chevron" id="user-dropdown-chevron" width="12" height="12"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        {{-- User Dropdown Menu --}}
+                        <div id="user-dropdown-menu" class="nav-dropdown-menu position-absolute end-0 mt-2"
+                            style="display: none; top: 100%;">
+
+                            {{-- Header utente --}}
+                            <div class="px-3 py-2 mb-1">
+                                <p class="mb-0 text-white fw-semibold" style="font-size:0.875rem;">{{ Auth::user()->name }}</p>
+                                <p class="mb-0" style="font-size:0.75rem; color:#6b7280;">{{ __('Gestisci il tuo account') }}</p>
+                            </div>
+
+                            <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 0.25rem 0;"></div>
+
+                            {{-- Profilo --}}
+                            <a href="{{ route('profile.index') }}" class="nav-dropdown-item">
+                                <div class="nav-dropdown-icon" style="background-color: rgba(99,102,241,0.1);">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
+                                        stroke="#818cf8" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                </div>
+                                {{ __('Profilo') }}
+                            </a>
+
+                            {{-- Impostazioni --}}
+                            <a href="{{ route('settings.index') }}" class="nav-dropdown-item">
+                                <div class="nav-dropdown-icon" style="background-color: rgba(245,158,11,0.1);">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
+                                        stroke="#f59e0b" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 008.5 4.6 1.65 1.65 0 0010 3.09V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 8.5a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                                    </svg>
+                                </div>
+                                {{ __('Impostazioni') }}
+                            </a>
+
+                            <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 0.25rem 0;"></div>
+
+                            {{-- Logout --}}
+                            <form method="POST" action="{{ route('logout') }}" class="m-0">
+                                @csrf
+                                <button type="submit" class="nav-dropdown-item w-100 border-0 bg-transparent text-start" style="cursor:pointer;">
+                                    <div class="nav-dropdown-icon" style="background-color: rgba(239,68,68,0.1);">
+                                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
+                                            stroke="#ef4444" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                        </svg>
+                                    </div>
+                                    {{ __('Esci') }}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
 
                 </div>
             </div>
@@ -232,21 +308,57 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // ── Collezioni Dropdown ──
         function toggleDropdown() {
             const menu = document.getElementById('dropdown-menu');
             const chevron = document.getElementById('dropdown-chevron');
             const isHidden = menu.style.display === 'none' || menu.style.display === '';
             menu.style.display = isHidden ? 'block' : 'none';
             chevron.classList.toggle('rotated', isHidden);
+
+            // Chiudi l'altro dropdown
+            closeUserDropdown();
+        }
+
+        // ── User Dropdown ──
+        function toggleUserDropdown() {
+            const menu = document.getElementById('user-dropdown-menu');
+            const chevron = document.getElementById('user-dropdown-chevron');
+            const isHidden = menu.style.display === 'none' || menu.style.display === '';
+            menu.style.display = isHidden ? 'block' : 'none';
+            chevron.classList.toggle('rotated', isHidden);
+
+            // Chiudi l'altro dropdown
+            closeCollezioniDropdown();
+        }
+
+        function closeUserDropdown() {
+            const menu = document.getElementById('user-dropdown-menu');
+            const chevron = document.getElementById('user-dropdown-chevron');
+            if (menu) {
+                menu.style.display = 'none';
+                chevron.classList.remove('rotated');
+            }
+        }
+
+        function closeCollezioniDropdown() {
+            const menu = document.getElementById('dropdown-menu');
+            const chevron = document.getElementById('dropdown-chevron');
+            if (menu) {
+                menu.style.display = 'none';
+                chevron.classList.remove('rotated');
+            }
         }
 
         document.addEventListener('click', function(e) {
-            const dropdown = document.getElementById('nav-collezioni-dropdown');
-            const menu = document.getElementById('dropdown-menu');
-            const chevron = document.getElementById('dropdown-chevron');
-            if (dropdown && !dropdown.contains(e.target)) {
-                menu.style.display = 'none';
-                chevron.classList.remove('rotated');
+            const collezioniDropdown = document.getElementById('nav-collezioni-dropdown');
+            const userDropdown = document.getElementById('nav-user-dropdown');
+
+            if (collezioniDropdown && !collezioniDropdown.contains(e.target)) {
+                closeCollezioniDropdown();
+            }
+            if (userDropdown && !userDropdown.contains(e.target)) {
+                closeUserDropdown();
             }
         });
     </script>

@@ -4,6 +4,7 @@ use App\Http\Controllers\CardController;
 use App\Http\Controllers\AuthWebController;
 use App\Http\Controllers\CollezioniController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserSettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +56,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/search', [CardController::class, 'search'])->name('search');
         Route::get('/{card}', [CardController::class, 'show'])->name('show');
     });
+
+    // Profilo utente
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::put('/profile/username', [ProfileController::class, 'updateUsername'])->name('profile.updateUsername');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.updatePassword');
 
     // Impostazioni utente
     Route::get('/settings', [UserSettingsController::class, 'index'])->name('settings.index');
