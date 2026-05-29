@@ -48,10 +48,6 @@ class TCGCard extends Model
         return $this->hasMany(TCGCardPrice::class, 'card_id', 'id');
     }
 
-    public function offers()
-    {
-        return $this->hasMany(TCGCardOffer::class, 'card_id', 'id');
-    }
 
     /**
      * Utenti che possiedono questa carta.

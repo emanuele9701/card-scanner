@@ -115,28 +115,7 @@ class CollezioniController extends Controller
         $paginatedCards = $missingCards->forPage($page, $perPage)->values();
         
         $cardIds = $paginatedCards->pluck('id')->toArray();
-        $offersCounts = [];
-        
-        if (!empty($cardIds)) {
-            $offers = \Illuminate\Support\Facades\DB::table('tcg_card_offers')
-                ->whereIn('card_id', $cardIds)
-                ->select('card_id', 'is_holo', 'is_reverse_holo', 'card_special_type', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total_offers'))
-                ->groupBy('card_id', 'is_holo', 'is_reverse_holo', 'card_special_type')
-                ->get();
-                
-            foreach ($offers as $offer) {
-                $variant = 'normal';
-                if ($offer->is_holo) $variant = 'holo';
-                elseif ($offer->is_reverse_holo) $variant = 'reverse';
-                elseif (stripos($offer->card_special_type ?? '', 'First Edition') !== false) $variant = 'firstedition';
-                
-                $offersCounts[$offer->card_id][$variant] = ($offersCounts[$offer->card_id][$variant] ?? 0) + $offer->total_offers;
-            }
-        }
-        
-        foreach ($paginatedCards as $card) {
-            $card->offers_count_by_variant = $offersCounts[$card->id] ?? [];
-        }
+
 
         $userCards = new \Illuminate\Pagination\LengthAwarePaginator(
             $paginatedCards,
@@ -405,193 +384,14 @@ class CollezioniController extends Controller
         $userCards = null;
         $sellers = null;
 
-        if ($tab === 'sellers') {
-            $selectedCardsStr = $request->input('selected_cards');
-            
-            $ownedCardIds = \App\Models\UserCardCollection::where('user_id', $user->id)
-                ->where('set_id', $set->id)
-                ->pluck('card_id');
-                
-            $sellersQuery = \Illuminate\Support\Facades\DB::table('tcg_card_offers')
-                ->join('tcg_cards', 'tcg_card_offers.card_id', '=', 'tcg_cards.id')
-                ->where('tcg_cards.set_id', $set->id);
-
-            // Advanced filtering by missing variants and selected cards
-            $sellersQuery->where(function($q) use ($missingCards, $selectedCardsStr) {
-                $selectedIds = !empty($selectedCardsStr) ? array_filter(explode(',', $selectedCardsStr)) : [];
-                $addedConditions = 0;
-
-                foreach ($missingCards as $card) {
-                    if (!empty($selectedIds) && !in_array($card->id, $selectedIds)) {
-                        continue;
-                    }
-
-                    foreach ($card->missing_variants as $variant) {
-                        $q->orWhere(function($subQ) use ($card, $variant) {
-                            $subQ->where('tcg_card_offers.card_id', $card->id);
-                            if ($variant === 'holo') {
-                                $subQ->where('tcg_card_offers.is_holo', 1);
-                            } elseif ($variant === 'reverse') {
-                                $subQ->where('tcg_card_offers.is_reverse_holo', 1);
-                            } elseif ($variant === 'firstedition') {
-                                // Add logic for first edition if present in DB
-                                $subQ->where('tcg_card_offers.card_special_type', 'like', '%First Edition%');
-                            } elseif ($variant === 'normal') {
-                                $subQ->where(function($sq) {
-                                    $sq->whereNull('tcg_card_offers.is_holo')->orWhere('tcg_card_offers.is_holo', 0);
-                                })->where(function($sq) {
-                                    $sq->whereNull('tcg_card_offers.is_reverse_holo')->orWhere('tcg_card_offers.is_reverse_holo', 0);
-                                });
-                            }
-                        });
-                        $addedConditions++;
-                    }
-                }
-
-                // If no missing variants, return no results
-                if ($addedConditions === 0) {
-                    $q->whereRaw('1 = 0');
-                }
-            });
-
-            $sellersQuery->select(
-                'tcg_card_offers.id',
-                'tcg_card_offers.card_id',
-                'tcg_card_offers.seller_name',
-                'tcg_card_offers.seller_country',
-                'tcg_card_offers.price_eur',
-                'tcg_card_offers.is_holo',
-                'tcg_card_offers.is_reverse_holo',
-                'tcg_card_offers.card_special_type',
-                'tcg_cards.name as card_name',
-                'tcg_cards.url_image'
-            );
-
-            $sellersQuery->orderBy('card_name', 'asc');
-
-            $rawOffers = $sellersQuery->get();
-
-            // 1. Definiamo i target: (card_id, variant) che stiamo cercando
-            $targetKeys = [];
-            $targetInfo = [];
-            $selectedIds = !empty($selectedCardsStr) ? array_filter(explode(',', $selectedCardsStr)) : [];
-            foreach ($missingCards as $card) {
-                if (!empty($selectedIds) && !in_array($card->id, $selectedIds)) continue;
-                foreach ($card->missing_variants as $variant) {
-                    $key = $card->id . '_' . $variant;
-                    $targetKeys[$key] = true;
-                    $targetInfo[$key] = [
-                        'card_id' => $card->id,
-                        'name' => $card->name,
-                        'variant' => $variant,
-                        'image' => is_string($card->images) ? json_decode($card->images, true)['small'] ?? null : ($card->images['small'] ?? null)
-                    ];
-                }
-            }
-
-            // 2. Mappiamo le offerte. Per ogni venditore e target, teniamo l'offerta più economica
-            $sellerInventories = [];
-            foreach ($rawOffers as $offer) {
-                $variant = 'normal';
-                if ($offer->is_holo) $variant = 'holo';
-                elseif ($offer->is_reverse_holo) $variant = 'reverse';
-                elseif (stripos($offer->card_special_type ?? '', 'First Edition') !== false) $variant = 'firstedition';
-                
-                $key = $offer->card_id . '_' . $variant;
-                if (!isset($targetKeys[$key])) continue;
-
-                $seller = $offer->seller_name;
-                if (!isset($sellerInventories[$seller])) {
-                    $sellerInventories[$seller] = [
-                        'name' => $seller,
-                        'country' => $offer->seller_country,
-                        'offers' => []
-                    ];
-                }
-
-                if (!isset($sellerInventories[$seller]['offers'][$key]) || $offer->price_eur < $sellerInventories[$seller]['offers'][$key]->price_eur) {
-                    // Aggiorna con l'offerta più bassa o aggiungi la prima
-                    // Aggiungiamo anche le info della carta per la view
-                    $offer->target_key = $key;
-                    $offer->card_image = $offer->url_image;
-                    $offer->variant_name = $variant;
-                    $sellerInventories[$seller]['offers'][$key] = $offer;
-                }
-            }
-
-            // 3. Algoritmo Greedy Set Cover
-            $optimalCart = [];
-            $uncoveredTargets = $targetKeys;
-
-            while (!empty($uncoveredTargets)) {
-                $bestSeller = null;
-                $bestCoverageCount = 0;
-                $bestPrice = PHP_FLOAT_MAX;
-                $bestCoveredKeys = [];
-
-                foreach ($sellerInventories as $sellerName => $inventory) {
-                    $coveredKeys = [];
-                    $priceSum = 0;
-                    foreach ($inventory['offers'] as $key => $offer) {
-                        if (isset($uncoveredTargets[$key])) {
-                            $coveredKeys[] = $key;
-                            $priceSum += $offer->price_eur;
-                        }
-                    }
-
-                    $coverageCount = count($coveredKeys);
-                    if ($coverageCount > 0) {
-                        if ($coverageCount > $bestCoverageCount || ($coverageCount === $bestCoverageCount && $priceSum < $bestPrice)) {
-                            $bestCoverageCount = $coverageCount;
-                            $bestPrice = $priceSum;
-                            $bestSeller = $sellerName;
-                            $bestCoveredKeys = $coveredKeys;
-                        }
-                    }
-                }
-
-                if ($bestSeller === null) {
-                    break; // Nessun venditore può coprire le carte rimanenti
-                }
-
-                // Aggiungiamo il venditore al carrello
-                $bundleOffers = [];
-                foreach ($bestCoveredKeys as $key) {
-                    $bundleOffers[] = $sellerInventories[$bestSeller]['offers'][$key];
-                    unset($uncoveredTargets[$key]); // Rimuoviamo il target
-                }
-
-                $optimalCart[] = (object) [
-                    'seller_name' => $bestSeller,
-                    'seller_country' => $sellerInventories[$bestSeller]['country'],
-                    'total_price' => $bestPrice,
-                    'cards' => $bundleOffers
-                ];
-            }
-
-            $uncoveredCardsInfo = [];
-            foreach (array_keys($uncoveredTargets) as $key) {
-                $uncoveredCardsInfo[] = (object) $targetInfo[$key];
-            }
-
-            $sellers = collect($optimalCart); // Use it as $sellers for the view
-            
-            // Just an empty paginator for userCards to avoid errors
-            $userCards = new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage);
-            
-            // Pass uncovering info via request or direct view variables (we'll adapt the view)
-            view()->share('optimalCart', $optimalCart);
-            view()->share('uncoveredCards', $uncoveredCardsInfo);
-        } else {
-            $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
-            $userCards = new \Illuminate\Pagination\LengthAwarePaginator(
-                $collectionToPaginate->forPage($currentPage, $perPage)->values(),
-                $collectionToPaginate->count(),
-                $perPage,
-                $currentPage,
-                ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
-            );
-        }
+        $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
+        $userCards = new \Illuminate\Pagination\LengthAwarePaginator(
+            $collectionToPaginate->forPage($currentPage, $perPage)->values(),
+            $collectionToPaginate->count(),
+            $perPage,
+            $currentPage,
+            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
 
         $allUserCardsForOptions = \App\Models\UserCardCollection::where('user_id', $user->id)
             ->where('set_id', $set->id)
@@ -606,22 +406,12 @@ class CollezioniController extends Controller
         $doppieTotal = $doppieCards->count();
 
         if ($request->boolean('ajax')) {
-            if ($tab === 'sellers') {
-                $html = view('collezioni.partials.sellers-grid', ['sellers' => $sellers, 'tab' => $tab])->render();
-                return response()->json([
-                    'html' => $html,
-                    'current_page' => $sellers->currentPage(),
-                    'last_page' => $sellers->lastPage(),
-                    'per_page' => $sellers->perPage(),
-                ]);
-            } else {
-                return response()->json([
-                    'html' => view('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab])->render(),
-                    'current_page' => $userCards->currentPage(),
-                    'last_page' => $userCards->lastPage(),
-                    'per_page' => $userCards->perPage(),
-                ]);
-            }
+            return response()->json([
+                'html' => view('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab])->render(),
+                'current_page' => $userCards->currentPage(),
+                'last_page' => $userCards->lastPage(),
+                'per_page' => $userCards->perPage(),
+            ]);
         }
 
         return view('collezioni.mie-set-detail', compact(
@@ -632,8 +422,7 @@ class CollezioniController extends Controller
             'tab',
             'ownedTotal',
             'missingTotal',
-            'doppieTotal',
-            'sellers'
+            'doppieTotal'
         ));
     }
 

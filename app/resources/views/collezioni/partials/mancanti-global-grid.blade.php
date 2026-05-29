@@ -48,24 +48,11 @@
                                 'firstedition' => 'Prima Edizione',
                                 default => 'Normale'
                             };
-                            $offersCount = $card->offers_count_by_variant[$variant] ?? 0;
-                        @endphp
                         <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge rounded-circle {{ $badgeColor }} d-flex justify-content-center align-items-center" style="width: 24px; height: 24px;">{{ $variantLabel }}</span>
                                 <span class="text-white fw-medium">{{ $variantName }}</span>
                             </div>
-                            
-                            @if($offersCount > 0)
-                                <a href="{{ route('collezioni.mie.set', ['set' => $card->set_id, 'tab' => 'sellers', 'selected_cards' => $card->id]) }}" class="badge bg-success text-white text-decoration-none px-3 py-2 rounded-pill d-flex align-items-center gap-1 transition-all">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-tag-fill" viewBox="0 0 16 16">
-                                        <path d="M2 1a1 1 0 0 0-1 1v4.586a1 1 0 0 0 .293.707l7 7a1 1 0 0 0 1.414 0l4.586-4.586a1 1 0 0 0 0-1.414l-7-7A1 1 0 0 0 6.586 1zm4 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/>
-                                    </svg>
-                                    {{ $offersCount }} offerte
-                                </a>
-                            @else
-                                <span class="badge bg-dark text-secondary border border-secondary px-3 py-2 rounded-pill">Nessuna offerta</span>
-                            @endif
                         </div>
                     @endforeach
                 </div>

@@ -185,18 +185,8 @@
                                 {{ __('Doppie') }} <span class="badge {{ ($tab ?? 'owned') === 'doppie' ? 'bg-white text-success' : 'bg-secondary text-white' }} ms-2">{{ $doppieTotal ?? 0 }}</span>
                             </a>
                         </li>
-                        <li class="nav-item ms-2">
-                            <a class="nav-link {{ ($tab ?? 'owned') === 'sellers' ? 'active bg-info text-dark' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'sellers', 'page' => 1]) }}">
-                                {{ __('Migliori Offerte') }}
-                            </a>
-                        </li>
                     </ul>
 
-                    @if(($tab ?? 'owned') === 'sellers')
-                        <div class="row g-4" id="cards-grid">
-                            @include('collezioni.partials.sellers-grid', ['sellers' => $sellers, 'tab' => $tab ?? 'owned'])
-                        </div>
-                    @else
                         <div class="d-flex justify-content-end mb-3">
                             <div class="form-check form-switch d-flex align-items-center gap-2 bg-dark p-2 px-3 rounded-pill border border-secondary shadow-sm">
                                 <input class="form-check-input mt-0" type="checkbox" id="selectAllVisible" onchange="toggleSelectAllVisible(this)" style="cursor: pointer;">
@@ -206,15 +196,13 @@
                         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="cards-grid">
                             @include('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab ?? 'owned'])
                         </div>
-                    @endif
 
                     <div class="d-flex justify-content-center mt-4">
                         @php
-                            $paginator = ($tab ?? 'owned') === 'sellers' ? ($sellers ?? null) : $userCards;
-                            $isPaginator = $paginator instanceof \Illuminate\Pagination\LengthAwarePaginator;
+                            $isPaginator = $userCards instanceof \Illuminate\Pagination\LengthAwarePaginator;
                         @endphp
                         <button id="load-more-btn" type="button" class="btn btn-outline-light px-4"
-                            @if (!$isPaginator || ($isPaginator && $paginator->currentPage() >= $paginator->lastPage())) style="display:none;" @endif>
+                            @if (!$isPaginator || ($isPaginator && $userCards->currentPage() >= $userCards->lastPage())) style="display:none;" @endif>
                             {{ __('Carica altro') }}
                         </button>
                     </div>
@@ -261,15 +249,7 @@
 
     <!-- Mass Action Bar -->
     <div id="mass-action-bar" class="fixed-bottom p-3 d-flex justify-content-center" style="pointer-events: none; z-index: 1040; transition: transform 0.3s ease; transform: translateY(100%);">
-        @if(($tab ?? 'owned') === 'missing')
-            <div class="card bg-info text-dark shadow-lg border-0" style="pointer-events: auto; max-width: 450px; border-radius: 2rem;">
-                <div class="card-body d-flex align-items-center gap-3 py-2 px-4">
-                    <span class="fw-bold"><span id="mass-selected-count">0</span> {{ __('carte selezionate') }}</span>
-                    <button class="btn btn-dark btn-sm text-info fw-bold rounded-pill" onclick="massFindSellers()">🔍 {{ __('Trova Venditori') }}</button>
-                    <button class="btn btn-sm text-dark text-opacity-75" onclick="clearSelection()">{{ __('Annulla') }}</button>
-                </div>
-            </div>
-        @else
+        @if(($tab ?? 'owned') !== 'missing')
             <div class="card bg-danger text-white shadow-lg border-0" style="pointer-events: auto; max-width: 400px; border-radius: 2rem;">
                 <div class="card-body d-flex align-items-center gap-3 py-2 px-4">
                     <span class="fw-bold"><span id="mass-selected-count">0</span> {{ __('carte selezionate') }}</span>
@@ -399,15 +379,7 @@
             });
         };
 
-        window.massFindSellers = function() {
-            if (selectedCards.size === 0) return;
-            const ids = Array.from(selectedCards).join(',');
-            const url = new URL(window.location.href);
-            url.searchParams.set('tab', 'sellers');
-            url.searchParams.set('selected_cards', ids);
-            url.searchParams.set('page', '1');
-            window.location.href = url.toString();
-        };
+
 
         window.massRemoveSelected = async function() {
             if (!confirm(window.__trans ? window.__trans.confirm_remove_mass.replace(':count', selectedCards.size) : `Vuoi rimuovere ${selectedCards.size} carte dalla tua collezione?`)) return;
