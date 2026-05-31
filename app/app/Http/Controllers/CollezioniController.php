@@ -253,63 +253,42 @@ class CollezioniController extends Controller
         $user = Auth::user();
         $language = $user->language ?? app()->getLocale();
 
-        $perPage = (int) $request->input('per_page', 10);
-        $allowedPerPage = [10, 15, 20];
-        if (! in_array($perPage, $allowedPerPage, true)) {
-            $perPage = 10;
-        }
-
-        $search = $request->input('search');
-        $typeFilter = $request->input('type');
-        $stageFilter = $request->input('stage');
-        $sort = $request->input('sort', 'dex_asc');
-
-        $cardsQuery = $set->cards()->with(['prices', 'collectors' => function($q) use ($user) {
+        $allCards = $set->cards()->with(['prices', 'collectors' => function($q) use ($user) {
             $q->where('user_id', $user->id);
-        }]);
+        }])->orderBy('dexId', 'asc')->get();
 
-        if ($search) {
-            $cardsQuery->where('name', 'like', '%' . $search . '%');
-        }
-
-        if ($typeFilter) {
-            $cardsQuery->whereJsonContains('types', $typeFilter);
-        }
-
-        if ($stageFilter) {
-            $cardsQuery->where('level_stage', $stageFilter);
-        }
-
-        match ($sort) {
-            'name_desc' => $cardsQuery->orderBy('name', 'desc'),
-            'name_asc' => $cardsQuery->orderBy('name', 'asc'),
-            'rarity_desc' => $cardsQuery->orderBy('rarity', 'desc'),
-            'rarity_asc' => $cardsQuery->orderBy('rarity', 'asc'),
-            'dex_desc' => $cardsQuery->orderBy('dexId', 'desc'),
-            default => $cardsQuery->orderBy('dexId', 'asc'),
-        };
-
-        $cards = $cardsQuery->paginate($perPage)->withQueryString();
-        
-        $cards->getCollection()->transform(function($card) {
+        $allCards->transform(function($card) {
             $card->isCollected = $card->collectors->isNotEmpty();
             return $card;
         });
 
-        $allCardsForOptions = $set->cards()->get();
-        $typeOptions = $allCardsForOptions->flatMap(fn ($card) => is_array($card->types) ? $card->types : [])->unique()->sort()->values();
-        $stageOptions = $allCardsForOptions->pluck('level_stage')->filter()->unique()->values();
+        $typeOptions = $allCards->flatMap(fn ($card) => is_array($card->types) ? $card->types : [])->unique()->sort()->values();
+        $stageOptions = $allCards->pluck('level_stage')->filter()->unique()->values();
 
-        if ($request->boolean('ajax')) {
-            return response()->json([
-                'html' => view('collezioni.partials.cards-grid', compact('cards'))->render(),
-                'current_page' => $cards->currentPage(),
-                'last_page' => $cards->lastPage(),
-                'per_page' => $cards->perPage(),
-            ]);
-        }
+        // Build lightweight JSON for client-side rendering
+        $allCardsJson = $allCards->map(function($card) {
+            $latestPrice = $card->prices->sortByDesc('updated_at')->first();
+            return [
+                'id'          => $card->id,
+                'name'        => $card->name,
+                'dexId'       => $card->dexId,
+                'rarity'      => $card->rarity ?? '',
+                'type'        => $card->type ?? '',
+                'types'       => $card->types ?? [],
+                'level_stage' => $card->level_stage ?? '',
+                'url_image'   => $card->url_image,
+                'language'    => $card->language ?? '',
+                'illustrator' => $card->illustrator ?? '',
+                'evolve_from' => $card->evolve_from ?? '',
+                'isCollected' => $card->isCollected,
+                'price'       => $latestPrice ? ($latestPrice->avg ?? 0) : 0,
+                'set_name'    => optional($card->set)->name ?? '',
+                'set_symbol'  => optional($card->set)->symbol ?? '',
+                'set_abbr'    => optional($card->set)->abbreviation_official ?? '',
+            ];
+        })->values();
 
-        return view('collezioni.set-detail', compact('set', 'cards', 'typeOptions', 'stageOptions'));
+        return view('collezioni.set-detail', compact('set', 'typeOptions', 'stageOptions', 'allCardsJson'));
     }
 
     public function addCardToCollection(TCGCard $card) {
