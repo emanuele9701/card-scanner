@@ -72,7 +72,7 @@ class DashboardController extends Controller
 
             return [
                 'set_id' => $userSet->set_id,
-                'name' => $userSet->set->name ?? 'Sconosciuto',
+                'name' => $userSet->set->name ?? __('Sconosciuto'),
                 'symbol' => ($userSet->set->logo ?? $userSet->set->symbol) ?? null,
                 'unique_cards' => $userSet->unique_cards,
                 'total_quantity' => $userSet->total_quantity,
@@ -82,11 +82,35 @@ class DashboardController extends Controller
             ];
         })->sortByDesc('completion_percentage')->values();
 
+        $topCards = collect($collections)->map(function ($item) {
+            $priceModel = $item->card?->prices->first();
+            $price = 0;
+            if ($priceModel) {
+                $isHoloOrReverse = false;
+                if (is_array($item->variants)) {
+                    $variantsLower = array_map('strtolower', $item->variants);
+                    $isHoloOrReverse = in_array('holo', $variantsLower) || in_array('reverse', $variantsLower);
+                }
+                if ($isHoloOrReverse) {
+                    $price = $priceModel->trend_holo ?? $priceModel->avg_holo ?? $priceModel->trend ?? $priceModel->avg ?? 0;
+                } else {
+                    $price = $priceModel->trend ?? $priceModel->avg ?? 0;
+                }
+            }
+            return [
+                'card' => $item->card,
+                'quantity' => $item->quantity,
+                'unit_price' => $price,
+                'total_price' => $price * $item->quantity,
+            ];
+        })->sortByDesc('total_price')->take(5)->values();
+
         return view('dashboard', compact(
             'totalSetsOwned', 
             'totalCardsOwned', 
             'totalEstimatedValue', 
-            'setsStats'
+            'setsStats',
+            'topCards'
         ));
     }
 }

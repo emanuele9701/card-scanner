@@ -254,7 +254,16 @@
                         {{-- Right — Info --}}
                         <div class="set-info">
                             <div style="min-width:0;">
-                                <p class="set-name">{{ $set->name }}</p>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <p class="set-name">{{ $set->name }}</p>
+                                    @if(isset($language) && $set->language && $set->language !== $language)
+                                        @php
+                                            $flags = ['it' => '🇮🇹', 'en' => '🇬🇧', 'fr' => '🇫🇷', 'de' => '🇩🇪', 'es' => '🇪🇸', 'jp' => '🇯🇵', 'ja' => '🇯🇵'];
+                                            $flag = $flags[strtolower($set->language)] ?? strtoupper($set->language);
+                                        @endphp
+                                        <span title="Disponibile solo in {{ strtoupper($set->language) }}" style="font-size: 0.9rem; line-height: 1;">{{ $flag }}</span>
+                                    @endif
+                                </div>
                                 
                                 @if($set->serie)
                                     <div class="serie-badge mt-1 d-inline-block">{{ $set->serie->name }}</div>

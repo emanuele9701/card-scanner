@@ -2,87 +2,59 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ProfileUpdateRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
     /**
-     * Mostra la pagina del profilo utente.
+     * Display the user's profile form.
      */
-    public function index(): View
+    public function edit(Request $request): View
     {
-        return view('profile');
+        return view('profile.edit', [
+            'user' => $request->user(),
+        ]);
     }
 
     /**
-     * Aggiorna lo username dell'utente.
+     * Update the user's profile information.
      */
-    public function updateUsername(Request $request): RedirectResponse
+    public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $user = Auth::user();
+        $request->user()->fill($request->validated());
 
-        $validator = Validator::make($request->all(), [
-            'name' => ['required', 'string', 'max:255', 'unique:users,name,' . $user->id],
-        ], [
-            'name.required' => 'Lo username è obbligatorio.',
-            'name.unique'   => 'Questo username è già in uso.',
-            'name.max'      => 'Lo username non può superare 255 caratteri.',
-        ]);
-
-        if ($validator->fails()) {
-            throw ValidationException::withMessages($validator->errors()->toArray())
-                ->errorBag('username');
+        if ($request->user()->isDirty('email')) {
+            $request->user()->email_verified_at = null;
         }
 
-        // Aggiorna anche il placeholder email per mantenerlo coerente
-        $user->name  = $request->name;
-        $user->email = strtolower($request->name) . '@placeholder.local';
-        $user->save();
+        $request->user()->save();
 
-        return redirect()
-            ->route('profile.index')
-            ->with('success', __('Username aggiornato con successo.'));
+        return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
     /**
-     * Aggiorna la password dell'utente.
+     * Delete the user's account.
      */
-    public function updatePassword(Request $request): RedirectResponse
+    public function destroy(Request $request): RedirectResponse
     {
-        $user = Auth::user();
-
-        // Verifica la password attuale
-        if (!Hash::check($request->current_password, $user->password)) {
-            throw ValidationException::withMessages([
-                'current_password' => __('La password attuale non è corretta.'),
-            ])->errorBag('password');
-        }
-
-        $validator = Validator::make($request->all(), [
-            'new_password' => ['required', 'string', 'min:8', 'confirmed'],
-        ], [
-            'new_password.required'  => 'La nuova password è obbligatoria.',
-            'new_password.min'       => 'La nuova password deve avere almeno 8 caratteri.',
-            'new_password.confirmed' => 'Le password non coincidono.',
+        $request->validateWithBag('userDeletion', [
+            'password' => ['required', 'current_password'],
         ]);
 
-        if ($validator->fails()) {
-            throw ValidationException::withMessages($validator->errors()->toArray())
-                ->errorBag('password');
-        }
+        $user = $request->user();
 
-        $user->password = Hash::make($request->new_password);
-        $user->save();
+        Auth::logout();
 
-        return redirect()
-            ->route('profile.index')
-            ->with('success', __('Password aggiornata con successo.'));
+        $user->delete();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return Redirect::to('/');
     }
 }
-

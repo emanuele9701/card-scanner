@@ -171,23 +171,23 @@
                 <div class="col-12 col-xl-8">
                     <ul class="nav nav-pills mb-4" id="collection-tabs">
                         <li class="nav-item">
-                            <a class="nav-link {{ ($tab ?? 'owned') === 'owned' ? 'active bg-primary text-white' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'owned', 'page' => 1]) }}">
+                            <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'owned' ? 'active bg-primary text-white' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'owned', 'page' => 1]) }}" data-tab="owned">
                                 {{ __('Le mie carte') }} <span class="badge {{ ($tab ?? 'owned') === 'owned' ? 'bg-white text-primary' : 'bg-secondary text-white' }} ms-2">{{ $ownedTotal ?? 0 }}</span>
                             </a>
                         </li>
                         <li class="nav-item ms-2">
-                            <a class="nav-link {{ ($tab ?? 'owned') === 'missing' ? 'active bg-warning text-dark' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'missing', 'page' => 1]) }}">
+                            <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'missing' ? 'active bg-warning text-dark' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'missing', 'page' => 1]) }}" data-tab="missing">
                                 {{ __('Carte Mancanti') }} <span class="badge {{ ($tab ?? 'owned') === 'missing' ? 'bg-dark text-warning' : 'bg-secondary text-white' }} ms-2">{{ $missingTotal ?? 0 }}</span>
                             </a>
                         </li>
                         <li class="nav-item ms-2">
-                            <a class="nav-link {{ ($tab ?? 'owned') === 'doppie' ? 'active bg-success text-white' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'doppie', 'page' => 1]) }}">
+                            <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'doppie' ? 'active bg-success text-white' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'doppie', 'page' => 1]) }}" data-tab="doppie">
                                 {{ __('Doppie') }} <span class="badge {{ ($tab ?? 'owned') === 'doppie' ? 'bg-white text-success' : 'bg-secondary text-white' }} ms-2">{{ $doppieTotal ?? 0 }}</span>
                             </a>
                         </li>
                     </ul>
 
-                        <div class="d-flex justify-content-end mb-3">
+                        <div class="d-flex justify-content-end mb-3" id="selectAllContainer" style="{{ ($tab ?? 'owned') === 'owned' ? '' : 'display: none !important;' }}">
                             <div class="form-check form-switch d-flex align-items-center gap-2 bg-dark p-2 px-3 rounded-pill border border-secondary shadow-sm">
                                 <input class="form-check-input mt-0" type="checkbox" id="selectAllVisible" onchange="toggleSelectAllVisible(this)" style="cursor: pointer;">
                                 <label class="form-check-label text-white small fw-bold text-uppercase" for="selectAllVisible" style="cursor: pointer;">{{ __('Seleziona Tutte Visibili') }}</label>
@@ -216,8 +216,8 @@
                             <div class="list-group list-group-flush mt-4">
                                 <div
                                     class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between align-items-center border-0">
-                                    <span class="summary-label">{{ __('Carte possedute') }}</span>
-                                    <span class="summary-value">{{ $userCards->total() }} /
+                                    <span class="summary-label">{{ __('Carte possedute (Uniche)') }}</span>
+                                    <span class="summary-value">{{ $ownedTotal ?? 0 }} /
                                         {{ $set->card_total ?? '?' }}</span>
                                 </div>
                                 @php
@@ -303,9 +303,84 @@
                 pagination.dataset.lastPage = data.last_page;
                 updateLoadMoreButton(data.current_page, data.last_page);
                 var pageInput = document.getElementById('filter-page');
-                if (pageInput) pageInput.value = 1;
+                if (pageInput) pageInput.value = data.current_page;
             }
         }
+
+        async function reloadCardsGrid(page = 1) {
+            document.getElementById('cards-grid').innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="text-secondary mt-3">' + (window.__trans ? window.__trans.loading : 'Caricamento...') + '</p></div>';
+            
+            var params = currentFilterParams();
+            params.set('page', page);
+            params.set('ajax', 1);
+
+            var pagination = document.getElementById('cards-pagination');
+            var url = pagination.dataset.loadUrl + '?' + params.toString();
+            
+            try {
+                var response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                var data = await response.json();
+                if (data.html !== undefined) {
+                    document.getElementById('cards-grid').innerHTML = data.html;
+                    pagination.dataset.currentPage = data.current_page || 1;
+                    pagination.dataset.lastPage = data.last_page || 1;
+                    updateLoadMoreButton(data.current_page || 1, data.last_page || 1);
+                    var pageInput = document.getElementById('filter-page');
+                    if (pageInput) pageInput.value = data.current_page || 1;
+                    clearSelection();
+                }
+            } catch (e) {
+                console.error("AJAX Error:", e);
+                // Fallback, reload page if ajax fails
+                window.location.reload();
+            }
+        }
+
+        document.querySelectorAll('.collection-tab-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Update visuals
+                document.querySelectorAll('.collection-tab-link').forEach(l => {
+                    l.classList.remove('active', 'bg-primary', 'bg-warning', 'bg-success', 'text-white', 'text-dark');
+                    l.classList.add('text-secondary');
+                    l.querySelector('.badge').className = 'badge bg-secondary text-white ms-2';
+                });
+                
+                let tabValue = this.dataset.tab;
+                this.classList.remove('text-secondary');
+                
+                if(tabValue === 'owned') {
+                    this.classList.add('active', 'bg-primary', 'text-white');
+                    this.querySelector('.badge').className = 'badge bg-white text-primary ms-2';
+                } else if(tabValue === 'missing') {
+                    this.classList.add('active', 'bg-warning', 'text-dark');
+                    this.querySelector('.badge').className = 'badge bg-dark text-warning ms-2';
+                } else if(tabValue === 'doppie') {
+                    this.classList.add('active', 'bg-success', 'text-white');
+                    this.querySelector('.badge').className = 'badge bg-white text-success ms-2';
+                }
+
+                // Update hidden input & reload
+                document.querySelector('input[name="tab"]').value = tabValue;
+                
+                let selectAllBtn = document.getElementById('selectAllContainer');
+                if (selectAllBtn) {
+                    if (tabValue === 'owned') {
+                        selectAllBtn.style.setProperty('display', 'flex', 'important');
+                    } else {
+                        selectAllBtn.style.setProperty('display', 'none', 'important');
+                    }
+                }
+                
+                reloadCardsGrid(1);
+            });
+        });
+
+        document.getElementById('filter-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            reloadCardsGrid(1);
+        });
 
         window._cardDetailRoute = "{{ route('cards.show', ['card' => ':card']) }}";
 

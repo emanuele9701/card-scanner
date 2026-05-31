@@ -23,6 +23,7 @@ class TCGSet extends Model
         "release_date",
         'variants',
         "abbreviation",
+        "abbreviation_official",
         "language",
     ];
 

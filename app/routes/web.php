@@ -1,41 +1,28 @@
 <?php
 
 use App\Http\Controllers\CardController;
-use App\Http\Controllers\AuthWebController;
 use App\Http\Controllers\CollezioniController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserSettingsController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-*/
-
-// ── Guest (non autenticati) ─────────────────────────────────────────────
-Route::middleware('guest')->group(function () {
-    Route::get('/login', [AuthWebController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthWebController::class, 'login']);
-    Route::get('/register', [AuthWebController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthWebController::class, 'register']);
+Route::get('/', function () {
+    return redirect()->route('dashboard');
 });
 
-// ── Authenticated ───────────────────────────────────────────────────────
 Route::get('/test-variants', function() {
     $card = \App\Models\TCGCard::whereNotNull('variants')->first();
     return response()->json($card->variants);
 });
 
-Route::middleware('auth')->group(function () {
-    Route::get('/', fn () => redirect()->route('dashboard'));
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::post('/logout', [AuthWebController::class, 'logout'])->name('logout');
 
     // Collezioni
     Route::prefix('collezioni')->name('collezioni.')->group(function () {
         Route::get('/mie', [CollezioniController::class, 'index'])->name('mie');
+        Route::get('/mie/export', [CollezioniController::class, 'export'])->name('mie.export');
         Route::get('/mancanti', [CollezioniController::class, 'missingGlobal'])->name('mancanti');
         Route::get('/mie/set/{set}', [CollezioniController::class, 'showMySet'])->name('mie.set');
         Route::get('/disponibili', [CollezioniController::class, 'disponibili'])->name('disponibili');
@@ -54,15 +41,18 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('cards')->name('cards.')->group(function () {
         Route::get('/search', [CardController::class, 'search'])->name('search');
+        Route::get('/autocomplete', [CardController::class, 'autocomplete'])->name('autocomplete');
         Route::get('/{card}', [CardController::class, 'show'])->name('show');
     });
 
     // Profilo utente
-    Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
-    Route::put('/profile/username', [ProfileController::class, 'updateUsername'])->name('profile.updateUsername');
-    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.updatePassword');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Impostazioni utente
     Route::get('/settings', [UserSettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings', [UserSettingsController::class, 'update'])->name('settings.update');
 });
+
+require __DIR__.'/auth.php';

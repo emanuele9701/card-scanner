@@ -214,7 +214,7 @@
             }
         }
 
-        window.addToCollection = async function(button, cardId) {
+        window.addToCollection = async function(button, cardId, cardName = '', cardDexId = '') {
             if (!button) return;
             var textEl = button.querySelector('.btn-card-add-text');
             var loaderEl = button.querySelector('.btn-card-loader');
@@ -248,6 +248,13 @@
                 button.classList.add('btn-success');
                 button.classList.remove('btn-card-add');
                 button.disabled = true;
+
+                if (window.showToast) {
+                    let msg = window.__trans && window.__trans.pokemon_added 
+                        ? window.__trans.pokemon_added.replace(':name', cardName).replace(':number', cardDexId)
+                        : `${cardName} #${cardDexId} aggiunto`;
+                    window.showToast(msg, 'success');
+                }
             } catch (error) {
                 if (textEl) textEl.textContent = window.__trans ? window.__trans.error : 'Errore';
                 console.error('addToCollection:', error);

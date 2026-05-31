@@ -76,6 +76,13 @@ class FetchPokemonCommand extends Command
                         $tcgSet->card_first_edition = $set->cardCount->firstEd;
                         $tcgSet->release_date = $set->releaseDate;
                         $tcgSet->abbreviation = $set->abbreviation ?? '-';
+                        // Denormalizza abbreviazione ufficiale per ricerca indicizzata
+                        $abbr = $set->abbreviation;
+                        if (is_object($abbr) && isset($abbr->official)) {
+                            $tcgSet->abbreviation_official = strtoupper($abbr->official);
+                        } elseif (is_array($abbr) && isset($abbr['official'])) {
+                            $tcgSet->abbreviation_official = strtoupper($abbr['official']);
+                        }
                         $tcgSet->language = $language;
                         $tcgSet->save();
                     }

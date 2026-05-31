@@ -31,6 +31,61 @@ class CollezioniController extends Controller
         ]);
     }
 
+    public function export(Request $request)
+    {
+        $user = Auth::user();
+        $collections = \App\Models\UserCardCollection::with(['card', 'card.set', 'card.prices'])
+            ->where('user_id', $user->id)
+            ->get();
+            
+        $csvHeader = ['Card Name', 'Set', 'Rarity', 'Condition', 'Variants', 'Quantity', 'Estimated Unit Value', 'Estimated Total Value'];
+        $csvData = [];
+        
+        foreach ($collections as $item) {
+            $card = $item->card;
+            if (!$card) continue;
+            
+            $price = 0;
+            $priceModel = $card->prices->first();
+            if ($priceModel) {
+                $isHoloOrReverse = false;
+                if (is_array($item->variants)) {
+                    $variantsLower = array_map('strtolower', $item->variants);
+                    $isHoloOrReverse = in_array('holo', $variantsLower) || in_array('reverse', $variantsLower);
+                }
+                if ($isHoloOrReverse) {
+                    $price = $priceModel->trend_holo ?? $priceModel->avg_holo ?? $priceModel->trend ?? $priceModel->avg ?? 0;
+                } else {
+                    $price = $priceModel->trend ?? $priceModel->avg ?? 0;
+                }
+            }
+            
+            $csvData[] = [
+                $card->name,
+                $card->set->name ?? '',
+                $card->rarity ?? '',
+                $item->condition ?? 'NM',
+                is_array($item->variants) ? implode(', ', $item->variants) : '',
+                $item->quantity,
+                number_format((float)$price, 2, '.', ''),
+                number_format((float)$price * $item->quantity, 2, '.', ''),
+            ];
+        }
+        
+        $filename = "pokestash_collection_" . date('Y-m-d') . ".csv";
+        
+        return response()->streamDownload(function() use ($csvHeader, $csvData) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, $csvHeader);
+            foreach ($csvData as $row) {
+                fputcsv($handle, $row);
+            }
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=utf-8',
+        ]);
+    }
+
     public function missingGlobal(Request $request)
     {
         $user = Auth::user();
@@ -148,7 +203,21 @@ class CollezioniController extends Controller
         $year = $request->input('year');
         $sort = $request->input('sort', 'desc');
 
-        $setsQuery = TCGSet::where('language', $language)->has('cards')->with('serie');
+        $allSets = TCGSet::has('cards')->get(['id', 'set_id', 'language']);
+        
+        $selectedIds = [];
+        $grouped = $allSets->groupBy('set_id');
+        foreach ($grouped as $setId => $versions) {
+            $preferred = $versions->firstWhere('language', $language);
+            if ($preferred) {
+                $selectedIds[] = $preferred->id;
+            } else {
+                $en = $versions->firstWhere('language', 'en');
+                $selectedIds[] = $en ? $en->id : $versions->first()->id;
+            }
+        }
+
+        $setsQuery = TCGSet::whereIn('id', $selectedIds)->with('serie');
 
         if ($search) {
             $setsQuery->where('name', 'like', '%' . $search . '%');
@@ -166,14 +235,14 @@ class CollezioniController extends Controller
 
         $sets = $setsQuery->paginate(30)->withQueryString();
 
-        $years = TCGSet::where('language', $language)
+        $years = TCGSet::whereIn('id', $selectedIds)
             ->whereNotNull('release_date')
             ->selectRaw('YEAR(release_date) as year')
             ->distinct()
             ->orderBy('year', 'desc')
             ->pluck('year');
 
-        return view('collezioni.disponibili', compact('sets', 'years', 'search', 'year', 'sort'));
+        return view('collezioni.disponibili', compact('sets', 'years', 'search', 'year', 'sort', 'language'));
     }
 
     /**
@@ -183,16 +252,6 @@ class CollezioniController extends Controller
     {
         $user = Auth::user();
         $language = $user->language ?? app()->getLocale();
-
-        if ($set->language !== $language) {
-            $translated = TCGSet::where('set_id', $set->set_id)
-                ->where('language', $language)
-                ->first();
-
-            if ($translated) {
-                $set = $translated;
-            }
-        }
 
         $perPage = (int) $request->input('per_page', 10);
         $allowedPerPage = [10, 15, 20];
@@ -205,7 +264,9 @@ class CollezioniController extends Controller
         $stageFilter = $request->input('stage');
         $sort = $request->input('sort', 'dex_asc');
 
-        $cardsQuery = $set->cards()->with('prices');
+        $cardsQuery = $set->cards()->with(['prices', 'collectors' => function($q) use ($user) {
+            $q->where('user_id', $user->id);
+        }]);
 
         if ($search) {
             $cardsQuery->where('name', 'like', '%' . $search . '%');
@@ -229,6 +290,11 @@ class CollezioniController extends Controller
         };
 
         $cards = $cardsQuery->paginate($perPage)->withQueryString();
+        
+        $cards->getCollection()->transform(function($card) {
+            $card->isCollected = $card->collectors->isNotEmpty();
+            return $card;
+        });
 
         $allCardsForOptions = $set->cards()->get();
         $typeOptions = $allCardsForOptions->flatMap(fn ($card) => is_array($card->types) ? $card->types : [])->unique()->sort()->values();
@@ -256,10 +322,10 @@ class CollezioniController extends Controller
                 'set_id' => $card->set_id,
                 'serie_id' => $card->set->serie_id
             ]);            
-            return response()->json(['esito' => true, 'message' => 'Carta aggiunta']);
+            return response()->json(['esito' => true, 'message' => __('Carta aggiunta')]);
         }
         
-        return response()->json(['esito' => false, 'message' => 'Carta già inserita']);
+        return response()->json(['esito' => false, 'message' => __('Carta già inserita')]);
     }
 
     /**
@@ -269,16 +335,6 @@ class CollezioniController extends Controller
     {
         $user = Auth::user();
         $language = $user->language ?? app()->getLocale();
-
-        if ($set->language !== $language) {
-            $translated = TCGSet::where('set_id', $set->set_id)
-                ->where('language', $language)
-                ->first();
-
-            if ($translated) {
-                $set = $translated;
-            }
-        }
 
         $perPage = (int) $request->input('per_page', 100);
         $allowedPerPage = [100, 200, 300];

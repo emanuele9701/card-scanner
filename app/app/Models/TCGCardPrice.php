@@ -64,6 +64,14 @@ class TCGCardPrice extends Model
         $price->avg_30d_holo = $pricing->{'avg30-holo'} ?? null;
         $price->language = $language;
         $price->save();
+
+        TCGCardPriceHistory::create([
+            'card_id' => $idCard,
+            'trend' => $price->trend,
+            'trend_holo' => $price->trend_holo,
+            'avg' => $price->avg,
+            'avg_holo' => $price->avg_holo,
+        ]);
     }
 
     /**
@@ -116,5 +124,13 @@ class TCGCardPrice extends Model
         }
 
         $price->save();
+
+        TCGCardPriceHistory::create([
+            'card_id' => $idCard,
+            'trend' => $price->trend,
+            'trend_holo' => $price->trend_holo,
+            'avg' => $price->avg,
+            'avg_holo' => $price->avg_holo,
+        ]);
     }
 }

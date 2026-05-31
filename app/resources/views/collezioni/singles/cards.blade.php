@@ -21,7 +21,7 @@
             'dot_style' => 'background-color:#69d4f4;',
         ],
         default => [
-            'label' => 'Common',
+            'label' => $card->rarity ?: 'Common',
             'chip_style' =>
                 'background-color:rgba(212,228,250,0.06); border:1px solid rgba(212,228,250,0.15); color:#a0b4cc;',
             'dot_style' => 'background-color:#a0b4cc;',
@@ -321,7 +321,7 @@
                     {{ __('Vedi dettagli') }}
                 </button>
                 @if (!$isCollected)
-                    <button type="button" class="btn-card-add w-100" onclick="event.stopPropagation(); addToCollection(this, {{ $card->id }})">
+                    <button type="button" class="btn-card-add w-100" onclick="event.stopPropagation(); addToCollection(this, {{ $card->id }}, '{{ addslashes($card->name) }}', '{{ str_pad($card->dexId, 3, "0", STR_PAD_LEFT) }}')">
                         <span class="btn-card-add-text">{{ __('+ Aggiungi') }}</span>
                         <span class="btn-card-loader visually-hidden">{{ __('Caricamento...') }}</span>
                     </button>
@@ -330,8 +330,51 @@
         </div>
 
         <div class="card-footer-area">
-            <p class="card-name">{{ $card->name }}</p>
-            <div class="d-flex align-items-center justify-content-between gap-1 mb-2">
+            <p class="card-name d-flex align-items-center gap-2 mb-1" title="{{ $card->name }}">
+                @if(strtolower($card->language ?? '') === 'it')
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2" width="16" height="12" style="border-radius: 2px; flex-shrink: 0;">
+                        <path fill="#009246" d="M0 0h1v2H0z"/>
+                        <path fill="#fff" d="M1 0h1v2H1z"/>
+                        <path fill="#ce2b37" d="M2 0h1v2H2z"/>
+                    </svg>
+                @elseif(strtolower($card->language ?? '') === 'en')
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" width="16" height="12" style="border-radius: 2px; flex-shrink: 0;">
+                        <clipPath id="s">
+                            <path d="M0,0 v30 h60 v-30 z"/>
+                        </clipPath>
+                        <clipPath id="t">
+                            <path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/>
+                        </clipPath>
+                        <g clip-path="url(#s)">
+                            <path d="M0,0 v30 h60 v-30 z" fill="#012169"/>
+                            <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/>
+                            <path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#t)" stroke="#C8102E" stroke-width="4"/>
+                            <path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/>
+                            <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/>
+                        </g>
+                    </svg>
+                @elseif(strtolower($card->language ?? '') === 'jp')
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="16" height="12" style="border-radius: 2px; flex-shrink: 0;">
+                        <rect width="900" height="600" fill="#fff"/>
+                        <circle cx="450" cy="300" r="180" fill="#bc002d"/>
+                    </svg>
+                @endif
+                <span class="text-truncate">{{ $card->name }}</span>
+            </p>
+            
+            <p class="text-secondary d-flex align-items-center text-truncate mb-2" style="font-size: 0.75rem;" title="{{ optional($card->set)->name }}">
+                @if($card->set)
+                    @if($card->set->symbol)
+                        <img src="{{ $card->set->symbol }}/low.png" alt="Set Symbol" style="height: 12px; width: auto; margin-right: 6px; filter: drop-shadow(0px 1px 1px rgba(0,0,0,0.5));" loading="lazy" onerror="this.style.display='none'">
+                    @endif
+                    <span class="text-truncate">{{ $card->set->name }}</span>
+                    @if($card->set->abbreviation_official)
+                        <span style="opacity: 0.5; margin-left: 4px; flex-shrink: 0;">({{ $card->set->abbreviation_official }})</span>
+                    @endif
+                @endif
+            </p>
+
+            <div class="d-flex align-items-center justify-content-between gap-1 mb-2 mt-1">
                 <span class="card-rarity-chip" style="{{ $rarityConfig['chip_style'] }}">
                     <span class="card-rarity-dot" style="{{ $rarityConfig['dot_style'] }}"></span>
                     {{ $rarityConfig['label'] }}

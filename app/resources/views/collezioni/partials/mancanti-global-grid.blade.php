@@ -45,9 +45,10 @@
                             $variantName = match(strtolower($variant)) {
                                 'reverse' => 'Reverse Holo',
                                 'holo' => 'Holo',
-                                'firstedition' => 'Prima Edizione',
-                                default => 'Normale'
+                                'firstedition' => __('Prima Edizione'),
+                                default => __('Normale')
                             };
+                        @endphp
                         <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge rounded-circle {{ $badgeColor }} d-flex justify-content-center align-items-center" style="width: 24px; height: 24px;">{{ $variantLabel }}</span>

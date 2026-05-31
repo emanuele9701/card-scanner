@@ -205,7 +205,7 @@
 @section('content')
     @php
         $collections = collect($collezioni);
-        $series = $collections->groupBy(fn ($item) => $item->set?->serie?->name ?? 'Senza serie');
+        $series = $collections->groupBy(fn ($item) => $item->set?->serie?->name ?? __('Senza serie'));
         $ownedCards = 0;
         $totalSlots = 0;
         $totalValue = 0;
@@ -248,6 +248,43 @@
 
     <div class="container py-4" style="max-width: 1200px;">
         
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 text-white fw-bold mb-0">{{ __('Le mie collezioni') }}</h1>
+            @if(!$collections->isEmpty())
+                <a href="{{ route('collezioni.mie.export') }}" class="btn btn-outline-light btn-sm rounded-pill px-3 d-flex align-items-center gap-2">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    {{ __('Esporta CSV') }}
+                </a>
+            @endif
+        </div>
+        
+        @if($collections->isEmpty())
+            {{-- Wizard / Empty State per PokeStash --}}
+            <div class="row justify-content-center py-5 mt-4">
+                <div class="col-12 col-md-8 col-lg-6">
+                    <div class="stat-box text-center py-5" style="border: 1px dashed rgba(255,255,255,0.2); background: linear-gradient(180deg, rgba(30,41,59,0.5) 0%, rgba(21,25,35,0.8) 100%);">
+                        <div class="mb-4">
+                            <svg width="64" height="64" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color: #64748b; margin: 0 auto;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                        </div>
+                        <h2 class="h4 text-white fw-bold mb-3">{{ __('Benvenuto in PokeStash!') }}</h2>
+                        <p class="text-secondary mb-4" style="line-height: 1.6;">{{ __('Il tuo caveau è ancora vuoto. Inizia a costruire la tua collezione cercando le tue carte preferite o esplorando i set ufficiali.') }}</p>
+                        
+                        <div class="d-flex flex-column flex-sm-row justify-content-center gap-3 mt-2">
+                            <a href="{{ route('collezioni.disponibili') }}" class="btn btn-primary px-4 py-2 rounded-pill" style="background-color: var(--accent); border: none; font-weight: 500;">
+                                {{ __('Sfoglia i Set') }}
+                            </a>
+                            <a href="#" onclick="document.querySelector('input[name=q]').focus()" class="btn btn-outline-light px-4 py-2 rounded-pill" style="border-color: rgba(255,255,255,0.2); font-weight: 500;">
+                                {{ __('Cerca una Carta') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @else
         {{-- Stats Row --}}
         <div class="row g-4 mb-5">
             <div class="col-12 col-md-4">
@@ -288,7 +325,7 @@
         </div>
 
         {{-- Series Sections --}}
-        @forelse ($series as $serieName => $items)
+        @foreach ($series as $serieName => $items)
             @php
                 $sets = $items->groupBy(fn ($item) => $item->set?->id ?? 0);
             @endphp
@@ -362,12 +399,8 @@
                     </div>
                 @endforeach
             </div>
-        @empty
-            <div class="text-center py-5">
-                <p class="text-muted">{{ __('Nessuna collezione salvata. Inizia ad aggiungere set alla tua collezione.') }}</p>
-                <a href="{{ route('collezioni.disponibili') }}" class="btn btn-primary mt-3" style="background-color: var(--accent); border: none;">{{ __('Sfoglia Set') }}</a>
+                @endforeach
             </div>
-        @endforelse
-
+        @endif
     </div>
 @endsection

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Card Scanner') — Card Scanner</title>
+    <title>@yield('title', 'PokeStash') — PokeStash</title>
     <meta name="description" content="@yield('meta_description', __('Gestisci la tua collezione di carte collezionabili.'))">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -154,8 +154,29 @@
                             <circle cx="12" cy="12" r="3" />
                         </svg>
                     </div>
-                    Card Scanner
+                    PokeStash
                 </a>
+
+                {{-- Search Bar --}}
+                <form action="{{ route('cards.search') }}" method="GET" class="d-none d-md-flex mx-4 position-relative" style="flex-grow: 1; max-width: 800px;" id="nav-search-form">
+                    <div class="input-group input-group-sm position-relative">
+                        <span class="input-group-text border-0" style="background-color: rgba(255, 255, 255, 0.05); color: #9ca3af; border-radius: 0.5rem 0 0 0.5rem;">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </span>
+                        <input type="text" id="nav-search-input" name="q" class="form-control border-0 text-white shadow-none" style="background-color: rgba(255, 255, 255, 0.05); border-radius: 0 0.5rem 0.5rem 0;" placeholder="{{ __('Cerca carte...') }}" value="{{ request('q') }}" autocomplete="off">
+                        
+                        <!-- Autocomplete Dropdown -->
+                        <div id="nav-search-dropdown" class="position-absolute w-100 bg-dark rounded-3 shadow-lg d-none" style="top: 100%; left: 0; z-index: 1050; max-height: 400px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); margin-top: 8px;">
+                            <div id="nav-search-results" class="list-group list-group-flush rounded-3"></div>
+                            <div id="nav-search-loading" class="p-3 text-center text-secondary d-none">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <small>{{ __('Caricamento...') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </form>
 
                 {{-- Navigation Links --}}
                 <div class="d-flex align-items-center gap-1">
@@ -201,16 +222,7 @@
                                 </div>
                                 {{ __('Le mie collezioni') }}
                             </a>
-                            <a href="{{ route('collezioni.mancanti') }}" class="nav-dropdown-item">
-                                <div class="nav-dropdown-icon" style="background-color: rgba(239,68,68,0.1);">
-                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
-                                        stroke="#ef4444" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                </div>
-                                {{ __('Carte Mancanti') }}
-                            </a>
+
                             <a href="{{ route('collezioni.disponibili') }}" class="nav-dropdown-item">
                                 <div class="nav-dropdown-icon" style="background-color: rgba(16,185,129,0.1);">
                                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
@@ -252,7 +264,7 @@
                             <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 0.25rem 0;"></div>
 
                             {{-- Profilo --}}
-                            <a href="{{ route('profile.index') }}" class="nav-dropdown-item">
+                            <a href="{{ route('profile.edit') }}" class="nav-dropdown-item">
                                 <div class="nav-dropdown-icon" style="background-color: rgba(99,102,241,0.1);">
                                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
                                         stroke="#818cf8" stroke-width="2">
@@ -378,7 +390,166 @@
             confirm_remove_card: @json(__('Vuoi rimuovere completamente questa carta dalla tua collezione?')),
             confirm_remove_mass: @json(__('Vuoi rimuovere :count carte dalla tua collezione?')),
             save_error: @json(__('Errore durante il salvataggio.')),
-            add_error: @json(__('Errore durante l\'aggiunta'))
+            add_error: @json(__('Errore durante l\'aggiunta')),
+            pokemon_added: @json(__(':name #:number aggiunto'))
+        };
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('nav-search-input');
+            const searchDropdown = document.getElementById('nav-search-dropdown');
+            const searchResults = document.getElementById('nav-search-results');
+            const searchLoading = document.getElementById('nav-search-loading');
+            let debounceTimer;
+
+            if (!searchInput) return;
+
+            searchInput.addEventListener('input', function(e) {
+                const query = e.target.value.trim();
+                
+                clearTimeout(debounceTimer);
+                
+                if (query.length < 2) {
+                    searchDropdown.classList.add('d-none');
+                    return;
+                }
+
+                debounceTimer = setTimeout(() => {
+                    searchDropdown.classList.remove('d-none');
+                    searchResults.innerHTML = '';
+                    searchLoading.classList.remove('d-none');
+
+                    fetch(`{{ route('cards.autocomplete') }}?q=${encodeURIComponent(query)}`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        searchLoading.classList.add('d-none');
+                        searchResults.innerHTML = '';
+                        
+                        if (data.length === 0) {
+                            searchResults.innerHTML = `<div class="p-3 text-center text-secondary small">{{ __('Nessun risultato trovato') }}</div>`;
+                            return;
+                        }
+
+                        data.forEach(card => {
+                            const rarityStyle = card.rarity.toLowerCase().includes('ultra') || card.rarity.toLowerCase().includes('secret') 
+                                ? 'color:#ffb3b1;' : (card.rarity.toLowerCase().includes('rare') ? 'color:#ffd795;' : 'color:#a0b4cc;');
+                            
+                            const setImg = card.set_symbol 
+                                ? `<img src="${card.set_symbol}" alt="" style="height:12px; margin-right:4px; filter: drop-shadow(0px 1px 1px rgba(0,0,0,0.5));">`
+                                : '';
+                                
+                            let flagSvg = '';
+                            if (card.language === 'it') flagSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2" width="12" height="9" style="border-radius:1px; flex-shrink:0;"><path fill="#009246" d="M0 0h1v2H0z"/><path fill="#fff" d="M1 0h1v2H1z"/><path fill="#ce2b37" d="M2 0h1v2H2z"/></svg>`;
+                            else if (card.language === 'en') flagSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" width="12" height="9" style="border-radius:1px; flex-shrink:0;"><clipPath id="s"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#s)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#t)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>`;
+                            else if (card.language === 'jp') flagSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="12" height="9" style="border-radius:1px; flex-shrink:0;"><rect width="900" height="600" fill="#fff"/><circle cx="450" cy="300" r="180" fill="#bc002d"/></svg>`;
+
+                            const a = document.createElement('a');
+                            a.href = `{{ route('cards.search') }}?q=${encodeURIComponent(card.name + ' ' + card.dexId)}`; // Navigate to card specifically
+                            // If they just click, they will search for this exact card. Or we can open the modal. For now, doing a specific search is fine.
+                            a.className = 'list-group-item list-group-item-action bg-transparent text-white border-0 border-bottom d-flex align-items-center gap-3 py-2';
+                            a.style.borderColor = 'rgba(255,255,255,0.05) !important';
+                            
+                            // Let's open the modal directly! It's much cooler.
+                            a.onclick = (ev) => {
+                                ev.preventDefault();
+                                searchDropdown.classList.add('d-none');
+                                openModal({ id: card.id, name: card.name, image: card.image ? card.image.replace('/low.png', '') : null });
+                            };
+
+                            a.innerHTML = `
+                                <div style="width: 35px; height: 48px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; flex-shrink: 0;" class="d-flex align-items-center justify-content-center">
+                                    ${card.image ? `<img src="${card.image}" style="width:100%; height:100%; object-fit:contain;" loading="lazy" onerror="this.style.display='none'">` : '<span style="font-size:10px; color:#666;">{{ __("No img") }}</span>'}
+                                </div>
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        ${flagSvg}
+                                        <div class="fw-bold text-truncate" style="font-size: 0.85rem;">${card.name}</div>
+                                        <div class="ms-auto font-monospace text-secondary" style="font-size:0.7rem;">#${card.dexId}</div>
+                                    </div>
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div class="text-secondary text-truncate d-flex align-items-center" style="font-size: 0.7rem;">
+                                            ${setImg} ${card.set_name || '{{ __("Sconosciuto") }}'}
+                                        </div>
+                                        <div style="font-size: 0.7rem; font-weight: 600; ${rarityStyle}">
+                                            ${card.rarity}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            searchResults.appendChild(a);
+                        });
+                        
+                        // Add "See all results" link
+                        const seeAll = document.createElement('a');
+                        seeAll.href = `{{ route('cards.search') }}?q=${encodeURIComponent(query)}`;
+                        seeAll.className = 'list-group-item list-group-item-action bg-transparent text-center text-primary border-0 py-2 py-2 fw-semibold';
+                        seeAll.style.fontSize = '0.8rem';
+                        seeAll.innerHTML = `{{ __('Vedi tutti i risultati') }} &rarr;`;
+                        searchResults.appendChild(seeAll);
+                    })
+                    .catch(err => {
+                        searchLoading.classList.add('d-none');
+                        searchResults.innerHTML = `<div class="p-3 text-center text-danger small">{{ __('Errore di connessione') }}</div>`;
+                    });
+                }, 300);
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !searchDropdown.contains(e.target)) {
+                    searchDropdown.classList.add('d-none');
+                }
+            });
+            
+            // Show dropdown when clicking input if there's a value
+            searchInput.addEventListener('focus', function(e) {
+                if (e.target.value.trim().length >= 2 && searchResults.innerHTML !== '') {
+                    searchDropdown.classList.remove('d-none');
+                }
+            });
+        });
+    </script>
+    <!-- Global Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3 mt-5" id="global-toast-container" style="z-index: 1080;"></div>
+
+    <script>
+        window.showToast = function(message, type = 'success') {
+            const container = document.getElementById('global-toast-container');
+            if (!container) return;
+
+            const bgClass = type === 'success' ? 'bg-success' : (type === 'danger' ? 'bg-danger' : 'bg-primary');
+            const icon = type === 'success' 
+                ? '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>'
+                : '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>';
+
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast align-items-center text-white ${bgClass} border-0 shadow-lg`;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body d-flex align-items-center gap-2 fw-medium" style="font-size: 0.95rem;">
+                        ${icon}
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+            
+            container.appendChild(toastEl);
+            const toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+            toast.show();
+            
+            toastEl.addEventListener('hidden.bs.toast', () => {
+                toastEl.remove();
+            });
         };
     </script>
 </body>
