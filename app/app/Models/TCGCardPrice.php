@@ -67,6 +67,7 @@ class TCGCardPrice extends Model
 
         TCGCardPriceHistory::create([
             'card_id' => $idCard,
+            'provider' => 'cardmarket',
             'trend' => $price->trend,
             'trend_holo' => $price->trend_holo,
             'avg' => $price->avg,
@@ -127,6 +128,7 @@ class TCGCardPrice extends Model
 
         TCGCardPriceHistory::create([
             'card_id' => $idCard,
+            'provider' => 'tcgplayer',
             'trend' => $price->trend,
             'trend_holo' => $price->trend_holo,
             'avg' => $price->avg,

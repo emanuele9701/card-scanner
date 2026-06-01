@@ -170,5 +170,7 @@
     "Carta aggiunta": "Card added",
     "Carta già inserita": "Card already added",
     "No img": "No img",
-    ":name #:number aggiunto": ":name #:number added"
+    ":name #:number aggiunto": ":name #:number added",
+    "Andamento Prezzi": "Price Trend",
+    "Nessun dato storico disponibile": "No historical data available"
 }

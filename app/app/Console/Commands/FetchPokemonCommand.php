@@ -94,6 +94,10 @@ class FetchPokemonCommand extends Command
                          * @var \TCGdex\Models\Card $card
                          */
                         $card = $card->toCard();
+                        $pricingArray = json_decode(json_encode($card->pricing ?? []),true);
+                        if($card->pricing && !empty(array_diff(['tcgplayer','cardmarket'],array_keys($pricingArray)))) {
+                            dd($pricingArray);
+                        }
 
                         $tcgCard = TCGCard::where('card_id', $card->id)->where('set_id', $tcgSet->id)->first();
                         if ($tcgCard) {

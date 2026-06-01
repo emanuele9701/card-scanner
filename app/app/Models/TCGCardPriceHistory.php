@@ -10,10 +10,15 @@ class TCGCardPriceHistory extends Model
 
     protected $fillable = [
         'card_id',
+        'provider',
         'trend',
         'trend_holo',
         'avg',
         'avg_holo',
+    ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
     ];
 
     public function card()

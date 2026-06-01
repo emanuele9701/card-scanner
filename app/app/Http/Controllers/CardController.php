@@ -195,7 +195,7 @@ class CardController extends Controller
 
     public function show(TCGCard $card) {
         
-        $card->load('abilities','prices');
+        $card->load('abilities', 'prices', 'priceHistory');
         
         return response()->json($card);
     }

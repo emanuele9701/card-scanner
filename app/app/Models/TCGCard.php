@@ -50,7 +50,7 @@ class TCGCard extends Model
 
     public function priceHistory()
     {
-        return $this->hasMany(\App\Models\TCGCardPriceHistory::class, 'card_id', 'id');
+        return $this->hasMany(TCGCardPriceHistory::class, 'card_id', 'id')->orderBy('created_at', 'asc');
     }
 
 

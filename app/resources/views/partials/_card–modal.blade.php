@@ -171,6 +171,21 @@
 
             <div style="border-top:1px solid rgba(255,255,255,0.07); margin-bottom:1.25rem;"></div>
 
+            {{-- Grafico Andamento Prezzi --}}
+            <div class="mb-4">
+                <h3 class="fw-semibold mb-3"
+                    style="font-size:0.875rem; color:rgba(212,228,250,0.6);
+                           text-transform:uppercase; letter-spacing:0.05em;">
+                    {{ __('Andamento Prezzi') }}
+                </h3>
+                <div id="cm-chart-container" style="position:relative; height:260px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:0.75rem; padding:1rem;">
+                    <canvas id="cm-price-chart"></canvas>
+                </div>
+                <div id="cm-chart-empty" style="display:none; text-align:center; padding:2rem; color:rgba(212,228,250,0.3); font-size:0.85rem;">
+                    {{ __('Nessun dato storico disponibile') }}
+                </div>
+            </div>
+
             {{-- Storico prezzi --}}
             <div>
                 <h3 class="fw-semibold mb-3"
@@ -362,6 +377,164 @@
             var trend = card.prices && card.prices[0] ? card.prices[0].trend : null;
             document.getElementById('cm-price').innerHTML =
                 '<span class="fw-bold" style="color:#fbb400;font-size:1rem;">' + _price(trend) + '</span>';
+
+            /* ── Grafico Andamento Prezzi ── */
+            var chartContainer = document.getElementById('cm-chart-container');
+            var chartEmpty = document.getElementById('cm-chart-empty');
+            
+            // Destroy previous chart if exists
+            if (window._priceChart) {
+                window._priceChart.destroy();
+                window._priceChart = null;
+            }
+
+            if (card.price_history && card.price_history.length > 1) {
+                chartContainer.style.display = '';
+                chartEmpty.style.display = 'none';
+
+                // Group by provider
+                var providerData = {};
+                card.price_history.forEach(function(entry) {
+                    var prov = entry.provider || 'cardmarket';
+                    if (!providerData[prov]) providerData[prov] = [];
+                    providerData[prov].push(entry);
+                });
+
+                // Provider color mapping
+                var providerColors = {
+                    'cardmarket': { line: '#fbb400', bg: 'rgba(251, 180, 0, 0.1)' },
+                    'tcgplayer':  { line: '#63b3ed', bg: 'rgba(99, 179, 237, 0.1)' },
+                    'default':    { line: '#9ae6b4', bg: 'rgba(154, 230, 180, 0.1)' }
+                };
+                var colorIndex = 0;
+                var extraColors = [
+                    { line: '#f687b3', bg: 'rgba(246, 135, 179, 0.1)' },
+                    { line: '#b794f4', bg: 'rgba(183, 148, 244, 0.1)' },
+                ];
+
+                var datasets = [];
+                var allLabels = new Set();
+
+                Object.keys(providerData).forEach(function(provider) {
+                    var entries = providerData[provider];
+                    entries.forEach(function(e) {
+                        var dateStr = new Date(e.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+                        allLabels.add(dateStr);
+                    });
+                });
+
+                // We need a unified x-axis. Build from all price_history sorted by date.
+                var allEntries = card.price_history.slice().sort(function(a, b) {
+                    return new Date(a.created_at) - new Date(b.created_at);
+                });
+                
+                // Build unique sorted labels
+                var labelsArr = [];
+                var labelDateMap = {};
+                allEntries.forEach(function(e) {
+                    var d = new Date(e.created_at);
+                    var key = d.toISOString().split('T')[0]; // YYYY-MM-DD
+                    var label = d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+                    if (!labelDateMap[key]) {
+                        labelDateMap[key] = label;
+                        labelsArr.push(key);
+                    }
+                });
+
+                Object.keys(providerData).forEach(function(provider) {
+                    var entries = providerData[provider];
+                    var colors = providerColors[provider] || extraColors[colorIndex++ % extraColors.length] || providerColors['default'];
+                    
+                    // Map entries to the unified x-axis
+                    var dataByDate = {};
+                    entries.forEach(function(e) {
+                        var key = new Date(e.created_at).toISOString().split('T')[0];
+                        dataByDate[key] = parseFloat(e.avg || e.trend || 0);
+                    });
+
+                    var dataPoints = labelsArr.map(function(key) {
+                        return dataByDate[key] !== undefined ? dataByDate[key] : null;
+                    });
+
+                    datasets.push({
+                        label: provider.charAt(0).toUpperCase() + provider.slice(1),
+                        data: dataPoints,
+                        borderColor: colors.line,
+                        backgroundColor: colors.bg,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: colors.line,
+                        fill: true,
+                        tension: 0.3,
+                        spanGaps: true
+                    });
+                });
+
+                var displayLabels = labelsArr.map(function(key) { return labelDateMap[key]; });
+
+                var ctx = document.getElementById('cm-price-chart').getContext('2d');
+                window._priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: displayLabels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: {
+                                display: datasets.length > 1,
+                                position: 'top',
+                                labels: {
+                                    color: 'rgba(212, 228, 250, 0.7)',
+                                    font: { size: 11, weight: '600' },
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    padding: 16
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(5, 20, 36, 0.95)',
+                                titleColor: '#d4e4fa',
+                                bodyColor: '#d4e4fa',
+                                borderColor: 'rgba(255, 255, 255, 0.1)',
+                                borderWidth: 1,
+                                padding: 12,
+                                cornerRadius: 8,
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': \u20ac ' + (context.parsed.y !== null ? context.parsed.y.toFixed(2) : '\u2014');
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false },
+                                ticks: { color: 'rgba(212, 228, 250, 0.4)', font: { size: 10 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 12 }
+                            },
+                            y: {
+                                grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false },
+                                ticks: {
+                                    color: 'rgba(212, 228, 250, 0.4)',
+                                    font: { size: 10 },
+                                    callback: function(value) { return '\u20ac ' + value.toFixed(2); }
+                                },
+                                beginAtZero: false
+                            }
+                        }
+                    }
+                });
+            } else {
+                chartContainer.style.display = 'none';
+                chartEmpty.style.display = '';
+            }
 
             /* Storico prezzi */
             var tbody = document.getElementById('cm-prices-tbody');
