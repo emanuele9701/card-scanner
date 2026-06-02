@@ -28,7 +28,7 @@
                     <input type="hidden" id="mcm-card-id" value="">
                     
                     <div class="row g-3">
-                        <div class="col-12 col-md-6">
+                        <div class="col-12 col-md-4">
                             <label class="form-label text-secondary small">{{ __('Condizione') }}</label>
                             <select id="mcm-condition" class="form-select bg-dark text-white border-secondary" required>
                                 <option value="NM">NM (Near Mint)</option>
@@ -38,7 +38,19 @@
                                 <option value="DMG">DMG (Damaged)</option>
                             </select>
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label text-secondary small">{{ __('Lingua') }}</label>
+                            <select id="mcm-language" class="form-select bg-dark text-white border-secondary" required>
+                                <option value="it">Italiano (IT)</option>
+                                <option value="en">Inglese (EN)</option>
+                                <option value="jp">Giapponese (JP)</option>
+                                <option value="fr">Francese (FR)</option>
+                                <option value="de">Tedesco (DE)</option>
+                                <option value="es">Spagnolo (ES)</option>
+                                <option value="pt">Portoghese (PT)</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
                             <label class="form-label text-secondary small">{{ __('Quantità') }}</label>
                             <input type="number" id="mcm-quantity" class="form-control bg-dark text-white border-secondary" value="1" min="1" required>
                         </div>
@@ -53,6 +65,12 @@
                                 </label>
                                 <label class="d-flex align-items-center gap-1 text-white" style="font-size: 0.85rem;">
                                     <input type="checkbox" name="mcm-variants" value="firstEdition" class="form-check-input mt-0"> 1ª Edizione
+                                </label>
+                                <label class="d-flex align-items-center gap-1 text-white" style="font-size: 0.85rem;">
+                                    <input type="checkbox" name="mcm-variants" value="signed" class="form-check-input mt-0"> Signed
+                                </label>
+                                <label class="d-flex align-items-center gap-1 text-white" style="font-size: 0.85rem;">
+                                    <input type="checkbox" name="mcm-variants" value="altered" class="form-check-input mt-0"> Altered
                                 </label>
                             </div>
                         </div>
@@ -198,6 +216,12 @@
         
         const variantCheckboxes = document.querySelectorAll('input[name="mcm-variants"]:checked');
         const variants = Array.from(variantCheckboxes).map(cb => cb.value);
+        
+        // Aggiungi la lingua come variante (es. "it", "en")
+        const language = document.getElementById('mcm-language').value;
+        if (language) {
+            variants.push(language);
+        }
         
         try {
             const res = await fetch(`/collezioni/cards/${cardId}/copies`, {

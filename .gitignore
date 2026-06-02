@@ -9,3 +9,5 @@ app/jsScripts/scraper-puppeteer.js
 app/jsScripts/scheda_tecnica_scraper.md
 app/composer.lock
 app/package-lock.json
+app/collezione.json
+app/Pricings_master.json

@@ -32,18 +32,22 @@ class TCGCardAbility extends Model
         return $this->belongsTo(TCGCard::class, 'card_id', 'id');
     }
 
-    public static function createAbilities($idCard, $abilities, $language)
+    public static function prepareAbilitiesData($idCard, $abilities, $language, $now)
     {
-        foreach ($abilities as $key => $value) {
-            $ability = new TCGCardAbility();
-            $ability->card_id = $idCard;
-            $ability->type = $value->type ?? "";
-            $ability->cost = $value->cost ?? "";
-            $ability->name = $value->name ?? "";
-            $ability->effect = $value->effect ?? "";
-            $ability->damage = $value->damage ?? "";
-            $ability->language = $language;
-            $ability->save();
+        $data = [];
+        foreach ($abilities as $value) {
+            $data[] = [
+                'card_id' => $idCard,
+                'type' => $value->type ?? "",
+                'cost' => isset($value->cost) ? json_encode($value->cost) : null,
+                'name' => $value->name ?? "",
+                'effect' => $value->effect ?? "",
+                'damage' => $value->damage ?? "",
+                'language' => $language,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
+        return $data;
     }
 }

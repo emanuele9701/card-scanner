@@ -21,120 +21,105 @@ class FetchPokemonCommand extends Command
      */
     public function handle()
     {   
-        $pricings = [
-            'cardmarket' => [],
-            'tcgplayer' => []
-        ];
-        $languages = ['it','en'];
-        foreach ($languages as $language) {
-            $this->info("Language: " . $language);
-            $tcg = new TCGdex($language);
-            // 1. Recupero tutte le espansioni
-            $series = $tcg->serie->list();
+        $masterLang = 'en';
+        $now = \Carbon\Carbon::now();
+        
+        $this->info("Inizializzo TCGdex master (en)...");
+        $tcgEn = new TCGdex($masterLang);
 
-            foreach ($series as $k => $serie) {
-                $this->info("Serie: " . $serie->name);
-                /**
-                 * @var \TCGdex\Models\Serie $serie
-                 */
-                $serie = $serie->toSerie();
+        $this->info("Recupero tutte le espansioni...");
+        $series = $tcgEn->serie->list();
 
-                $tcgSerie = TCGSeries::where('serie_id', $serie->id)->where('language', $language)->first();
-                if (!$tcgSerie) {
-                    $this->info("Inserisco Serie: " . $serie->name);
-                    $tcgSerie = new TCGSeries();
-                    $tcgSerie->serie_id = $serie->id;
-                    $tcgSerie->name = $serie->name;
-                    $tcgSerie->logo = $serie->logo;
-                    $tcgSerie->language = $language;
-                    $tcgSerie->save();
-                }
+        $bulkSeries = [];
+        foreach ($series as $serieResume) {
+            $serie = $serieResume->toSerie(); // Fetch single serie
+            $bulkSeries[] = [
+                'serie_id' => $serie->id,
+                'name' => $serie->name,
+                'logo' => $serie->logo,
+                'language' => $masterLang,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
 
-                // Sets
-                $sets = $serie->sets;
-                foreach ($sets as $k => $setResume) {
-                    $this->info("Set: " . $setResume->name);
-                    /**
-                     * @var \TCGdex\Models\Set $set
-                     */
-                    $set = $setResume->toSet();
+        $this->info("Salvataggio " . count($bulkSeries) . " Series a DB...");
+        \App\Models\TCGSeries::upsert($bulkSeries, ['serie_id'], ['name', 'logo', 'language', 'updated_at']);
 
-                    $tcgSet = TCGSet::where('set_id', $set->id)->where('language', $language)->first();
-                    if (!$tcgSet) {
-                        $this->info("Inserisco Set: " . $set->name);
-                        $tcgSet = new TCGSet();
-                        $tcgSet->set_id = $set->id;
-                        $tcgSet->serie_id = $tcgSerie->id; // FK auto-increment
-                        $tcgSet->name = $set->name;
-                        $tcgSet->logo = $set->logo;
-                        $tcgSet->symbol = $set->symbol;
-                        $tcgSet->card_total = $set->cardCount->total;
-                        $tcgSet->card_official = $set->cardCount->official;
-                        $tcgSet->card_normal = $set->cardCount->normal;
-                        $tcgSet->card_reverse = $set->cardCount->reverse;
-                        $tcgSet->card_holo = $set->cardCount->holo;
-                        $tcgSet->card_first_edition = $set->cardCount->firstEd;
-                        $tcgSet->release_date = $set->releaseDate;
-                        $tcgSet->abbreviation = $set->abbreviation ?? '-';
-                        // Denormalizza abbreviazione ufficiale per ricerca indicizzata
-                        $abbr = $set->abbreviation;
-                        if (is_object($abbr) && isset($abbr->official)) {
-                            $tcgSet->abbreviation_official = strtoupper($abbr->official);
-                        } elseif (is_array($abbr) && isset($abbr['official'])) {
-                            $tcgSet->abbreviation_official = strtoupper($abbr['official']);
-                        }
-                        $tcgSet->language = $language;
-                        $tcgSet->save();
-                    }
+        // Recuperiamo gli ID interni appena creati
+        $dbSeries = \App\Models\TCGSeries::pluck('id', 'serie_id')->toArray();
 
-                    $cards = $set->cards;
-                    foreach ($cards as $k => $card) {
-                        $this->info("Card: " . $card->name);
-                        /**
-                         * @var \TCGdex\Models\Card $card
-                         */
-                        $card = $card->toCard();
-                        $pricingArray = json_decode(json_encode($card->pricing ?? []),true);
-                        if($card->pricing && !empty(array_diff(['tcgplayer','cardmarket'],array_keys($pricingArray)))) {
-                            dd($pricingArray);
-                        }
+        foreach ($series as $serieResume) {
+            $serie = $serieResume->toSerie();
+            $this->info("Elaboro Serie: " . $serie->name);
+            
+            if (!isset($dbSeries[$serie->id])) {
+                $this->error("Serie {$serie->id} non trovata nel DB, salto.");
+                continue;
+            }
+            $localSerieId = $dbSeries[$serie->id];
 
-                        $tcgCard = TCGCard::where('card_id', $card->id)->where('set_id', $tcgSet->id)->first();
-                        if ($tcgCard) {
-                            $this->info("Aggiorno Prezzi: " . $tcgCard->name . " ({$tcgCard->card_id}) ");
-                            TCGCardPrice::createPrices($tcgCard->id, $card->pricing->cardmarket, $language);
-                            continue;
-                        }
+            $sets = $serie->sets;
+            $bulkSets = [];
 
-                        $this->info("Inserisco Card: " . $card->name . " ({$card->id}) ");
-                        $tcgCard = new TCGCard();
-                        $tcgCard->card_id = $card->id;
-                        $tcgCard->set_id = $tcgSet->id; // FK auto-increment
-                        $tcgCard->name = $card->name;
-                        $tcgCard->url_image = $card->image;
-                        $tcgCard->illustrator = $card->illustrator;
-                        $tcgCard->rarity = $card->rarity;
-                        $tcgCard->variants = $card->variants;
-                        $tcgCard->dexId = $card->localId; // Numero della carta.
-                        $tcgCard->types = $card->types; // Tipo di carta.
-                        $tcgCard->level_stage = $card->stage;
-                        $tcgCard->language = $language;
-                        $tcgCard->save();
-
-                        $pricings['cardmarket'][$tcgCard->id][] = $card->pricing->cardmarket;
-                        $pricings['tcgplayer'][$tcgCard->id][] = $card->pricing->tcgplayer;
-
-                        // Abilities
-                        TCGCardAbility::createAbilities($tcgCard->id, array_merge($card->abilities ?? [], $card->attacks ?? []), $language);
-
-                        // Prices
-                        TCGCardPrice::createPrices($tcgCard->id, $card->pricing->cardmarket, $language);
+            foreach ($sets as $setResume) {
+                $set = $setResume->toSet();
+                
+                $hasAbbr = isset($set->abbreviation);
+                $abbreviation = $hasAbbr ? $set->abbreviation : '-';
+                $abbreviationOfficial = null;
+                
+                if ($hasAbbr) {
+                    if (is_object($abbreviation) && isset($abbreviation->official)) {
+                        $abbreviationOfficial = strtoupper($abbreviation->official);
+                    } elseif (is_array($abbreviation) && isset($abbreviation['official'])) {
+                        $abbreviationOfficial = strtoupper($abbreviation['official']);
                     }
                 }
-                $this->info("Salvo i prezzi...");
-                file_put_contents("Pricings_{$language}.json",json_encode($pricings,JSON_PRETTY_PRINT));
+
+                $bulkSets[] = [
+                    'set_id' => $set->id,
+                    'serie_id' => $localSerieId,
+                    'name' => $set->name,
+                    'logo' => $set->logo,
+                    'symbol' => $set->symbol,
+                    'card_total' => $set->cardCount->total ?? 0,
+                    'card_official' => $set->cardCount->official ?? 0,
+                    'card_normal' => $set->cardCount->normal ?? 0,
+                    'card_reverse' => $set->cardCount->reverse ?? 0,
+                    'card_holo' => $set->cardCount->holo ?? 0,
+                    'card_first_edition' => $set->cardCount->firstEd ?? 0,
+                    'release_date' => $set->releaseDate ?? null,
+                    'abbreviation' => json_encode($abbreviation),
+                    'abbreviation_official' => $abbreviationOfficial,
+                    'language' => $masterLang,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+
+            if (!empty($bulkSets)) {
+                $this->info("  Salvataggio " . count($bulkSets) . " Sets a DB per {$serie->name}...");
+                \App\Models\TCGSet::upsert(
+                    $bulkSets, 
+                    ['set_id'], 
+                    ['serie_id', 'name', 'logo', 'symbol', 'card_total', 'card_official', 'card_normal', 'card_reverse', 'card_holo', 'card_first_edition', 'release_date', 'abbreviation', 'abbreviation_official', 'language', 'updated_at']
+                );
+            }
+
+            // Recuperiamo gli ID dei Set dal DB
+            $setIds = array_column($bulkSets, 'set_id');
+            $dbSets = \App\Models\TCGSet::whereIn('set_id', $setIds)->pluck('id', 'set_id')->toArray();
+
+            // Dispatch Jobs per scaricare le carte
+            foreach ($sets as $setResume) {
+                if (isset($dbSets[$setResume->id])) {
+                    $this->info("  -> Dispatch Job per il Set: " . $setResume->name);
+                    \App\Jobs\FetchPokemonSetJob::dispatch($setResume->id, $dbSets[$setResume->id]);
+                }
             }
         }
-        
+
+        $this->info("Comando dispatcher completato. I Job elaboreranno le carte in background.");
     }
 }

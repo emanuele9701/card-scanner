@@ -15,6 +15,11 @@ class TCGCardPriceHistory extends Model
         'trend_holo',
         'avg',
         'avg_holo',
+        'condition',
+        'is_first_edition',
+        'is_altered',
+        'is_signed',
+        'is_reverse',
     ];
 
     protected $casts = [

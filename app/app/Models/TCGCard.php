@@ -38,6 +38,11 @@ class TCGCard extends Model
         return $this->hasMany(TCGCardAbility::class, 'card_id', 'id');
     }
 
+    public function translations()
+    {
+        return $this->hasMany(TCGCardTranslation::class, 'card_id', 'id');
+    }
+
     public function set()
     {
         return $this->belongsTo(TCGSet::class, 'set_id', 'id');

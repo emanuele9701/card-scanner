@@ -111,12 +111,17 @@
                            border:1px solid rgba(251,180,0,0.3);
                            font-size:0.7rem; font-weight:600; display:none;"></span>
             </div>
-            <button onclick="closeModal()" class="btn-modal-close">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-            </button>
+            <div class="d-flex gap-2">
+                <button id="cm-manage-copies-btn" class="btn btn-sm text-dark fw-bold" style="background-color: #fbb400; display:none;" onclick="if(window._currentCard) openManageModal(window._currentCard.id, window._currentCard.name)">
+                    {{ __('Gestisci le tue copie') }}
+                </button>
+                <button onclick="closeModal()" class="btn-modal-close">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
         </div>
 
         {{-- Spinner --}}
@@ -173,11 +178,37 @@
 
             {{-- Grafico Andamento Prezzi --}}
             <div class="mb-4">
-                <h3 class="fw-semibold mb-3"
-                    style="font-size:0.875rem; color:rgba(212,228,250,0.6);
-                           text-transform:uppercase; letter-spacing:0.05em;">
-                    {{ __('Andamento Prezzi') }}
-                </h3>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="fw-semibold mb-0"
+                        style="font-size:0.875rem; color:rgba(212,228,250,0.6);
+                               text-transform:uppercase; letter-spacing:0.05em;">
+                        {{ __('Andamento Prezzi') }}
+                    </h3>
+                    <div id="cm-chart-filters" class="d-flex gap-2">
+                        <select id="cm-filter-lang" class="form-select form-select-sm bg-dark text-white border-secondary" style="font-size:0.75rem;" onchange="renderChart()">
+                            <option value="">{{ __('Tutte Lingue') }}</option>
+                            <option value="it">IT</option>
+                            <option value="en">EN</option>
+                            <option value="jp">JP</option>
+                            <option value="fr">FR</option>
+                            <option value="de">DE</option>
+                            <option value="es">ES</option>
+                            <option value="pt">PT</option>
+                        </select>
+                        <select id="cm-filter-cond" class="form-select form-select-sm bg-dark text-white border-secondary" style="font-size:0.75rem;" onchange="renderChart()">
+                            <option value="">{{ __('Tutte Cond.') }}</option>
+                            <option value="NM">NM</option>
+                            <option value="LP">LP</option>
+                            <option value="MP">MP</option>
+                            <option value="HP">HP</option>
+                            <option value="DMG">DMG</option>
+                        </select>
+                        <select id="cm-filter-variant" class="form-select form-select-sm bg-dark text-white border-secondary" style="font-size:0.75rem;" onchange="renderChart()">
+                            <option value="normal">{{ __('Normal') }}</option>
+                            <option value="holo">{{ __('Holo / Foil') }}</option>
+                        </select>
+                    </div>
+                </div>
                 <div id="cm-chart-container" style="position:relative; height:260px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:0.75rem; padding:1rem;">
                     <canvas id="cm-price-chart"></canvas>
                 </div>
@@ -296,6 +327,7 @@
             overlay.classList.remove('is-open');
             setTimeout(function() {
                 overlay.style.display = 'none';
+                window._currentCard = null;
             }, 300);
             document.body.style.overflow = '';
         };
@@ -378,7 +410,87 @@
             document.getElementById('cm-price').innerHTML =
                 '<span class="fw-bold" style="color:#fbb400;font-size:1rem;">' + _price(trend) + '</span>';
 
-            /* ── Grafico Andamento Prezzi ── */
+            window._currentCard = card;
+            var btnManage = document.getElementById('cm-manage-copies-btn');
+            
+            // Auto-select filters based on collection
+            var condSelect = document.getElementById('cm-filter-cond');
+            var variantSelect = document.getElementById('cm-filter-variant');
+            var langSelect = document.getElementById('cm-filter-lang');
+            condSelect.value = "";
+            variantSelect.value = "normal";
+            langSelect.value = "";
+
+            if (card.collectors && card.collectors.length > 0) {
+                btnManage.style.display = 'inline-flex';
+                // Find highest value condition/variant (simplified heuristic: first one is NM/Holo preferred)
+                var bestCopy = card.collectors[0];
+                card.collectors.forEach(function(c) {
+                    if(c.condition === 'NM') bestCopy = c;
+                });
+                
+                condSelect.value = bestCopy.condition || "";
+                
+                if (bestCopy.variants && Array.isArray(bestCopy.variants)) {
+                    var vLower = bestCopy.variants.map(function(v) { return v.toLowerCase(); });
+                    if (vLower.indexOf('holo') !== -1 || vLower.indexOf('reverse') !== -1) {
+                        variantSelect.value = "holo";
+                    }
+                    
+                    // Look for languages in variants
+                    var langs = ['it', 'en', 'jp', 'fr', 'de', 'es', 'pt'];
+                    for(var i=0; i<langs.length; i++) {
+                        if (vLower.indexOf(langs[i]) !== -1) {
+                            langSelect.value = langs[i];
+                            break;
+                        }
+                    }
+                }
+            } else {
+                btnManage.style.display = 'none';
+            }
+
+            renderChart();
+            
+            /* Storico prezzi */
+            var tbody = document.getElementById('cm-prices-tbody');
+            if (card.prices && card.prices.length) {
+                tbody.innerHTML = card.prices.map(function(p) {
+                    var d = p.created_at ?
+                        new Date(p.created_at).toLocaleDateString('it-IT', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                        }) :
+                        '—';
+                    var trendVal = variantSelect.value === 'holo' ? p.trend_holo : p.trend;
+                    var avg1Val = variantSelect.value === 'holo' ? p.avg_1d_holo : p.avg_1d;
+                    var avg7Val = variantSelect.value === 'holo' ? p.avg_7d_holo : p.avg_7d;
+                    var avg30Val = variantSelect.value === 'holo' ? p.avg_30d_holo : p.avg_30d;
+                    return '<tr>' +
+                        '<td class="modal-td">' + _esc(d) + '</td>' +
+                        '<td class="modal-td" style="color:#fbb400;font-weight:600;">' + _price(trendVal || p.trend) +
+                        '</td>' +
+                        '<td class="modal-td">' + _price(avg1Val || p.avg_1d) + '</td>' +
+                        '<td class="modal-td">' + _price(avg7Val || p.avg_7d) + '</td>' +
+                        '<td class="modal-td">' + _price(avg30Val || p.avg_30d) + '</td>' +
+                        '<td class="modal-td" style="color:rgba(212,228,250,0.45);font-size:0.75rem;">' +
+                        _esc(p.provider || '—') + '</td>' +
+                        '</tr>';
+                }).join('');
+            } else {
+                tbody.innerHTML =
+                    '<tr><td colspan="6" class="modal-td" ' +
+                    'style="text-align:center;color:rgba(212,228,250,0.3);padding:1.5rem 0;">' +
+                    (window.__trans ? window.__trans.no_price : 'Nessun prezzo disponibile') + '</td></tr>';
+            }
+        }
+
+        /* ── renderChart ──────────────────────────────────────────────────────── */
+        window.renderChart = function() {
+            var card = window._currentCard;
+            if(!card) return;
+            
             var chartContainer = document.getElementById('cm-chart-container');
             var chartEmpty = document.getElementById('cm-chart-empty');
             
@@ -388,13 +500,31 @@
                 window._priceChart = null;
             }
 
-            if (card.price_history && card.price_history.length > 1) {
+            var validPrices = (card.priceHistory && card.priceHistory.length > 0 ? card.priceHistory : (card.prices || [])).filter(function(e) { return !!e.created_at; });
+            
+            var filterCond = document.getElementById('cm-filter-cond').value;
+            var filterVariant = document.getElementById('cm-filter-variant').value;
+            var filterLang = document.getElementById('cm-filter-lang').value;
+            
+            if (filterCond) {
+                validPrices = validPrices.filter(function(e) {
+                    return !e.condition || e.condition === filterCond;
+                });
+            }
+            
+            if (filterLang) {
+                validPrices = validPrices.filter(function(e) {
+                    return !e.language || e.language.toLowerCase() === filterLang;
+                });
+            }
+
+            if (validPrices.length > 1) {
                 chartContainer.style.display = '';
                 chartEmpty.style.display = 'none';
 
                 // Group by provider
                 var providerData = {};
-                card.price_history.forEach(function(entry) {
+                validPrices.forEach(function(entry) {
                     var prov = entry.provider || 'cardmarket';
                     if (!providerData[prov]) providerData[prov] = [];
                     providerData[prov].push(entry);
@@ -415,16 +545,8 @@
                 var datasets = [];
                 var allLabels = new Set();
 
-                Object.keys(providerData).forEach(function(provider) {
-                    var entries = providerData[provider];
-                    entries.forEach(function(e) {
-                        var dateStr = new Date(e.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
-                        allLabels.add(dateStr);
-                    });
-                });
-
-                // We need a unified x-axis. Build from all price_history sorted by date.
-                var allEntries = card.price_history.slice().sort(function(a, b) {
+                // We need a unified x-axis. Build from all prices sorted by date.
+                var allEntries = validPrices.slice().sort(function(a, b) {
                     return new Date(a.created_at) - new Date(b.created_at);
                 });
                 
@@ -449,7 +571,14 @@
                     var dataByDate = {};
                     entries.forEach(function(e) {
                         var key = new Date(e.created_at).toISOString().split('T')[0];
-                        dataByDate[key] = parseFloat(e.avg || e.trend || 0);
+                        // If variant is holo, use trend_holo or avg_holo
+                        var val = 0;
+                        if(filterVariant === 'holo') {
+                            val = e.trend_holo || e.avg_holo || e.trend || e.avg || 0;
+                        } else {
+                            val = e.trend || e.avg || 0;
+                        }
+                        dataByDate[key] = parseFloat(val);
                     });
 
                     var dataPoints = labelsArr.map(function(key) {
@@ -535,36 +664,7 @@
                 chartContainer.style.display = 'none';
                 chartEmpty.style.display = '';
             }
-
-            /* Storico prezzi */
-            var tbody = document.getElementById('cm-prices-tbody');
-            if (card.prices && card.prices.length) {
-                tbody.innerHTML = card.prices.map(function(p) {
-                    var d = p.created_at ?
-                        new Date(p.created_at).toLocaleDateString('it-IT', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                        }) :
-                        '—';
-                    return '<tr>' +
-                        '<td class="modal-td">' + _esc(d) + '</td>' +
-                        '<td class="modal-td" style="color:#fbb400;font-weight:600;">' + _price(p.trend) +
-                        '</td>' +
-                        '<td class="modal-td">' + _price(p.avg_1d) + '</td>' +
-                        '<td class="modal-td">' + _price(p.avg_7d) + '</td>' +
-                        '<td class="modal-td">' + _price(p.avg_30d) + '</td>' +
-                        '<td class="modal-td" style="color:rgba(212,228,250,0.45);font-size:0.75rem;">' +
-                        _esc(p.provider || '—') + '</td>' +
-                        '</tr>';
-                }).join('');
-            } else {
-                tbody.innerHTML =
-                    '<tr><td colspan="6" class="modal-td" ' +
-                    'style="text-align:center;color:rgba(212,228,250,0.3);padding:1.5rem 0;">' +
-                    (window.__trans ? window.__trans.no_price : 'Nessun prezzo disponibile') + '</td></tr>';
-            }
-        }
+        };
 
     })();
 </script>

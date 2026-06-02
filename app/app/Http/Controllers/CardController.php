@@ -193,9 +193,18 @@ class CardController extends Controller
         }));
     }
 
-    public function show(TCGCard $card) {
-        
-        $card->load('abilities', 'prices', 'priceHistory');
+    public function show(\App\Models\TCGCard $card) {
+        $userId = \Illuminate\Support\Facades\Auth::id();
+        $card->load([
+            'abilities', 
+            'prices', 
+            'priceHistory',
+            'collectors' => function($q) use ($userId) {
+                if ($userId) {
+                    $q->where('user_id', $userId);
+                }
+            }
+        ]);
         
         return response()->json($card);
     }

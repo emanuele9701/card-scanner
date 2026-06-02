@@ -26,6 +26,11 @@ class TCGCardPrice extends Model
         "avg_7d_holo",
         "avg_30d_holo",
         "language",
+        "condition",
+        "is_first_edition",
+        "is_altered",
+        "is_signed",
+        "is_reverse",
         'created_at',
     ];
 
@@ -41,38 +46,47 @@ class TCGCardPrice extends Model
     /**
      * Crea un record di prezzo da dati CardMarket.
      */
-    public static function createPrices($idCard, $pricing, $language)
+    public static function preparePriceData($idCard, $pricing, $language, $now)
     {
-        if (!$pricing) return;
+        if (!$pricing) return null;
 
-        $price = new TCGCardPrice();
-        $price->card_id = $idCard;
-        $price->provider = 'cardmarket';
-        $price->card_id_product = $pricing->idProduct ?? null;
-        $price->unit = $pricing->unit ?? 'EUR';
-        $price->avg = $pricing->avg ?? null;
-        $price->low = $pricing->low ?? null;
-        $price->trend = $pricing->trend ?? null;
-        $price->avg_1d = $pricing->avg1 ?? null;
-        $price->avg_7d = $pricing->avg7 ?? null;
-        $price->avg_30d = $pricing->avg30 ?? null;
-        $price->avg_holo = $pricing->{'avg-holo'} ?? null;
-        $price->low_holo = $pricing->{'low-holo'} ?? null;
-        $price->trend_holo = $pricing->{'trend-holo'} ?? null;
-        $price->avg_1d_holo = $pricing->{'avg1-holo'} ?? null;
-        $price->avg_7d_holo = $pricing->{'avg7-holo'} ?? null;
-        $price->avg_30d_holo = $pricing->{'avg30-holo'} ?? null;
-        $price->language = $language;
-        $price->save();
-
-        TCGCardPriceHistory::create([
+        $priceData = [
             'card_id' => $idCard,
             'provider' => 'cardmarket',
-            'trend' => $price->trend,
-            'trend_holo' => $price->trend_holo,
-            'avg' => $price->avg,
-            'avg_holo' => $price->avg_holo,
-        ]);
+            'card_id_product' => $pricing->idProduct ?? null,
+            'unit' => $pricing->unit ?? 'EUR',
+            'avg' => $pricing->avg ?? null,
+            'low' => $pricing->low ?? null,
+            'trend' => $pricing->trend ?? null,
+            'avg_1d' => $pricing->avg1 ?? null,
+            'avg_7d' => $pricing->avg7 ?? null,
+            'avg_30d' => $pricing->avg30 ?? null,
+            'avg_holo' => $pricing->{'avg-holo'} ?? null,
+            'low_holo' => $pricing->{'low-holo'} ?? null,
+            'trend_holo' => $pricing->{'trend-holo'} ?? null,
+            'avg_1d_holo' => $pricing->{'avg1-holo'} ?? null,
+            'avg_7d_holo' => $pricing->{'avg7-holo'} ?? null,
+            'avg_30d_holo' => $pricing->{'avg30-holo'} ?? null,
+            'language' => $language,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+
+        $historyData = [
+            'card_id' => $idCard,
+            'provider' => 'cardmarket',
+            'trend' => $priceData['trend'],
+            'trend_holo' => $priceData['trend_holo'],
+            'avg' => $priceData['avg'],
+            'avg_holo' => $priceData['avg_holo'],
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+
+        return [
+            'price' => $priceData,
+            'history' => $historyData
+        ];
     }
 
     /**
@@ -86,53 +100,74 @@ class TCGCardPrice extends Model
      *  - normal.directLowPrice→ avg_1d  (prezzo diretto più basso)
      *  - holofoil/reverse varianti → campi _holo
      */
-    public static function createTcgPlayerPrices($idCard, $pricing, $language)
+    public static function prepareTcgPlayerPriceData($idCard, $pricing, $language, $now)
     {
-        if (!$pricing) return;
+        if (!$pricing) return null;
         
-        $price = new TCGCardPrice();
-        $price->card_id = $idCard;
-        $price->provider = 'tcgplayer';
-        $price->unit = $pricing->unit ?? 'USD';
-        $price->language = $language;
+        $priceData = [
+            'card_id' => $idCard,
+            'provider' => 'tcgplayer',
+            'card_id_product' => null,
+            'unit' => $pricing->unit ?? 'USD',
+            'avg' => null,
+            'low' => null,
+            'trend' => null,
+            'avg_1d' => null,
+            'avg_7d' => null,
+            'avg_30d' => null,
+            'avg_holo' => null,
+            'low_holo' => null,
+            'trend_holo' => null,
+            'avg_1d_holo' => null,
+            'avg_7d_holo' => null,
+            'avg_30d_holo' => null,
+            'language' => $language,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
 
         // ── Variante Normal ──
         $normal = $pricing->normal ?? null;
         if ($normal) {
-            $price->low = $normal->lowPrice ?? null;
-            $price->avg = $normal->midPrice ?? null;
-            $price->trend = $normal->marketPrice ?? null;
-            $price->avg_30d = $normal->highPrice ?? null;
-            $price->avg_1d = $normal->directLowPrice ?? null;
+            $priceData['low'] = $normal->lowPrice ?? null;
+            $priceData['avg'] = $normal->midPrice ?? null;
+            $priceData['trend'] = $normal->marketPrice ?? null;
+            $priceData['avg_30d'] = $normal->highPrice ?? null;
+            $priceData['avg_1d'] = $normal->directLowPrice ?? null;
         }
 
         // ── Variante Holo (holofoil o reverse-holofoil) ──
         // Priorità: holofoil > reverse-holofoil
         $holo = $pricing->holofoil ?? $pricing->{'reverse-holofoil'} ?? null;
         if ($holo) {
-            $price->low_holo = $holo->lowPrice ?? null;
-            $price->avg_holo = $holo->midPrice ?? null;
-            $price->trend_holo = $holo->marketPrice ?? null;
-            $price->avg_30d_holo = $holo->highPrice ?? null;
-            $price->avg_1d_holo = $holo->directLowPrice ?? null;
+            $priceData['low_holo'] = $holo->lowPrice ?? null;
+            $priceData['avg_holo'] = $holo->midPrice ?? null;
+            $priceData['trend_holo'] = $holo->marketPrice ?? null;
+            $priceData['avg_30d_holo'] = $holo->highPrice ?? null;
+            $priceData['avg_1d_holo'] = $holo->directLowPrice ?? null;
         }
 
         // Se c'è anche la reverse separata dalla holofoil, usiamo i campi _7d_holo per non perderla
         if (isset($pricing->holofoil) && isset($pricing->{'reverse-holofoil'})) {
             $reverse = $pricing->{'reverse-holofoil'};
-            $price->avg_7d = $reverse->midPrice ?? null;
-            $price->avg_7d_holo = $reverse->marketPrice ?? null;
+            $priceData['avg_7d'] = $reverse->midPrice ?? null;
+            $priceData['avg_7d_holo'] = $reverse->marketPrice ?? null;
         }
 
-        $price->save();
-
-        TCGCardPriceHistory::create([
+        $historyData = [
             'card_id' => $idCard,
             'provider' => 'tcgplayer',
-            'trend' => $price->trend,
-            'trend_holo' => $price->trend_holo,
-            'avg' => $price->avg,
-            'avg_holo' => $price->avg_holo,
-        ]);
+            'trend' => $priceData['trend'],
+            'trend_holo' => $priceData['trend_holo'],
+            'avg' => $priceData['avg'],
+            'avg_holo' => $priceData['avg_holo'],
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+
+        return [
+            'price' => $priceData,
+            'history' => $historyData
+        ];
     }
 }
