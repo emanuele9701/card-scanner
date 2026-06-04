@@ -3,6 +3,65 @@
 @section('title', 'Carte Mancanti')
 
 @section('content')
+    <style>
+        .mass-action-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1040;
+            padding: 1rem 1.5rem;
+            background: rgba(10, 15, 30, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+            display: flex;
+            justify-content: center;
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        .mass-action-bar.is-open {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1050;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(6px);
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.3s ease;
+            opacity: 0;
+        }
+        .modal-overlay.is-open {
+            opacity: 1;
+        }
+        .card-modal-content {
+            background: linear-gradient(135deg, rgba(14, 24, 44, 0.98), rgba(20, 30, 52, 0.98));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.25rem;
+            box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+            width: 90%;
+        }
+        .btn-modal-close {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+            border-radius: 0.5rem;
+            padding: 0.4rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-modal-close:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+        .z-index-1 { z-index: 1; }
+    </style>
     <main class="py-5">
         <div class="container py-4">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
@@ -84,7 +143,7 @@
             </div>
 
             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="cards-grid">
-                @include('collezioni.partials.mancanti-global-grid', ['userCards' => $userCards])
+                @include('collezioni.partials.mancanti-global-grid', ['userCards' => $userCards, 'incomingByCard' => $incomingByCard])
             </div>
 
             <div class="d-flex justify-content-center mt-5">
@@ -95,6 +154,31 @@
             </div>
         </div>
     </main>
+
+    {{-- Barra Azioni Massiva per le carte mancanti --}}
+    <div id="missing-action-bar" class="mass-action-bar" style="display:none;">
+        <div class="d-flex align-items-center justify-content-between w-100" style="max-width: 900px; margin: 0 auto;">
+            <div class="d-flex align-items-center gap-2">
+                <span class="fw-bold text-white"><span id="missing-selected-count">0</span> {{ __('selezionate') }}</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" onclick="openIncomingAddModal()" class="btn btn-sm fw-bold d-flex align-items-center gap-1 px-3" 
+                    style="background: linear-gradient(135deg, #fb923c, #f59e0b); color: #1a1a2e; border: none;">
+                    🚚 {{ __('Segna In Arrivo') }}
+                </button>
+                <button type="button" onclick="openIncomingArrivedModal()" class="btn btn-sm fw-bold d-flex align-items-center gap-1 px-3"
+                    style="background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border: none;">
+                    📦 {{ __('Sono Arrivate') }}
+                </button>
+                <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.2);"></div>
+                <button type="button" onclick="clearMissingSelection()" class="btn btn-sm btn-outline-light px-2" title="{{ __('Deseleziona tutto') }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @include('partials._incoming-modals')
 
     <div id="cards-pagination" data-current-page="{{ $userCards->currentPage() }}"
         data-last-page="{{ $userCards->lastPage() }}"

@@ -20,6 +20,9 @@ class FetchCardTraderCommand extends Command
 
     public function handle(CardTraderClient $client, CardTraderParser $parser)
     {
+        // Impostiamo a 1GB come hai suggerito per gestire json massicci
+        ini_set('memory_limit', '1G');
+
         $this->info("Recupero Categorie da CardTrader...");
         $categoriesData = $client->get('/categories');
         $categories = $parser->parseCategories($categoriesData);

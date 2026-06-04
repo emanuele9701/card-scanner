@@ -123,13 +123,43 @@
             $extraInfo = '<span class="ms-1 fw-bold" style="font-size: 0.5rem; opacity: 0.9;">x' . $card->doppie_variants[$vLow] . '</span>';
         }
         
+        $incomingBadge = '';
+        if ($isMissingTab && isset($cardIncoming)) {
+            $foilTypeForVariant = match($vLow) {
+                'reverse' => 'reverse',
+                'holo' => 'holo',
+                default => 'normal',
+            };
+            $variantIncoming = $cardIncoming->where('foil_type', $foilTypeForVariant);
+            if ($variantIncoming->count() > 0) {
+                $inc = $variantIncoming->first();
+                $qtyStr = $inc->quantity > 1 ? " x{$inc->quantity}" : "";
+                $titleStr = $inc->notes ? ' title="' . htmlspecialchars($inc->notes) . '" data-bs-toggle="tooltip"' : '';
+                $incomingBadge = '&nbsp;<span class="badge d-inline-flex align-items-center gap-1" style="background: rgba(251, 146, 60, 0.2); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.4); font-size: 0.55rem; padding: 2px 4px;"' . $titleStr . '>🚚' . $qtyStr . '</span>';
+            }
+        }
+        
         if (isset($vMap[$vLow])) {
-            $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center ' . $vMap[$vLow][1] . '" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>' . $vMap[$vLow][0] . '</span>' . $extraInfo . '</span>';
+            $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center ' . $vMap[$vLow][1] . '" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>' . $vMap[$vLow][0] . '</span>' . $extraInfo . '</span>' . $incomingBadge;
         } else {
-            $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center bg-light text-dark" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>'.strtoupper(substr($v, 0, 1)).'</span>' . $extraInfo . '</span>';
+            $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center bg-light text-dark" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>'.strtoupper(substr($v, 0, 1)).'</span>' . $extraInfo . '</span>' . $incomingBadge;
         }
     }
     $variantsHtml = implode(' ', $variantBadges);
+
+    $hasMissingIncoming = count($card->missing_incoming_variants ?? []) > 0;
+    $hasPureMissing = count($card->pure_missing_variants ?? []) > 0;
+    
+    // Fallback if missing_incoming_variants is not set (e.g. from an old cache or non-missing tab)
+    if (!isset($card->missing_incoming_variants)) {
+        $hasIncoming = isset($cardIncoming) && $cardIncoming->count() > 0;
+        if ($isMissingTab) {
+            $hasMissingIncoming = $hasIncoming;
+            $hasPureMissing = !$hasIncoming;
+        }
+    } else {
+        $hasIncoming = $hasMissingIncoming;
+    }
 @endphp
 
 <style>
@@ -348,7 +378,13 @@
 </style>
 
 <div class="col">
-    <div data-card-id="{{ $card->id }}" class="card-item">
+    <div data-card-id="{{ $card->id }}" class="card-item" style="{{ $hasIncoming ? 'border: 2px solid #fb923c; box-shadow: 0 0 20px rgba(251, 146, 60, 0.3);' : '' }}">
+        @if($hasIncoming)
+            <div style="position: absolute; top: -1px; right: -1px; z-index: 30; background: linear-gradient(135deg, #fb923c, #f59e0b); color: #1a1a2e; padding: 4px 16px; border-bottom-left-radius: 16px; font-weight: 800; font-size: 0.7rem; letter-spacing: 0.05em; box-shadow: -2px 2px 10px rgba(0,0,0,0.5);">
+                IN ARRIVO
+            </div>
+        @endif
+
         <div class="card-glass-highlight"></div>
 
         <div class="card-image-area">
@@ -422,6 +458,21 @@
                 </div>
             @else
                 <div style="font-size: 10px; color: transparent; margin-bottom: 6px;">&nbsp;</div>
+            @endif
+
+            @if($isMissingTab)
+                <div class="mt-2 pt-2 border-top border-secondary d-flex flex-column gap-1">
+                    @if($hasMissingIncoming)
+                        <div class="d-flex justify-content-between gap-1 w-100">
+                            <button type="button" class="btn btn-sm btn-success flex-grow-1 fw-bold" style="font-size: 0.7rem; padding: 4px 8px; box-shadow: 0 2px 4px rgba(34,197,94,0.2);" onclick="event.stopPropagation(); window.selectedCards = new Set([{{ $card->id }}]); window.openIncomingArrivedModal();">📦 Arrivate</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" style="font-size: 0.7rem; padding: 4px 8px;" title="Annulla In Arrivo" onclick="event.stopPropagation(); window.cancelIncomingByCardId({{ $card->id }}, this);">❌</button>
+                        </div>
+                    @endif
+                    
+                    @if($hasPureMissing || (!$hasMissingIncoming && !$hasPureMissing))
+                        <button type="button" class="btn btn-sm btn-outline-warning w-100 fw-bold" style="font-size: 0.7rem; padding: 4px 8px;" onclick="event.stopPropagation(); window.selectedCards = new Set([{{ $card->id }}]); window.openIncomingAddModal();">🚚 Segna In Arrivo</button>
+                    @endif
+                </div>
             @endif
 
             @if(!$isMissingTab)

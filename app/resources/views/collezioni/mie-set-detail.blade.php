@@ -72,95 +72,206 @@
                     </p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-warning fw-bold text-dark px-3" type="button" onclick="openMissingCardsModal()">
-                        {{ __('+ Aggiungi carte') }}
+                    <button class="btn btn-warning fw-bold text-dark px-3 rounded-pill" type="button" onclick="openMissingCardsModal()">
+                        {{ __('+ Aggiungi') }}
                     </button>
-                    <button class="btn btn-outline-light {{ $hasActiveFilters ? '' : 'collapsed' }}" type="button" data-bs-toggle="collapse"
-                        data-bs-target="#filterDrawer" aria-expanded="{{ $hasActiveFilters ? 'true' : 'false' }}" aria-controls="filterDrawer">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                            class="bi bi-funnel" viewBox="0 0 16 16">
-                            <path
-                                d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .4.8l-4.5 6.5V13.5a.5.5 0 0 1-.8.4L7 10.7l-2.1 3.2a.5.5 0 0 1-.8-.4V8.8L1.6 1.8A.5.5 0 0 1 1.5 1.5z" />
+                    <button class="btn btn-primary rounded-pill d-flex align-items-center justify-content-center position-relative" style="width: 38px; height: 38px; padding: 0;" type="button"
+                        data-bs-toggle="offcanvas" data-bs-target="#offcanvasFilters" aria-controls="offcanvasFilters">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-funnel" viewBox="0 0 16 16">
+                            <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .4.8l-4.5 6.5V13.5a.5.5 0 0 1-.8.4L7 10.7l-2.1 3.2a.5.5 0 0 1-.8-.4V8.8L1.6 1.8A.5.5 0 0 1 1.5 1.5z" />
                         </svg>
-                        {{ __('Filtri') }}
-                    </button>
-                    <button class="btn btn-outline-secondary disabled" type="button">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                            class="bi bi-sort-down" viewBox="0 0 16 16">
-                            <path
-                                d="M3.5 2.5a.5.5 0 0 1 .5.5v8.793l1.146-1.147a.5.5 0 1 1 .708.708l-2 2a.498.498 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L3 11.793V3a.5.5 0 0 1 .5-.5z" />
-                            <path
-                                d="M5 12.5a.5.5 0 0 0 .5.5h7.793l-1.147 1.146a.5.5 0 0 0 .708.708l2-2a.498.498 0 0 0 0-.708l-2-2a.5.5 0 0 0-.708.708L13.293 13H5.5a.5.5 0 0 0-.5.5z" />
-                        </svg>
-                        {{ __('Ordina') }}
+                        @if($hasActiveFilters)
+                            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="transform: translate(-30%, -30%) !important;">
+                                <span class="visually-hidden">Filtri attivi</span>
+                            </span>
+                        @endif
                     </button>
                 </div>
             </div>
 
-            <div class="collapse mb-4 {{ $hasActiveFilters ? 'show' : '' }}" id="filterDrawer">
-                <div class="card card-body filter-card border">
+            <!-- Compact Summary Row -->
+            <div class="d-flex flex-wrap gap-3 mb-4 align-items-center bg-dark border border-secondary rounded-pill px-4 py-2" style="background: rgba(14, 24, 44, 0.6) !important; width: fit-content;">
+                @php
+                    $cardTotal = $set->card_total > 0 ? $set->card_total : ($set->card_official ?? 0);
+                    $cardOfficial = $set->card_official ?? 0;
+                    
+                    $ownedCardIds = \App\Models\UserCardCollection::where('user_id', auth()->id())
+                        ->where('set_id', $set->id)
+                        ->distinct('card_id')
+                        ->pluck('card_id');
+                        
+                    $uniqueOwnedQty = $ownedCardIds->count();
+                    $progress = $cardTotal > 0 ? min(100, round(($uniqueOwnedQty / $cardTotal) * 100)) : 0;
+                    
+                    $ownedCardsForStats = \App\Models\TCGCard::whereIn('id', $ownedCardIds)->get(['id', 'dexId']);
+                    $ownedFuoriSerie = 0;
+                    foreach($ownedCardsForStats as $c) {
+                        $num = (int) preg_replace('/[^0-9]/', '', $c->dexId);
+                        if ($cardOfficial > 0 && ($num > $cardOfficial || (preg_match('/^[A-Za-z]/', $c->dexId) && $num > 0))) {
+                            $ownedFuoriSerie++;
+                        }
+                    }
+                    $totalFuoriSerie = max(0, $cardTotal - $cardOfficial);
+                    $ownedBase = max(0, $uniqueOwnedQty - $ownedFuoriSerie);
+                @endphp
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-secondary small text-uppercase fw-bold" style="font-size: 0.7rem;">{{ __('Set Base:') }}</span>
+                    <span class="text-white fw-bold">{{ $ownedBase }} / {{ $cardOfficial > 0 ? $cardOfficial : '?' }}</span>
+                </div>
+                @if($totalFuoriSerie > 0)
+                <div class="vr bg-secondary mx-1"></div>
+                <div class="d-flex align-items-center gap-2" title="{{ __('Fuori Serie / Secret Rares') }}">
+                    <span class="text-secondary small text-uppercase fw-bold" style="font-size: 0.7rem;">{{ __('Fuori Serie:') }}</span>
+                    <span class="text-warning fw-bold">{{ $ownedFuoriSerie }} / {{ $totalFuoriSerie }}</span>
+                </div>
+                @endif
+                <div class="vr bg-secondary mx-1"></div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-secondary small text-uppercase fw-bold" style="font-size: 0.7rem;">{{ __('Completamento Totale:') }}</span>
+                    <div class="progress" style="width: 60px; height: 6px; background-color: rgba(255,255,255,0.1);">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ $progress }}%" aria-valuenow="{{ $progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <span class="text-success fw-bold small">{{ $progress }}%</span>
+                </div>
+            </div>
+
+            <div class="offcanvas offcanvas-start text-bg-dark border-end border-secondary" tabindex="-1" id="offcanvasFilters" aria-labelledby="offcanvasFiltersLabel">
+                <div class="offcanvas-header border-bottom border-secondary">
+                    <h5 class="offcanvas-title fw-bold" id="offcanvasFiltersLabel">
+                        <svg width="18" height="18" fill="currentColor" class="bi bi-funnel me-2" viewBox="0 0 16 16">
+                            <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .4.8l-4.5 6.5V13.5a.5.5 0 0 1-.8.4L7 10.7l-2.1 3.2a.5.5 0 0 1-.8-.4V8.8L1.6 1.8A.5.5 0 0 1 1.5 1.5z" />
+                        </svg>
+                        {{ __('Filtri e Ordinamento') }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body">
                     <form id="filter-form" method="GET" action="{{ route('collezioni.mie.set', ['set' => $set->id]) }}">
                         <input type="hidden" name="page" value="1" id="filter-page" />
-                        <input type="hidden" name="tab" value="{{ $tab ?? 'owned' }}" />
-                        <div class="row g-3">
-                            <div class="col-12 col-md-6">
-                                <label for="search" class="form-label text-secondary small text-uppercase">{{ __('Nome carta') }}
-                                    </label>
-                                <input id="search" name="search" type="text"
-                                    class="form-control bg-dark text-white border-secondary" value="{{ request('search') }}"
-                                    placeholder="{{ __('Cerca nome carta...') }}" />
+                        <input type="hidden" name="tab" value="{{ $tab ?? 'owned' }}" id="filter-tab" />
+                        
+                        <div class="d-flex flex-column gap-4">
+                            <!-- Filtri Base -->
+                            <div>
+                                <h6 class="text-uppercase text-secondary fw-bold small mb-3">{{ __('Ricerca Base') }}</h6>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label for="search" class="form-label text-white small">{{ __('Nome carta') }}</label>
+                                        <input id="search" name="search" type="text" class="form-control bg-dark text-white border-secondary" value="{{ request('search') }}" placeholder="{{ __('Cerca nome carta...') }}" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="type" class="form-label text-white small">{{ __('Tipo Pokémon') }}</label>
+                                        <select id="type" name="type" class="form-select bg-dark text-white border-secondary">
+                                            <option value="">{{ __('Tutti i tipi') }}</option>
+                                            @foreach ($typeOptions as $typeOption)
+                                                <option value="{{ $typeOption }}" @selected(request('type') === $typeOption)>{{ $typeOption }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="stage" class="form-label text-white small">{{ __('Stadio evolutivo') }}</label>
+                                        <select id="stage" name="stage" class="form-select bg-dark text-white border-secondary">
+                                            <option value="">{{ __('Tutti gli stadi') }}</option>
+                                            @foreach ($stageOptions as $stageOption)
+                                                <option value="{{ $stageOption }}" @selected(request('stage') === $stageOption)>{{ $stageOption }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="col-12 col-md-6">
-                                <label for="type" class="form-label text-secondary small text-uppercase">{{ __('Tipo Pokémon') }}
-                                    </label>
-                                <select id="type" name="type"
-                                    class="form-select bg-dark text-white border-secondary">
-                                    <option value="">{{ __('Tutti i tipi') }}</option>
-                                    @foreach ($typeOptions as $typeOption)
-                                        <option value="{{ $typeOption }}" @selected(request('type') === $typeOption)>{{ $typeOption }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                            
+                            <!-- Divider -->
+                            <hr class="border-secondary my-0">
+                            
+                            <!-- Filtri Avanzati (Dinamici) -->
+                            <div>
+                                <h6 class="text-uppercase text-secondary fw-bold small mb-3">{{ __('Filtri Avanzati') }}</h6>
+                                
+                                <div id="filters-owned-doppie" style="display: {{ in_array(($tab ?? 'owned'), ['owned', 'doppie']) ? 'block' : 'none' }} !important;">
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label for="filter_language" class="form-label text-white small">{{ __('Lingua') }}</label>
+                                            <select id="filter_language" name="filter_language" class="form-select bg-dark text-white border-secondary">
+                                                <option value="">{{ __('Tutte le lingue') }}</option>
+                                                <option value="IT" @selected(request('filter_language') === 'IT')>Italiano</option>
+                                                <option value="EN" @selected(request('filter_language') === 'EN')>Inglese</option>
+                                                <option value="JP" @selected(request('filter_language') === 'JP')>Giapponese</option>
+                                                <option value="FR" @selected(request('filter_language') === 'FR')>Francese</option>
+                                                <option value="DE" @selected(request('filter_language') === 'DE')>Tedesco</option>
+                                                <option value="ES" @selected(request('filter_language') === 'ES')>Spagnolo</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="filter_condition" class="form-label text-white small">{{ __('Condizione') }}</label>
+                                            <select id="filter_condition" name="filter_condition" class="form-select bg-dark text-white border-secondary">
+                                                <option value="">{{ __('Tutte le condizioni') }}</option>
+                                                <option value="NM" @selected(request('filter_condition') === 'NM')>Near Mint (NM)</option>
+                                                <option value="EX" @selected(request('filter_condition') === 'EX')>Excellent (EX)</option>
+                                                <option value="GD" @selected(request('filter_condition') === 'GD')>Good (GD)</option>
+                                                <option value="LP" @selected(request('filter_condition') === 'LP')>Light Played (LP)</option>
+                                                <option value="PL" @selected(request('filter_condition') === 'PL')>Played (PL)</option>
+                                                <option value="PO" @selected(request('filter_condition') === 'PO')>Poor (PO)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="filter_variant" class="form-label text-white small">{{ __('Variante') }}</label>
+                                            <select id="filter_variant" name="filter_variant" class="form-select bg-dark text-white border-secondary">
+                                                <option value="">{{ __('Tutte le varianti') }}</option>
+                                                <option value="normal" @selected(request('filter_variant') === 'normal')>Normal</option>
+                                                <option value="reverse" @selected(request('filter_variant') === 'reverse')>Reverse</option>
+                                                <option value="holo" @selected(request('filter_variant') === 'holo')>Holo</option>
+                                                <option value="firstedition" @selected(request('filter_variant') === 'firstedition')>1ª Edizione</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="filters-missing" style="display: {{ ($tab ?? 'owned') === 'missing' ? 'block' : 'none' }} !important;">
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label for="filter_incoming" class="form-label text-white small">{{ __('Stato Arrivo') }}</label>
+                                            <select id="filter_incoming" name="filter_incoming" class="form-select bg-dark text-white border-secondary">
+                                                <option value="all" @selected(request('filter_incoming') === 'all')>{{ __('Mostra Tutto') }}</option>
+                                                <option value="only_incoming" @selected(request('filter_incoming') === 'only_incoming')>🚚 {{ __('Solo In Arrivo') }}</option>
+                                                <option value="only_missing" @selected(request('filter_incoming') === 'only_missing')>❌ {{ __('Solo Mancanti Pure') }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="col-12 col-md-6">
-                                <label for="stage" class="form-label text-secondary small text-uppercase">{{ __('Stadio evolutivo') }}
-                                    </label>
-                                <select id="stage" name="stage"
-                                    class="form-select bg-dark text-white border-secondary">
-                                    <option value="">{{ __('Tutti gli stadi') }}</option>
-                                    @foreach ($stageOptions as $stageOption)
-                                        <option value="{{ $stageOption }}" @selected(request('stage') === $stageOption)>
-                                            {{ $stageOption }}</option>
-                                    @endforeach
-                                </select>
+                            
+                            <!-- Divider -->
+                            <hr class="border-secondary my-0">
+                            
+                            <!-- Ordinamento & Paginazione -->
+                            <div>
+                                <h6 class="text-uppercase text-secondary fw-bold small mb-3">{{ __('Visualizzazione') }}</h6>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label for="sort" class="form-label text-white small">{{ __('Ordina per') }}</label>
+                                        <select id="sort" name="sort" class="form-select bg-dark text-white border-secondary">
+                                            <option value="dex_asc" @selected(request('sort') === 'dex_asc')>{{ __('Numero carta') }}</option>
+                                            <option value="dex_desc" @selected(request('sort') === 'dex_desc')>{{ __('Numero carta (desc)') }}</option>
+                                            <option value="name_asc" @selected(request('sort') === 'name_asc')>{{ __('Nome A → Z') }}</option>
+                                            <option value="name_desc" @selected(request('sort') === 'name_desc')>{{ __('Nome Z → A') }}</option>
+                                            <option value="rarity_asc" @selected(request('sort') === 'rarity_asc')>{{ __('Rarità ascendente') }}</option>
+                                            <option value="rarity_desc" @selected(request('sort') === 'rarity_desc')>{{ __('Rarità discendente') }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="per_page" class="form-label text-white small">{{ __('Carte per pagina') }}</label>
+                                        <select id="per_page" name="per_page" class="form-select bg-dark text-white border-secondary">
+                                            <option value="100" @selected(request('per_page', 100) == 100)>100</option>
+                                            <option value="200" @selected(request('per_page') == 200)>200</option>
+                                            <option value="300" @selected(request('per_page') == 300)>300</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="col-12 col-md-6">
-                                <label for="sort" class="form-label text-secondary small text-uppercase">{{ __('Ordina per') }}
-                                    </label>
-                                <select id="sort" name="sort"
-                                    class="form-select bg-dark text-white border-secondary">
-                                    <option value="dex_asc" @selected(request('sort') === 'dex_asc')>{{ __('Numero carta') }}</option>
-                                    <option value="dex_desc" @selected(request('sort') === 'dex_desc')>{{ __('Numero carta (desc)') }}</option>
-                                    <option value="name_asc" @selected(request('sort') === 'name_asc')>{{ __('Nome A → Z') }}</option>
-                                    <option value="name_desc" @selected(request('sort') === 'name_desc')>{{ __('Nome Z → A') }}</option>
-                                    <option value="rarity_asc" @selected(request('sort') === 'rarity_asc')>{{ __('Rarità ascendente') }}</option>
-                                    <option value="rarity_desc" @selected(request('sort') === 'rarity_desc')>{{ __('Rarità discendente') }}</option>
-                                </select>
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label for="per_page" class="form-label text-secondary small text-uppercase">{{ __('Carte per pagina') }}
-                                    </label>
-                                <select id="per_page" name="per_page"
-                                    class="form-select bg-dark text-white border-secondary">
-                                    <option value="100" @selected(request('per_page', 100) == 100)>100</option>
-                                    <option value="200" @selected(request('per_page') == 200)>200</option>
-                                    <option value="300" @selected(request('per_page') == 300)>300</option>
-                                </select>
-                            </div>
-                            <div class="col-12 d-flex justify-content-between align-items-center gap-2">
-                                <button type="submit" class="btn btn-primary">{{ __('Applica') }}</button>
-                                <span class="badge rounded-pill bg-secondary text-white">{{ $userCards->total() }}
-                                    {{ __('risultati') }}</span>
+                            
+                            <div class="mt-4 d-flex justify-content-between align-items-center">
+                                <span class="badge rounded-pill bg-primary px-3 py-2 fs-6" id="filter-results-count">{{ $userCards->total() }} {{ __('risultati') }}</span>
+                                <button type="button" class="btn btn-outline-light" data-bs-dismiss="offcanvas">{{ __('Chiudi') }}</button>
                             </div>
                         </div>
                     </form>
@@ -168,7 +279,7 @@
             </div>
 
             <div class="row gy-4">
-                <div class="col-12 col-xl-8">
+                <div class="col-12">
                     <ul class="nav nav-pills mb-4" id="collection-tabs">
                         <li class="nav-item">
                             <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'owned' ? 'active bg-primary text-white' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'owned', 'page' => 1]) }}" data-tab="owned">
@@ -193,7 +304,7 @@
                                 <label class="form-check-label text-white small fw-bold text-uppercase" for="selectAllVisible" style="cursor: pointer;">{{ __('Seleziona Tutte Visibili') }}</label>
                             </div>
                         </div>
-                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="cards-grid">
+                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4" id="cards-grid">
                             @include('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab ?? 'owned'])
                         </div>
 
@@ -207,54 +318,18 @@
                         </button>
                     </div>
                 </div>
-
-                <div class="col-12 col-xl-4">
-                    <div class="card summary-card h-100">
-                        <div class="card-body">
-                            <h2 class="h5 text-white">{{ __('Riepilogo collezione nel set') }}</h2>
-                            <p class="text-secondary">{{ __('Informazioni sulla tua collezione per questo specifico set.') }}</p>
-                            <div class="list-group list-group-flush mt-4">
-                                <div
-                                    class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between align-items-center border-0">
-                                    <span class="summary-label">{{ __('Carte possedute (Uniche)') }}</span>
-                                    <span class="summary-value">{{ $ownedTotal ?? 0 }} /
-                                        {{ $set->card_total ?? '?' }}</span>
-                                </div>
-                                @php
-                                    $uniqueOwnedQty = \App\Models\UserCardCollection::where('user_id', auth()->id())
-                                        ->where('set_id', $set->id)
-                                        ->distinct('card_id')
-                                        ->count('card_id');
-                                    $cardTotal = $set->card_official ?? ($set->card_total ?? 0);
-                                    $progress =
-                                        $cardTotal > 0 ? min(100, round(($uniqueOwnedQty / $cardTotal) * 100)) : 0;
-                                @endphp
-                                <div
-                                    class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between align-items-center border-0">
-                                    <span class="summary-label">{{ __('Completamento') }}</span>
-                                    <span class="summary-value">{{ $progress }}%</span>
-                                </div>
-                                <div
-                                    class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between align-items-center border-0">
-                                    <span class="summary-label">{{ __('Lingua set') }}</span>
-                                    <span class="summary-value">{{ strtoupper($set->language) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </main>
 
     <!-- Mass Action Bar -->
     <div id="mass-action-bar" class="fixed-bottom p-3 d-flex justify-content-center" style="pointer-events: none; z-index: 1040; transition: transform 0.3s ease; transform: translateY(100%);">
-        @if(($tab ?? 'owned') !== 'missing')
-            <div class="card bg-dark text-white shadow-lg border border-secondary" style="pointer-events: auto; border-radius: 2rem;">
-                <div class="card-body d-flex align-items-center justify-content-between py-2 px-4">
-                    <span class="fw-bold me-3 text-nowrap"><span id="mass-selected-count" class="text-warning">0</span> {{ __('carte') }}</span>
-                    
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="card bg-dark text-white shadow-lg border border-secondary" style="pointer-events: auto; border-radius: 2rem;">
+            <div class="card-body d-flex align-items-center justify-content-between py-2 px-4">
+                <span class="fw-bold me-3 text-nowrap"><span id="mass-selected-count" class="text-warning">0</span> {{ __('carte') }}</span>
+                
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <div id="mass-actions-owned" class="d-flex align-items-center gap-2 flex-wrap" style="display: {{ ($tab ?? 'owned') !== 'missing' ? 'flex' : 'none' }} !important;">
                         <button class="btn btn-outline-light btn-sm fw-bold rounded-pill d-flex align-items-center gap-1" onclick="openMassEditModal()">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                             {{ __('Modifica') }}
@@ -269,16 +344,28 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                             {{ __('Elimina') }}
                         </button>
-                        
-                        <div class="vr bg-secondary mx-1"></div>
-                        
-                        <button class="btn btn-sm text-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; padding: 0;" onclick="clearSelection()" title="{{ __('Annulla Selezione') }}">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </div>
+                    
+                    <div id="mass-actions-missing" class="d-flex align-items-center gap-2 flex-wrap" style="display: {{ ($tab ?? 'owned') === 'missing' ? 'flex' : 'none' }} !important;">
+                        <button class="btn btn-sm fw-bold rounded-pill text-dark d-flex align-items-center gap-1" style="background: linear-gradient(135deg, #fb923c, #f59e0b); border: none;" onclick="openIncomingAddModal()">
+                            🚚 {{ __('Segna In Arrivo') }}
+                        </button>
+                        <button class="btn btn-sm fw-bold rounded-pill text-white d-flex align-items-center gap-1" style="background: linear-gradient(135deg, #22c55e, #16a34a); border: none;" onclick="openIncomingArrivedModal()">
+                            📦 {{ __('Sono Arrivate') }}
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm fw-bold rounded-pill d-flex align-items-center gap-1" onclick="massCancelIncoming()">
+                            ❌ {{ __('Annulla') }}
                         </button>
                     </div>
+                    
+                    <div class="vr bg-secondary mx-1"></div>
+                    
+                    <button class="btn btn-sm text-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; padding: 0;" onclick="clearSelection()" title="{{ __('Annulla Selezione') }}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
                 </div>
             </div>
-        @endif
+        </div>
     </div>
 
     <div id="cards-pagination" data-current-page="{{ $userCards->currentPage() }}"
@@ -287,6 +374,7 @@
 
     @include('partials._missing-cards-modal')
     @include('partials._mass-action-modals')
+    @include('partials._incoming-modals')
 
     <script>
         function currentFilterParams() {
@@ -349,6 +437,23 @@
                     updateLoadMoreButton(data.current_page || 1, data.last_page || 1);
                     var pageInput = document.getElementById('filter-page');
                     if (pageInput) pageInput.value = data.current_page || 1;
+                    
+                    let resultBadge = document.getElementById('filter-results-count');
+                    if (resultBadge && data.total !== undefined) {
+                        resultBadge.textContent = data.total + ' risultati';
+                    }
+                    
+                    // Update tab badges
+                    if (data.ownedTotal !== undefined) {
+                        document.querySelector('a[data-tab="owned"] .badge').textContent = data.ownedTotal;
+                    }
+                    if (data.missingTotal !== undefined) {
+                        document.querySelector('a[data-tab="missing"] .badge').textContent = data.missingTotal;
+                    }
+                    if (data.doppieTotal !== undefined) {
+                        document.querySelector('a[data-tab="doppie"] .badge').textContent = data.doppieTotal;
+                    }
+                    
                     clearSelection();
                 }
             } catch (e) {
@@ -395,12 +500,51 @@
                     }
                 }
                 
+                let ownedActions = document.getElementById('mass-actions-owned');
+                let missingActions = document.getElementById('mass-actions-missing');
+                if (ownedActions && missingActions) {
+                    if (tabValue === 'missing') {
+                        ownedActions.style.setProperty('display', 'none', 'important');
+                        missingActions.style.setProperty('display', 'flex', 'important');
+                    } else {
+                        ownedActions.style.setProperty('display', 'flex', 'important');
+                        missingActions.style.setProperty('display', 'none', 'important');
+                    }
+                }
+                
+                let filtersOwned = document.getElementById('filters-owned-doppie');
+                let filtersMissing = document.getElementById('filters-missing');
+                if (filtersOwned && filtersMissing) {
+                    if (tabValue === 'missing') {
+                        filtersOwned.style.setProperty('display', 'none', 'important');
+                        filtersMissing.style.setProperty('display', 'block', 'important');
+                    } else {
+                        filtersOwned.style.setProperty('display', 'block', 'important');
+                        filtersMissing.style.setProperty('display', 'none', 'important');
+                    }
+                }
+                
+                // Clear selection when switching tabs
+                if (typeof clearSelection === 'function') clearSelection();
+                
                 reloadCardsGrid(1);
+            });
+        });
+
+        let filterTimeout;
+        document.querySelectorAll('#filter-form input, #filter-form select').forEach(el => {
+            el.addEventListener('input', () => {
+                clearTimeout(filterTimeout);
+                filterTimeout = setTimeout(() => {
+                    document.getElementById('filter-page').value = 1;
+                    reloadCardsGrid(1);
+                }, 400);
             });
         });
 
         document.getElementById('filter-form').addEventListener('submit', function(e) {
             e.preventDefault();
+            document.getElementById('filter-page').value = 1;
             reloadCardsGrid(1);
         });
 
@@ -499,6 +643,32 @@
                         }
                     });
                     clearSelection();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+
+        window.massCancelIncoming = async function() {
+            if (window.selectedCards.size === 0) return;
+            if (!confirm('Vuoi annullare lo status "In Arrivo" per le carte selezionate?')) return;
+            
+            try {
+                const res = await fetch('/collezioni/incoming/remove', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ card_ids: Array.from(window.selectedCards).map(Number) })
+                });
+                
+                if (res.ok) {
+                    reloadCardsGrid(document.getElementById('filter-page')?.value || 1);
+                    clearSelection();
+                } else {
+                    alert('Errore durante l\'annullamento.');
                 }
             } catch (e) {
                 console.error(e);

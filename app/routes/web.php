@@ -29,6 +29,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/set/{set}', [CollezioniController::class, 'showSet'])->name('set');
         Route::get('/set/{set}/missing-cards', [CollezioniController::class, 'missingCards'])->name('set.missing');
 
+        // Incoming cards (in arrivo)
+        Route::post('/incoming/add', [CollezioniController::class, 'addIncoming'])->name('incoming.add');
+        Route::post('/incoming/arrived', [CollezioniController::class, 'arrivedIncoming'])->name('incoming.arrived');
+        Route::post('/incoming/remove', [CollezioniController::class, 'removeIncoming'])->name('incoming.remove');
+        Route::post('/incoming/list', [CollezioniController::class, 'getIncomingCards'])->name('incoming.list');
+
         // Mass actions — MUST be before /cards/{card} to avoid wildcard capture
         Route::delete('/cards/mass-remove', [CollezioniController::class, 'massRemoveCards'])->name('cards.massRemove');
         Route::post('/cards/mass-add', [CollezioniController::class, 'massAddCopies'])->name('cards.massAdd');
