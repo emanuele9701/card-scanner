@@ -393,7 +393,7 @@
             <div class="row g-3">
                 @foreach($setsStats as $index => $stat)
                 <div class="col-12 col-xl-6" x-show="showAll || {{ $index }} < 4" x-transition.opacity>
-                    <div class="set-card d-flex h-100 overflow-hidden text-decoration-none">
+                    <a href="{{ route('collezioni.mie.set', $stat['set_id']) }}" class="set-card d-flex h-100 overflow-hidden text-decoration-none">
                         <div class="set-symbol-container py-3">
                             @if($stat['symbol'])
                                 <img src="{{ $stat['symbol'] }}.png" alt="Simbolo" class="img-fluid px-2" style="max-height: 40px; opacity: 0.8;" onerror="this.style.display='none'">
@@ -420,7 +420,7 @@
                                 </span>
                             </div>
                         </div>
-                    </div>
+                    </a>
                 </div>
                 @endforeach
             </div>

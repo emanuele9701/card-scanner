@@ -50,27 +50,29 @@
                                 <option value="pt">Portoghese (PT)</option>
                             </select>
                         </div>
-                        <div class="col-12 col-md-4">
+                        <div class="col-12 col-md-3">
                             <label class="form-label text-secondary small">{{ __('Quantità') }}</label>
                             <input type="number" id="mcm-quantity" class="form-control bg-dark text-white border-secondary" value="1" min="1" required>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label text-secondary small">{{ __('Varianti') }}</label>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label text-secondary small">{{ __('Foil Carta') }}</label>
+                            <select id="mcm-foil" class="form-select bg-dark text-white border-secondary">
+                                <option value="normal">Normale</option>
+                                <option value="holo">Holo</option>
+                                <option value="reverse">Reverse</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <label class="form-label text-secondary small">{{ __('Opzioni Extra') }}</label>
                             <div class="d-flex flex-wrap gap-3 mt-1">
                                 <label class="d-flex align-items-center gap-1 text-white" style="font-size: 0.85rem;">
-                                    <input type="checkbox" name="mcm-variants" value="holo" class="form-check-input mt-0"> Holo
+                                    <input type="checkbox" id="mcm-first-edition" class="form-check-input mt-0"> 1ª Edizione
                                 </label>
                                 <label class="d-flex align-items-center gap-1 text-white" style="font-size: 0.85rem;">
-                                    <input type="checkbox" name="mcm-variants" value="reverse" class="form-check-input mt-0"> Reverse
+                                    <input type="checkbox" id="mcm-signed" class="form-check-input mt-0"> Signed
                                 </label>
                                 <label class="d-flex align-items-center gap-1 text-white" style="font-size: 0.85rem;">
-                                    <input type="checkbox" name="mcm-variants" value="firstEdition" class="form-check-input mt-0"> 1ª Edizione
-                                </label>
-                                <label class="d-flex align-items-center gap-1 text-white" style="font-size: 0.85rem;">
-                                    <input type="checkbox" name="mcm-variants" value="signed" class="form-check-input mt-0"> Signed
-                                </label>
-                                <label class="d-flex align-items-center gap-1 text-white" style="font-size: 0.85rem;">
-                                    <input type="checkbox" name="mcm-variants" value="altered" class="form-check-input mt-0"> Altered
+                                    <input type="checkbox" id="mcm-altered" class="form-check-input mt-0"> Altered
                                 </label>
                             </div>
                         </div>
@@ -139,15 +141,22 @@
         
         let html = '';
         copies.forEach(copy => {
-            const variants = Array.isArray(copy.variants) && copy.variants.length > 0 
-                ? `<span class="badge bg-secondary ms-2">${copy.variants.join(', ')}</span>` 
-                : '';
+            const langStr = copy.language ? copy.language.toUpperCase() : 'EN';
+            const foilStr = !copy.foil_type || copy.foil_type === 'normal' ? '' : `<span class="badge bg-info text-dark ms-1">${copy.foil_type.charAt(0).toUpperCase() + copy.foil_type.slice(1)}</span>`;
+            
+            let extraArr = [];
+            if (copy.is_first_edition) extraArr.push('1ª Ed');
+            if (copy.is_signed) extraArr.push('Signed');
+            if (copy.is_altered) extraArr.push('Altered');
+            const extraStr = extraArr.length > 0 ? `<span class="badge bg-warning text-dark ms-1">${extraArr.join(', ')}</span>` : '';
             
             html += `
                 <div class="d-flex align-items-center justify-content-between p-2" style="background: rgba(255,255,255,0.05); border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.1);">
                     <div>
                         <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3);">${copy.condition}</span>
-                        ${variants}
+                        <span class="badge bg-secondary ms-1">${langStr}</span>
+                        ${foilStr}
+                        ${extraStr}
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <div class="input-group input-group-sm" style="width: 100px;">
@@ -213,15 +222,12 @@
         const cardId = document.getElementById('mcm-card-id').value;
         const condition = document.getElementById('mcm-condition').value;
         const quantity = document.getElementById('mcm-quantity').value;
-        
-        const variantCheckboxes = document.querySelectorAll('input[name="mcm-variants"]:checked');
-        const variants = Array.from(variantCheckboxes).map(cb => cb.value);
-        
-        // Aggiungi la lingua come variante (es. "it", "en")
         const language = document.getElementById('mcm-language').value;
-        if (language) {
-            variants.push(language);
-        }
+        const foilType = document.getElementById('mcm-foil').value;
+        
+        const isFirstEdition = document.getElementById('mcm-first-edition').checked;
+        const isSigned = document.getElementById('mcm-signed').checked;
+        const isAltered = document.getElementById('mcm-altered').checked;
         
         try {
             const res = await fetch(`/collezioni/cards/${cardId}/copies`, {
@@ -234,7 +240,11 @@
                 body: JSON.stringify({
                     condition: condition,
                     quantity: quantity,
-                    variants: variants
+                    language: language,
+                    foil_type: foilType,
+                    is_first_edition: isFirstEdition,
+                    is_signed: isSigned,
+                    is_altered: isAltered
                 })
             });
             

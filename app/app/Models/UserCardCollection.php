@@ -15,17 +15,23 @@ class UserCardCollection extends Model implements HasMedia
 
     protected $fillable = [
         'user_id',
+        'card_id',
         'set_id',
         'serie_id',
-        'card_id',
-        'quantity',
-        'variants',
         'condition',
+        'language',
+        'foil_type',
+        'is_first_edition',
+        'is_signed',
+        'is_altered',
+        'quantity',
         'notes',
     ];
 
     protected $casts = [
-        'variants' => 'array',
+        'is_first_edition' => 'boolean',
+        'is_signed' => 'boolean',
+        'is_altered' => 'boolean',
     ];
 
     protected $hidden = [

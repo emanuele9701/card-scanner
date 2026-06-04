@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\TCGCard;
 use App\Models\TCGSeries;
 use App\Models\TCGSet;
+use App\Models\UserCardCollection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class CollezioniController extends Controller
@@ -152,10 +154,13 @@ class CollezioniController extends Controller
 
             $ownedVariants = [];
             foreach ($card->collectors as $coll) {
-                $v = is_array($coll->variants) && count($coll->variants) > 0 ? $coll->variants : ['normal'];
-                $ownedVariants = array_merge($ownedVariants, $v);
+                if ($coll->foil_type) $ownedVariants[] = strtolower(trim($coll->foil_type));
+                if ($coll->is_first_edition) $ownedVariants[] = 'firstedition';
             }
-            $ownedVariantsUnique = array_unique(array_map('strtolower', $ownedVariants));
+            if (empty($ownedVariants)) {
+                $ownedVariants[] = 'normal';
+            }
+            $ownedVariantsUnique = array_unique($ownedVariants);
             $producedUnique = array_unique(array_map('strtolower', $produced));
 
             $missingVariants = array_values(array_diff($producedUnique, $ownedVariantsUnique));
@@ -370,9 +375,12 @@ class CollezioniController extends Controller
             $ownedVariants = [];
             $variantCounts = [];
             foreach ($card->collectors as $coll) {
-                $v = is_array($coll->variants) && count($coll->variants) > 0 ? $coll->variants : ['normal'];
-                foreach ($v as $variantItem) {
-                    $variantItemLow = strtolower(trim($variantItem));
+                $feats = [];
+                if ($coll->foil_type) $feats[] = strtolower(trim($coll->foil_type));
+                if ($coll->is_first_edition) $feats[] = 'firstedition';
+                if (empty($feats)) $feats[] = 'normal';
+
+                foreach ($feats as $variantItemLow) {
                     $ownedVariants[] = $variantItemLow;
                     if (!isset($variantCounts[$variantItemLow])) {
                         $variantCounts[$variantItemLow] = 0;
@@ -472,24 +480,25 @@ class CollezioniController extends Controller
     public function addCardCopy(Request $request, TCGCard $card) {
         $request->validate([
             'condition' => 'required|in:NM,LP,MP,HP,DMG',
-            'variants' => 'array',
+            'language' => 'nullable|string',
+            'foil_type' => 'nullable|in:normal,holo,reverse',
+            'is_first_edition' => 'boolean',
+            'is_signed' => 'boolean',
+            'is_altered' => 'boolean',
             'quantity' => 'required|integer|min:1',
         ]);
         
         $user = Auth::user();
-        $variants = $request->input('variants', []);
         
         $existing = \App\Models\UserCardCollection::where('user_id', $user->id)
             ->where('card_id', $card->id)
             ->where('condition', $request->condition)
-            ->get()
-            ->filter(function($col) use ($variants) {
-                $colVariants = is_array($col->variants) ? $col->variants : [];
-                $reqVariants = is_array($variants) ? $variants : [];
-                sort($colVariants);
-                sort($reqVariants);
-                return $colVariants === $reqVariants;
-            })->first();
+            ->where('language', $request->language ?: 'en')
+            ->where('foil_type', $request->foil_type ?: 'normal')
+            ->where('is_first_edition', $request->boolean('is_first_edition'))
+            ->where('is_signed', $request->boolean('is_signed'))
+            ->where('is_altered', $request->boolean('is_altered'))
+            ->first();
 
         if ($existing) {
             $existing->quantity += $request->quantity;
@@ -499,9 +508,13 @@ class CollezioniController extends Controller
                 'user_id' => $user->id,
                 'card_id' => $card->id,
                 'set_id' => $card->set_id,
-                'serie_id' => $card->set->serie_id,
+                'serie_id' => $card->set->serie_id ?? $card->set?->serie_id,
                 'condition' => $request->condition,
-                'variants' => $variants,
+                'language' => $request->language ?: 'en',
+                'foil_type' => $request->foil_type ?: 'normal',
+                'is_first_edition' => $request->boolean('is_first_edition'),
+                'is_signed' => $request->boolean('is_signed'),
+                'is_altered' => $request->boolean('is_altered'),
                 'quantity' => $request->quantity,
             ]);
         }
@@ -542,6 +555,136 @@ class CollezioniController extends Controller
             ->delete();
         
         return response()->json(['success' => true]);
+    }
+
+    public function getMassCardCopies(Request $request)
+    {
+        $request->validate([
+            'card_ids' => 'required|array',
+            'card_ids.*' => 'integer|exists:tcg_cards,id'
+        ]);
+
+        $userId = Auth::id();
+        
+        $copies = UserCardCollection::with(['card', 'card.set'])
+            ->where('user_id', $userId)
+            ->whereIn('card_id', $request->card_ids)
+            ->get();
+            
+        // Group by card_id for frontend convenience
+        $grouped = [];
+        foreach($copies as $copy) {
+            $cid = $copy->card_id;
+            if(!isset($grouped[$cid])) {
+                $grouped[$cid] = [
+                    'card' => $copy->card,
+                    'copies' => []
+                ];
+            }
+            $grouped[$cid]['copies'][] = $copy;
+        }
+
+        return response()->json(array_values($grouped));
+    }
+
+    public function massAddCopies(Request $request)
+    {
+        $request->validate([
+            'card_ids' => 'required|array',
+            'card_ids.*' => 'integer|exists:tcg_cards,id',
+            'condition' => 'required|in:NM,LP,MP,HP,DMG',
+            'language' => 'nullable|string',
+            'foil_type' => 'nullable|in:normal,holo,reverse',
+            'is_first_edition' => 'boolean',
+            'is_signed' => 'boolean',
+            'is_altered' => 'boolean',
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        $userId = Auth::id();
+        $condition = $request->condition;
+        
+        $language = $request->language ?: 'en';
+        $foil_type = $request->foil_type ?: 'normal';
+        $is_first_edition = $request->boolean('is_first_edition');
+        $is_signed = $request->boolean('is_signed');
+        $is_altered = $request->boolean('is_altered');
+
+        DB::beginTransaction();
+        try {
+            foreach ($request->card_ids as $cardId) {
+                // Check if copy already exists
+                $existing = UserCardCollection::where('user_id', $userId)
+                    ->where('card_id', $cardId)
+                    ->where('condition', $condition)
+                    ->where('language', $language)
+                    ->where('foil_type', $foil_type)
+                    ->where('is_first_edition', $is_first_edition)
+                    ->where('is_signed', $is_signed)
+                    ->where('is_altered', $is_altered)
+                    ->first();
+
+                if ($existing) {
+                    $existing->quantity += $request->quantity;
+                    $existing->save();
+                } else {
+                    $card = \App\Models\TCGCard::find($cardId);
+                    if ($card) {
+                        UserCardCollection::create([
+                            'user_id' => $userId,
+                            'card_id' => $cardId,
+                            'set_id' => $card->set_id,
+                            'serie_id' => $card->set->serie_id ?? $card->set?->serie_id,
+                            'condition' => $condition,
+                            'language' => $language,
+                            'foil_type' => $foil_type,
+                            'is_first_edition' => $is_first_edition,
+                            'is_signed' => $is_signed,
+                            'is_altered' => $is_altered,
+                            'quantity' => $request->quantity,
+                        ]);
+                    }
+                }
+            }
+            DB::commit();
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function massUpdateQuantities(Request $request)
+    {
+        $request->validate([
+            'updates' => 'required|array',
+            'updates.*' => 'integer|min:0'
+        ]);
+
+        $userId = Auth::id();
+
+        DB::beginTransaction();
+        try {
+            foreach ($request->updates as $copyId => $newQty) {
+                $copy = UserCardCollection::where('id', $copyId)
+                    ->where('user_id', $userId)
+                    ->first();
+                
+                if ($copy) {
+                    if ($newQty == 0) {
+                        $copy->delete();
+                    } else {
+                        $copy->quantity = $newQty;
+                        $copy->save();
+                    }
+                }
+            }
+            DB::commit();
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 
     public function massRemoveCards(Request $request) {

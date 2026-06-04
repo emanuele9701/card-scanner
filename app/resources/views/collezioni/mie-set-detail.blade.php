@@ -250,11 +250,32 @@
     <!-- Mass Action Bar -->
     <div id="mass-action-bar" class="fixed-bottom p-3 d-flex justify-content-center" style="pointer-events: none; z-index: 1040; transition: transform 0.3s ease; transform: translateY(100%);">
         @if(($tab ?? 'owned') !== 'missing')
-            <div class="card bg-danger text-white shadow-lg border-0" style="pointer-events: auto; max-width: 400px; border-radius: 2rem;">
-                <div class="card-body d-flex align-items-center gap-3 py-2 px-4">
-                    <span class="fw-bold"><span id="mass-selected-count">0</span> {{ __('carte selezionate') }}</span>
-                    <button class="btn btn-light btn-sm text-danger fw-bold rounded-pill" onclick="massRemoveSelected()">{{ __('Elimina') }}</button>
-                    <button class="btn btn-sm text-white text-opacity-75" onclick="clearSelection()">{{ __('Annulla') }}</button>
+            <div class="card bg-dark text-white shadow-lg border border-secondary" style="pointer-events: auto; border-radius: 2rem;">
+                <div class="card-body d-flex align-items-center justify-content-between py-2 px-4">
+                    <span class="fw-bold me-3 text-nowrap"><span id="mass-selected-count" class="text-warning">0</span> {{ __('carte') }}</span>
+                    
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <button class="btn btn-outline-light btn-sm fw-bold rounded-pill d-flex align-items-center gap-1" onclick="openMassEditModal()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            {{ __('Modifica') }}
+                        </button>
+                        
+                        <button class="btn btn-sm fw-bold rounded-pill text-dark d-flex align-items-center gap-1" style="background-color: #fbb400; border: none;" onclick="openMassAddModal()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            {{ __('Aggiungi Copie') }}
+                        </button>
+                        
+                        <button class="btn btn-outline-danger btn-sm fw-bold rounded-pill d-flex align-items-center gap-1" onclick="massRemoveSelected()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            {{ __('Elimina') }}
+                        </button>
+                        
+                        <div class="vr bg-secondary mx-1"></div>
+                        
+                        <button class="btn btn-sm text-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; padding: 0;" onclick="clearSelection()" title="{{ __('Annulla Selezione') }}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         @endif
@@ -265,6 +286,7 @@
         data-load-url="{{ route('collezioni.mie.set', ['set' => $set->id]) }}"></div>
 
     @include('partials._missing-cards-modal')
+    @include('partials._mass-action-modals')
 
     <script>
         function currentFilterParams() {
@@ -398,23 +420,21 @@
                 
                 if (res.ok) {
                     const cardCol = btnEl.closest('.col');
-                    if (cardCol) {
-                        cardCol.remove();
-                    }
+                    if (cardCol) cardCol.remove();
                 }
             } catch (e) {
                 console.error(e);
             }
         };
 
-        let selectedCards = new Set();
+        window.selectedCards = window.selectedCards || new Set();
 
         window.handleCardSelection = function(checkbox) {
             if (checkbox.checked) {
-                selectedCards.add(checkbox.value);
+                window.selectedCards.add(checkbox.value);
                 checkbox.closest('.card-item').style.borderColor = '#ef4444';
             } else {
-                selectedCards.delete(checkbox.value);
+                window.selectedCards.delete(checkbox.value);
                 checkbox.closest('.card-item').style.borderColor = 'rgba(255, 255, 255, 0.08)';
             }
             updateMassActionBar();
@@ -423,41 +443,41 @@
         window.updateMassActionBar = function() {
             const bar = document.getElementById('mass-action-bar');
             const countEl = document.getElementById('mass-selected-count');
-            countEl.textContent = selectedCards.size;
-            
-            if (selectedCards.size > 0) {
-                bar.style.transform = 'translateY(0)';
-            } else {
-                bar.style.transform = 'translateY(100%)';
-            }
+            countEl.textContent = window.selectedCards.size;
+            bar.style.transform = window.selectedCards.size > 0 ? 'translateY(0)' : 'translateY(100%)';
         };
 
         window.clearSelection = function() {
-            selectedCards.clear();
-            document.querySelectorAll('.mass-select-checkbox').forEach(cb => {
+            window.selectedCards.clear();
+            const checkboxes = document.querySelectorAll('.mass-select-checkbox');
+            checkboxes.forEach(cb => {
                 cb.checked = false;
                 const cardItem = cb.closest('.card-item');
                 if(cardItem) cardItem.style.borderColor = 'rgba(255, 255, 255, 0.08)';
             });
-            const selectAllToggle = document.getElementById('selectAllVisible');
-            if(selectAllToggle) selectAllToggle.checked = false;
             updateMassActionBar();
+            var selectAllSwitch = document.getElementById('selectAllVisible');
+            if(selectAllSwitch) selectAllSwitch.checked = false;
         };
 
         window.toggleSelectAllVisible = function(checkbox) {
-            const isChecked = checkbox.checked;
-            document.querySelectorAll('.mass-select-checkbox').forEach(cb => {
-                if (cb.checked !== isChecked) {
-                    cb.checked = isChecked;
-                    handleCardSelection(cb);
+            const cardCheckboxes = document.querySelectorAll('.mass-select-checkbox');
+            cardCheckboxes.forEach(cb => {
+                cb.checked = checkbox.checked;
+                if (checkbox.checked) {
+                    window.selectedCards.add(cb.value);
+                    cb.closest('.card-item').style.borderColor = '#ef4444';
+                } else {
+                    window.selectedCards.delete(cb.value);
+                    cb.closest('.card-item').style.borderColor = 'rgba(255, 255, 255, 0.08)';
                 }
             });
+            updateMassActionBar();
         };
 
-
-
         window.massRemoveSelected = async function() {
-            if (!confirm(window.__trans ? window.__trans.confirm_remove_mass.replace(':count', selectedCards.size) : `Vuoi rimuovere ${selectedCards.size} carte dalla tua collezione?`)) return;
+            if (window.selectedCards.size === 0) return;
+            if (!confirm(window.__trans ? window.__trans.confirm_remove_mass.replace(':count', window.selectedCards.size) : `Vuoi rimuovere ${window.selectedCards.size} carte dalla tua collezione?`)) return;
             
             try {
                 const res = await fetch(`/collezioni/cards/mass-remove`, {
@@ -467,11 +487,11 @@
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify({ card_ids: Array.from(selectedCards) })
+                    body: JSON.stringify({ card_ids: Array.from(window.selectedCards).map(Number) })
                 });
                 
                 if (res.ok) {
-                    selectedCards.forEach(id => {
+                    window.selectedCards.forEach(id => {
                         const el = document.querySelector(`.mass-select-checkbox[value="${id}"]`);
                         if (el) {
                             const col = el.closest('.col');

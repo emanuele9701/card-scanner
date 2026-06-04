@@ -28,14 +28,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/disponibili', [CollezioniController::class, 'disponibili'])->name('disponibili');
         Route::get('/set/{set}', [CollezioniController::class, 'showSet'])->name('set');
         Route::get('/set/{set}/missing-cards', [CollezioniController::class, 'missingCards'])->name('set.missing');
-        Route::post('/cards/{card}', [CollezioniController::class, 'addCardToCollection'])
-            ->name('cards.addToCollection');
-            
+
+        // Mass actions — MUST be before /cards/{card} to avoid wildcard capture
+        Route::delete('/cards/mass-remove', [CollezioniController::class, 'massRemoveCards'])->name('cards.massRemove');
+        Route::post('/cards/mass-add', [CollezioniController::class, 'massAddCopies'])->name('cards.massAdd');
+        Route::post('/cards/mass-copies', [CollezioniController::class, 'getMassCardCopies'])->name('cards.massCopies');
+        Route::put('/copies/mass-update', [CollezioniController::class, 'massUpdateQuantities'])->name('copies.massUpdate');
+
+        // Single card routes
+        Route::post('/cards/{card}', [CollezioniController::class, 'addCardToCollection'])->name('cards.addToCollection');
         Route::get('/cards/{card}/copies', [CollezioniController::class, 'getCardCopies'])->name('cards.getCopies');
         Route::post('/cards/{card}/copies', [CollezioniController::class, 'addCardCopy'])->name('cards.addCopy');
         Route::put('/copies/{copy}', [CollezioniController::class, 'updateCardCopy'])->name('copies.update');
         Route::delete('/copies/{copy}', [CollezioniController::class, 'deleteCardCopy'])->name('copies.delete');
-        Route::delete('/cards/mass-remove', [CollezioniController::class, 'massRemoveCards'])->name('cards.massRemove');
         Route::delete('/cards/{card}/collection', [CollezioniController::class, 'removeCardFromCollection'])->name('cards.removeFromCollection');
     });
 
