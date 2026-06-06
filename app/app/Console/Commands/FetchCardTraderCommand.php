@@ -357,13 +357,26 @@ class FetchCardTraderCommand extends Command
                 $this->comment("    Inseriti " . count($toInsert) . " nuovi record di prezzo.");
             }
 
-            // Aggiornamento massivo dei prezzi esistenti (batch update per ID)
+            // Aggiornamento massivo dei prezzi esistenti (bulk upsert per ID)
             if (!empty($toUpdate)) {
+                $updateBatch = [];
                 foreach ($toUpdate as $id => $data) {
-                    unset($data['card_id'], $data['provider']); // Non serve aggiornare le chiavi
-                    TCGCardPrice::where('id', $id)->update($data);
+                    $data['id'] = $id; // Aggiungiamo l'ID per triggerare l'ON DUPLICATE KEY UPDATE
+                    $updateBatch[] = $data;
                 }
-                $this->comment("    Aggiornati " . count($toUpdate) . " record di prezzo esistenti.");
+                
+                foreach (array_chunk($updateBatch, 500) as $chunk) {
+                    TCGCardPrice::upsert(
+                        $chunk,
+                        ['id'], // Colonna univoca
+                        [
+                            'avg', 'low', 'trend', 'avg_1d', 'avg_7d', 'avg_30d', 
+                            'avg_holo', 'low_holo', 'trend_holo', 'avg_1d_holo', 'avg_7d_holo', 'avg_30d_holo', 
+                            'updated_at'
+                        ] // Colonne da aggiornare se l'ID esiste
+                    );
+                }
+                $this->comment("    Aggiornati " . count($toUpdate) . " record di prezzo esistenti in modalità bulk.");
             }
 
             // Inserimento massivo della history
