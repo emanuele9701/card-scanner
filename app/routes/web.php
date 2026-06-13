@@ -25,6 +25,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/mie/export', [CollezioniController::class, 'export'])->name('mie.export');
         Route::get('/mancanti', [CollezioniController::class, 'missingGlobal'])->name('mancanti');
         Route::get('/mie/set/{set}', [CollezioniController::class, 'showMySet'])->name('mie.set');
+        Route::get('/mie/set/{set}/export-excel', [CollezioniController::class, 'exportSetExcel'])->name('mie.set.exportExcel');
         Route::get('/disponibili', [CollezioniController::class, 'disponibili'])->name('disponibili');
         Route::get('/set/{set}', [CollezioniController::class, 'showSet'])->name('set');
         Route::get('/set/{set}/missing-cards', [CollezioniController::class, 'missingCards'])->name('set.missing');
