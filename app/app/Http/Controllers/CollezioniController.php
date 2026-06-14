@@ -459,6 +459,21 @@ class CollezioniController extends Controller
             return $card;
         });
 
+        $isSetWatchlisted = false;
+        $watchlistedCardIds = [];
+        if ($user) {
+            $isSetWatchlisted = \Illuminate\Support\Facades\DB::table('user_set_watchlists')
+                ->where('user_id', $user->id)
+                ->where('set_id', $set->id)
+                ->exists();
+                
+            $watchlistedCardIds = \Illuminate\Support\Facades\DB::table('user_card_watchlists')
+                ->where('user_id', $user->id)
+                ->whereIn('card_id', $allCards->pluck('id'))
+                ->pluck('card_id')
+                ->toArray();
+        }
+
         $typeOptions = $allCards->flatMap(fn ($card) => is_array($card->types) ? $card->types : [])->unique()->sort()->values();
         $stageOptions = $allCards->pluck('level_stage')->filter()->unique()->values();
 
@@ -482,10 +497,11 @@ class CollezioniController extends Controller
                 'set_name'    => optional($card->set)->name ?? '',
                 'set_symbol'  => optional($card->set)->symbol ?? '',
                 'set_abbr'    => optional($card->set)->abbreviation_official ?? '',
+                'is_watchlisted' => in_array($card->id, $watchlistedCardIds),
             ];
         })->values();
 
-        return view('collezioni.set-detail', compact('set', 'typeOptions', 'stageOptions', 'allCardsJson'));
+        return view('collezioni.set-detail', compact('set', 'typeOptions', 'stageOptions', 'allCardsJson', 'isSetWatchlisted', 'watchlistedCardIds'));
     }
 
     public function addCardToCollection(TCGCard $card) {
@@ -721,9 +737,24 @@ class CollezioniController extends Controller
             });
         }
 
+        $isSetWatchlisted = false;
+        $watchlistedCardIds = [];
+        if ($user) {
+            $isSetWatchlisted = \Illuminate\Support\Facades\DB::table('user_set_watchlists')
+                ->where('user_id', $user->id)
+                ->where('set_id', $set->id)
+                ->exists();
+                
+            $watchlistedCardIds = \Illuminate\Support\Facades\DB::table('user_card_watchlists')
+                ->where('user_id', $user->id)
+                ->whereIn('card_id', $collectionToPaginate->pluck('id'))
+                ->pluck('card_id')
+                ->toArray();
+        }
+
         if ($request->boolean('ajax')) {
             return response()->json([
-                'html' => view('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab, 'incomingByCard' => $incomingByCard])->render(),
+                'html' => view('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab, 'incomingByCard' => $incomingByCard, 'watchlistedCardIds' => $watchlistedCardIds])->render(),
                 'current_page' => $userCards->currentPage(),
                 'last_page' => $userCards->lastPage(),
                 'per_page' => $userCards->perPage(),
@@ -743,7 +774,9 @@ class CollezioniController extends Controller
             'ownedTotal',
             'missingTotal',
             'doppieTotal',
-            'incomingByCard'
+            'incomingByCard',
+            'isSetWatchlisted',
+            'watchlistedCardIds'
         ));
     }
 

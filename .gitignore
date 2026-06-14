@@ -11,3 +11,5 @@ app/composer.lock
 app/package-lock.json
 app/collezione.json
 app/Pricings_master.json
+app/directives/*
+app/.agent

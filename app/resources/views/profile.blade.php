@@ -323,6 +323,27 @@
                 </div>
             </form>
         </div>
+
+        {{-- ═══ Le Mie Watchlist ═══ --}}
+        <div class="profile-card p-4 mt-4">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="section-icon" style="background-color: rgba(16,185,129,0.1);">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#10b981" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-white fw-semibold mb-0" style="font-size:1rem;">{{ __('Watchlist Prezzi') }}</h2>
+                    <p class="text-secondary mb-0" style="font-size:0.75rem;">{{ __('Carte ed espansioni monitorate') }}</p>
+                </div>
+            </div>
+            
+            <div id="watchlist-container">
+                <div class="text-center text-secondary py-3">{{ __('Caricamento...') }}</div>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -413,6 +434,64 @@
             if (toast) {
                 setTimeout(() => toast.remove(), 4000);
             }
+
+            // Load Watchlists
+            function loadWatchlists() {
+                fetch('/watchlist', {
+                    headers: { 
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('watchlist-container');
+                    let html = '';
+                    
+                    if (data.cards && data.cards.length > 0) {
+                        html += '<h6 class="text-light mt-2 mb-3">Carte Monitorate</h6><ul class="list-group mb-4" style="background:transparent;">';
+                        data.cards.forEach(item => {
+                            html += `<li class="list-group-item d-flex justify-content-between align-items-center" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:0.5rem; margin-bottom:0.5rem; color:#fff;">
+                                <span>${item.card ? item.card.name : 'Carta #' + item.card_id}</span>
+                                <button class="btn btn-sm btn-outline-danger" onclick="removeWatchlist('card', ${item.card_id})">Rimuovi</button>
+                            </li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    if (data.sets && data.sets.length > 0) {
+                        html += '<h6 class="text-light mt-2 mb-3">Espansioni Monitorate</h6><ul class="list-group mb-4" style="background:transparent;">';
+                        data.sets.forEach(item => {
+                            html += `<li class="list-group-item d-flex justify-content-between align-items-center" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:0.5rem; margin-bottom:0.5rem; color:#fff;">
+                                <span>${item.set ? item.set.name : 'Set #' + item.set_id}</span>
+                                <button class="btn btn-sm btn-outline-danger" onclick="removeWatchlist('set', ${item.set_id})">Rimuovi</button>
+                            </li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    if (html === '') {
+                        html = `<div class="text-center text-secondary py-3">${'{{ __("Nessun elemento monitorato attualmente.") }}'}</div>`;
+                    }
+                    container.innerHTML = html;
+                });
+            }
+
+            window.removeWatchlist = function(type, id) {
+                fetch('/watchlist/' + type + '/' + id, {
+                    method: 'POST',
+                    headers: { 
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' 
+                    },
+                    credentials: 'same-origin'
+                }).then(() => loadWatchlists());
+            };
+
+            loadWatchlists();
         });
     </script>
 @endsection

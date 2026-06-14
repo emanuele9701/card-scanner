@@ -65,6 +65,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Impostazioni utente
     Route::get('/settings', [UserSettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings', [UserSettingsController::class, 'update'])->name('settings.update');
+
+    // Watchlist & Notifiche (web session auth)
+    Route::get('/watchlist', [\App\Http\Controllers\Api\WatchlistController::class, 'index'])->name('watchlist.index');
+    Route::post('/watchlist/card/mass-toggle', [\App\Http\Controllers\Api\WatchlistController::class, 'massToggle'])->name('watchlist.massToggle');
+    Route::post('/watchlist/card/{id}', [\App\Http\Controllers\Api\WatchlistController::class, 'toggleCard'])->name('watchlist.toggleCard');
+    Route::post('/watchlist/set/{id}', [\App\Http\Controllers\Api\WatchlistController::class, 'toggleSet'])->name('watchlist.toggleSet');
 });
 
 require __DIR__.'/auth.php';

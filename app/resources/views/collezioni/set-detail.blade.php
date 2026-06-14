@@ -338,6 +338,10 @@
                     <h1 class="h3 text-white mb-2">{{ $set->name }}</h1>
                     <p class="text-secondary mb-0">{{ __('Serie') }} {{ $set->serie?->name ?? 'Senza serie' }} • <span id="total-cards-label">{{ count($allCardsJson) }}</span> {{ __('carte') }}</p>
                 </div>
+                <button id="sm-monitor-btn" class="btn {{ isset($isSetWatchlisted) && $isSetWatchlisted ? 'btn-primary' : 'btn-outline-light' }} d-flex align-items-center" onclick="toggleSetWatchlist({{ $set->id }})">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    <span>{{ isset($isSetWatchlisted) && $isSetWatchlisted ? __('Monitorata') : __('Monitora Intera Espansione') }}</span>
+                </button>
             </div>
 
             <div class="row gy-4">
@@ -462,6 +466,10 @@
                 ? '<div class="card-collected-badge"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#ffd795" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg></div>'
                 : '';
 
+            var watchlistedBadge = card.is_watchlisted
+                ? '<div class="watchlisted-badge" style="position:absolute; top:12px; right:12px; z-index:25; background:rgba(99,179,237,0.9); color:#fff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);" title="In Watchlist"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></div>'
+                : '';
+
             var addBtn = !card.isCollected
                 ? '<button type="button" class="btn-card-add w-100" data-card-add-id="' + card.id + '" data-card-name="' + escapedName.replace(/"/g, '&quot;') + '" data-card-dex="' + dex + '"><span class="btn-card-add-text">' + @json(__('+ Aggiungi')) + '</span><span class="btn-card-loader visually-hidden">' + @json(__('Caricamento...')) + '</span></button>'
                 : '';
@@ -483,6 +491,7 @@
                         imgHtml +
                         '<div class="card-number-badge">#' + dex + '</div>' +
                         collectedBadge +
+                        watchlistedBadge +
                         '<div class="card-hover-overlay">' +
                             '<button type="button" class="btn-card-detail d-inline-flex justify-content-center align-items-center text-decoration-none" data-card-modal-id="' + card.id + '" data-card-modal-name="' + escapedName.replace(/"/g, '&quot;') + '" data-card-modal-image="' + (card.url_image || '') + '">' + @json(__('Vedi dettagli')) + '</button>' +
                             addBtn +
@@ -674,6 +683,51 @@
         };
 
         window._cardDetailRoute = "{{ route('cards.show', ['card' => ':card']) }}";
+
+        // Watchlist per Set
+        window.toggleSetWatchlist = function(setId) {
+            var btn = document.getElementById('sm-monitor-btn');
+            if (btn.disabled) return;
+
+            // Loading state
+            btn.disabled = true;
+            var spanEl = btn.querySelector('span');
+            var originalText = spanEl.textContent;
+            spanEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> ...';
+
+            fetch('/watchlist/set/' + setId, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || ''
+                },
+                credentials: 'same-origin'
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'added') {
+                    btn.classList.remove('btn-outline-light');
+                    btn.classList.add('btn-primary');
+                    spanEl.textContent = 'Monitorata';
+                    if (window.showToast) window.showToast(data.message, 'success');
+                } else if (data.status === 'removed') {
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-outline-light');
+                    spanEl.textContent = originalText;
+                    if (window.showToast) window.showToast(data.message, 'success');
+                }
+            })
+            .catch(e => {
+                console.error('Errore toggle set watchlist', e);
+                spanEl.textContent = originalText;
+                if (window.showToast) window.showToast('Errore durante l\'operazione', 'danger');
+            })
+            .finally(() => {
+                btn.disabled = false;
+            });
+        };
 
         // Initial render
         fullRender();

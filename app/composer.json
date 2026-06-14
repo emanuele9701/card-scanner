@@ -22,6 +22,7 @@
         "tcgdex/sdk": "^2.3"
     },
     "require-dev": {
+        "edneymatias/antigravity-laravel-kit": "^1.3",
         "fakerphp/faker": "^1.23",
         "laravel/breeze": "^2.4",
         "laravel/pail": "^1.2.5",

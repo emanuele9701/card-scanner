@@ -103,20 +103,35 @@
     <div class="card-modal-content p-4 position-relative" style="z-index:10;">
 
         {{-- Header --}}
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <div>
-                <h2 id="cm-name" class="fw-bold mb-0" style="font-size:1.125rem; color:#d4e4fa;">...</h2>
-                <span id="cm-rarity" class="badge mt-1"
-                    style="background:rgba(251,180,0,0.15); color:#fbb400;
-                           border:1px solid rgba(251,180,0,0.3);
-                           font-size:0.7rem; font-weight:600; display:none;"></span>
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
+            <div class="d-flex justify-content-between w-100">
+                <div class="pe-3">
+                    <h2 id="cm-name" class="fw-bold mb-0" style="font-size:1.125rem; color:#d4e4fa; line-height: 1.3;">...</h2>
+                    <span id="cm-rarity" class="badge mt-1"
+                        style="background:rgba(251,180,0,0.15); color:#fbb400;
+                               border:1px solid rgba(251,180,0,0.3);
+                               font-size:0.7rem; font-weight:600; display:none;"></span>
+                </div>
+                {{-- Pulsante chiudi per mobile --}}
+                <button onclick="closeModal()" class="btn-modal-close d-md-none flex-shrink-0" style="align-self: flex-start;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
-            <div class="d-flex gap-2">
-                <button id="cm-manage-copies-btn" class="btn btn-sm text-dark fw-bold" style="background-color: #fbb400; display:none;" onclick="if(window._currentCard) openManageModal(window._currentCard.id, window._currentCard.name)">
+
+            <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-md-auto ms-md-auto">
+                <button id="cm-monitor-btn" class="btn btn-sm d-flex align-items-center justify-content-center" style="background-color: rgba(99,179,237,0.15); color: #63b3ed; border: 1px solid rgba(99,179,237,0.3); font-weight: 600; display:none; flex: 1;" onclick="if(window._currentCard) toggleCardWatchlist(window._currentCard.id)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    <span id="cm-monitor-text" class="text-nowrap">{{ __('Monitora Prezzo') }}</span>
+                </button>
+                <button id="cm-manage-copies-btn" class="btn btn-sm text-dark fw-bold" style="background-color: #fbb400; display:none; flex: 1; white-space: nowrap;" onclick="if(window._currentCard) openManageModal(window._currentCard.id, window._currentCard.name)">
                     {{ __('Gestisci le tue copie') }}
                 </button>
-                <button onclick="closeModal()" class="btn-modal-close">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                {{-- Pulsante chiudi per desktop --}}
+                <button onclick="closeModal()" class="btn-modal-close d-none d-md-flex flex-shrink-0 ms-2">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
@@ -450,6 +465,11 @@
                 btnManage.style.display = 'none';
             }
 
+            // Mostra sempre il pulsante monitora
+            document.getElementById('cm-monitor-btn').style.display = 'inline-flex';
+            document.getElementById('cm-monitor-btn').style.backgroundColor = 'rgba(99,179,237,0.15)';
+            document.getElementById('cm-monitor-btn').style.color = '#63b3ed';
+
             renderChart();
             
             /* Storico prezzi */
@@ -664,6 +684,72 @@
                 chartContainer.style.display = 'none';
                 chartEmpty.style.display = '';
             }
+        };
+
+        /* ── toggleCardWatchlist ────────────────────────────────────────────────── */
+        window.toggleCardWatchlist = function(cardId) {
+            var btn = document.getElementById('cm-monitor-btn');
+            if (btn.disabled) return;
+
+            // Loading state
+            btn.disabled = true;
+            var textEl = document.getElementById('cm-monitor-text');
+            var originalText = textEl.textContent;
+            textEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> ...';
+
+            fetch('/watchlist/card/' + cardId, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name=csrf-token]') || {}).content || ''
+                },
+                credentials: 'same-origin'
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                var cardEls = document.querySelectorAll('.card-item[data-card-id="' + cardId + '"]');
+                if (data.status === 'added') {
+                    btn.style.backgroundColor = '#63b3ed';
+                    btn.style.color = '#fff';
+                    textEl.textContent = 'Monitorata';
+                    if (window.showToast) window.showToast(data.message, 'success');
+                    
+                    cardEls.forEach(function(cardEl) {
+                        var imgArea = cardEl.querySelector('.card-image-area');
+                        if (imgArea && !imgArea.querySelector('.watchlisted-badge')) {
+                            var badge = document.createElement('div');
+                            badge.className = 'watchlisted-badge';
+                            badge.style.cssText = "position:absolute; top:12px; right:12px; z-index:25; background:rgba(99,179,237,0.9); color:#fff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+                            badge.title = "In Watchlist";
+                            badge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>';
+                            if (imgArea.querySelector('.card-qty-badge')) {
+                                badge.style.right = '42px';
+                            }
+                            imgArea.appendChild(badge);
+                        }
+                    });
+                } else if (data.status === 'removed') {
+                    btn.style.backgroundColor = 'rgba(99,179,237,0.15)';
+                    btn.style.color = '#63b3ed';
+                    textEl.textContent = 'Monitora Prezzo';
+                    if (window.showToast) window.showToast(data.message, 'success');
+                    
+                    cardEls.forEach(function(cardEl) {
+                        var badge = cardEl.querySelector('.watchlisted-badge');
+                        if (badge) badge.remove();
+                    });
+                }
+            })
+            .catch(function(e) {
+                console.error('Errore toggle watchlist', e);
+                textEl.textContent = originalText;
+                if (window.showToast) window.showToast('Errore durante l\'operazione', 'danger');
+            })
+            .finally(function() {
+                btn.disabled = false;
+            });
         };
 
     })();

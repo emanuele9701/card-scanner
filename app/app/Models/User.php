@@ -12,7 +12,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\UserSetting;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'fcm_token'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -46,6 +46,16 @@ class User extends Authenticatable implements MustVerifyEmail
     public function settings()
     {
         return $this->hasMany(UserSetting::class, 'user_id', 'id');
+    }
+
+    public function cardWatchlists()
+    {
+        return $this->hasMany(UserCardWatchlist::class, 'user_id', 'id');
+    }
+
+    public function setWatchlists()
+    {
+        return $this->hasMany(UserSetWatchlist::class, 'user_id', 'id');
     }
 
     /**

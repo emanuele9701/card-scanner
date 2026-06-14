@@ -318,19 +318,23 @@ class FetchCardTraderCommand extends Command
                 ->whereIn('card_id', $cardIds)
                 ->get();
             
-            // Costruisco una mappa di lookup in RAM: "card_id|lang|cond|1ed|alt|sign|rev" => record ID
+            // Costruisco una mappa di lookup in RAM: "card_id|lang|cond|1ed|alt|sign|rev" => record ID e trend
             $existingLookup = [];
             foreach ($existingPrices as $ep) {
                 $lookupKey = "{$ep->card_id}|{$ep->language}|{$ep->condition}|"
                     . ($ep->is_first_edition?1:0) . "|" . ($ep->is_altered?1:0) . "|"
                     . ($ep->is_signed?1:0) . "|" . ($ep->is_reverse?1:0);
-                $existingLookup[$lookupKey] = $ep->id;
+                $existingLookup[$lookupKey] = [
+                    'id' => $ep->id,
+                    'trend' => $ep->trend
+                ];
             }
             unset($existingPrices); // Libera memoria
 
             $toInsert = [];
             $toUpdate = [];
             $historyBatch = [];
+            $priceChanges = [];
             $now = now();
 
             foreach ($groupedByBlueprint as $blueprintId => $variations) {
@@ -377,7 +381,26 @@ class FetchCardTraderCommand extends Command
                     if (isset($existingLookup[$lookupKey])) {
                         // Record esistente: aggiorniamo per ID (velocissimo)
                         $priceData['updated_at'] = $now;
-                        $toUpdate[$existingLookup[$lookupKey]] = $priceData;
+                        $existingId = $existingLookup[$lookupKey]['id'];
+                        $toUpdate[$existingId] = $priceData;
+
+                        // Rilevamento variazione trend
+                        $oldTrend = $existingLookup[$lookupKey]['trend'];
+                        $newTrend = $avg;
+                        
+                        // Ignoriamo variazioni nulle o differenze di millesimi
+                        if (round((float)$oldTrend, 2) !== round((float)$newTrend, 2)) {
+                            $priceChanges[] = [
+                                'card_id' => $cardId,
+                                'set_id' => $tcgSet->id,
+                                'set_name' => $tcgSet->name,
+                                'language' => $attrs['language'],
+                                'condition' => $attrs['condition'],
+                                'is_reverse' => $attrs['is_reverse'],
+                                'old_trend' => round((float)$oldTrend, 2),
+                                'new_trend' => round((float)$newTrend, 2),
+                            ];
+                        }
                     } else {
                         // Record nuovo: inserimento in blocco
                         $priceData['created_at'] = $now;
@@ -440,6 +463,11 @@ class FetchCardTraderCommand extends Command
                     TCGCardPriceHistory::insert($chunk);
                 }
                 $this->comment("    Inseriti " . count($historyBatch) . " record nello storico.");
+            }
+
+            if (!empty($priceChanges)) {
+                $this->comment("    Trovate " . count($priceChanges) . " variazioni di prezzo. Dispatch del job delle notifiche...");
+                \App\Jobs\ProcessWatchlistNotificationsJob::dispatch($priceChanges);
             }
         }
 

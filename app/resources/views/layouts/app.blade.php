@@ -128,6 +128,45 @@
             flex-shrink: 0;
             box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
         }
+
+        /* Mobile Bottom Nav */
+        @media (max-width: 767.98px) {
+            body {
+                padding-bottom: 72px; /* Spazio per la bottom nav */
+            }
+            .mobile-bottom-nav {
+                background-color: rgba(17, 24, 39, 0.95);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                z-index: 1040;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+            .mobile-nav-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+                color: #9ca3af;
+                text-decoration: none;
+                font-size: 0.65rem;
+                font-weight: 500;
+                flex: 1;
+                padding: 8px 0;
+                transition: color 0.2s;
+            }
+            .mobile-nav-item.active {
+                color: #fff;
+            }
+            .mobile-nav-item svg {
+                stroke-width: 2;
+                transition: transform 0.2s, stroke 0.2s;
+            }
+            .mobile-nav-item.active svg {
+                stroke: #60a5fa; /* Colore accento */
+            }
+        }
     </style>
     @yield('custom_style')
 </head>
@@ -179,7 +218,7 @@
                 </form>
 
                 {{-- Navigation Links --}}
-                <div class="d-flex align-items-center gap-1">
+                <div class="d-none d-md-flex align-items-center gap-1">
 
                     {{-- Dashboard --}}
                     <a href="{{ route('dashboard') }}"
@@ -517,6 +556,40 @@
     </script>
     <!-- Global Toast Container -->
     <div class="toast-container position-fixed top-0 end-0 p-3 mt-5" id="global-toast-container" style="z-index: 1080;"></div>
+
+    {{-- ─── Mobile Bottom Navigation Bar (Visualizzata solo su sm e inferiori) ─── --}}
+    <nav class="mobile-bottom-nav d-flex d-md-none fixed-bottom w-100">
+        <a href="{{ route('dashboard') }}" class="mobile-nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" />
+            </svg>
+            <span>{{ __('Home') }}</span>
+        </a>
+        <a href="{{ route('cards.search') }}" class="mobile-nav-item {{ request()->routeIs('cards.search') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span>{{ __('Cerca') }}</span>
+        </a>
+        <a href="{{ route('collezioni.mie') }}" class="mobile-nav-item {{ request()->routeIs('collezioni.mie') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+            <span>{{ __('Mie') }}</span>
+        </a>
+        <a href="{{ route('collezioni.disponibili') }}" class="mobile-nav-item {{ request()->routeIs('collezioni.disponibili') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <span>{{ __('Set') }}</span>
+        </a>
+        <a href="{{ route('profile.edit') }}" class="mobile-nav-item {{ request()->routeIs('profile.*', 'settings.*') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span>{{ __('Profilo') }}</span>
+        </a>
+    </nav>
 
     <script>
         window.showToast = function(message, type = 'success') {

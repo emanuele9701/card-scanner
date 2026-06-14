@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\CardController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserCardCollectionController;
+use App\Http\Controllers\Api\WatchlistController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -34,4 +35,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [UserCardCollectionController::class, 'destroy']);
         Route::delete('/{id}/photos/{mediaId}', [UserCardCollectionController::class, 'deletePhoto']);
     });
+
+    // Watchlist & Notifiche
+    Route::post('/user/fcm-token', [WatchlistController::class, 'updateFcmToken']);
+    Route::get('/watchlist', [WatchlistController::class, 'index']);
+    Route::post('/watchlist/card/{id}', [WatchlistController::class, 'toggleCard']);
+    Route::post('/watchlist/set/{id}', [WatchlistController::class, 'toggleSet']);
 });

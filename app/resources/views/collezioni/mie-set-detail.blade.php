@@ -96,7 +96,7 @@
             </div>
 
             <!-- Compact Summary Row -->
-            <div class="d-flex flex-wrap gap-3 mb-4 align-items-center bg-dark border border-secondary rounded-pill px-4 py-2" style="background: rgba(14, 24, 44, 0.6) !important; width: fit-content;">
+            <div class="d-flex flex-column flex-md-row gap-3 mb-4 align-items-start align-items-md-center bg-dark border border-secondary rounded-4 rounded-md-pill px-4 py-3 py-md-2 w-100 w-md-auto" style="background: rgba(14, 24, 44, 0.6) !important; max-width: 100%;">
                 @php
                     $cardTotal = $set->card_total > 0 ? $set->card_total : ($set->card_official ?? 0);
                     $cardOfficial = $set->card_official ?? 0;
@@ -125,13 +125,13 @@
                     <span class="text-white fw-bold">{{ $ownedBase }} / {{ $cardOfficial > 0 ? $cardOfficial : '?' }}</span>
                 </div>
                 @if($totalFuoriSerie > 0)
-                <div class="vr bg-secondary mx-1"></div>
+                <div class="vr bg-secondary mx-1 d-none d-md-block"></div>
                 <div class="d-flex align-items-center gap-2" title="{{ __('Fuori Serie / Secret Rares') }}">
                     <span class="text-secondary small text-uppercase fw-bold" style="font-size: 0.7rem;">{{ __('Fuori Serie:') }}</span>
                     <span class="text-warning fw-bold">{{ $ownedFuoriSerie }} / {{ $totalFuoriSerie }}</span>
                 </div>
                 @endif
-                <div class="vr bg-secondary mx-1"></div>
+                <div class="vr bg-secondary mx-1 d-none d-md-block"></div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="text-secondary small text-uppercase fw-bold" style="font-size: 0.7rem;">{{ __('Completamento Totale:') }}</span>
                     <div class="progress" style="width: 60px; height: 6px; background-color: rgba(255,255,255,0.1);">
@@ -286,28 +286,28 @@
 
             <div class="row gy-4">
                 <div class="col-12">
-                    <ul class="nav nav-pills mb-4" id="collection-tabs">
+                    <ul class="nav nav-pills flex-column flex-sm-row gap-2 mb-4" id="collection-tabs">
                         <li class="nav-item">
-                            <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'owned' ? 'active bg-primary text-white' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'owned', 'page' => 1]) }}" data-tab="owned">
+                            <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'owned' ? 'active bg-primary text-white' : 'text-secondary' }} px-4 rounded-pill fw-medium text-center" href="{{ request()->fullUrlWithQuery(['tab' => 'owned', 'page' => 1]) }}" data-tab="owned">
                                 {{ __('Le mie carte') }} <span class="badge {{ ($tab ?? 'owned') === 'owned' ? 'bg-white text-primary' : 'bg-secondary text-white' }} ms-2">{{ $ownedTotal ?? 0 }}</span>
                             </a>
                         </li>
-                        <li class="nav-item ms-2">
-                            <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'missing' ? 'active bg-warning text-dark' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'missing', 'page' => 1]) }}" data-tab="missing">
+                        <li class="nav-item">
+                            <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'missing' ? 'active bg-warning text-dark' : 'text-secondary' }} px-4 rounded-pill fw-medium text-center" href="{{ request()->fullUrlWithQuery(['tab' => 'missing', 'page' => 1]) }}" data-tab="missing">
                                 {{ __('Carte Mancanti') }} <span class="badge {{ ($tab ?? 'owned') === 'missing' ? 'bg-dark text-warning' : 'bg-secondary text-white' }} ms-2">{{ $missingTotal ?? 0 }}</span>
                             </a>
                         </li>
-                        <li class="nav-item ms-2">
-                            <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'doppie' ? 'active bg-success text-white' : 'text-secondary' }} px-4 rounded-pill fw-medium" href="{{ request()->fullUrlWithQuery(['tab' => 'doppie', 'page' => 1]) }}" data-tab="doppie">
+                        <li class="nav-item">
+                            <a class="nav-link collection-tab-link {{ ($tab ?? 'owned') === 'doppie' ? 'active bg-success text-white' : 'text-secondary' }} px-4 rounded-pill fw-medium text-center" href="{{ request()->fullUrlWithQuery(['tab' => 'doppie', 'page' => 1]) }}" data-tab="doppie">
                                 {{ __('Doppie') }} <span class="badge {{ ($tab ?? 'owned') === 'doppie' ? 'bg-white text-success' : 'bg-secondary text-white' }} ms-2">{{ $doppieTotal ?? 0 }}</span>
                             </a>
                         </li>
                     </ul>
 
-                        <div class="d-flex justify-content-end mb-3" id="selectAllContainer" style="{{ ($tab ?? 'owned') === 'owned' ? '' : 'display: none !important;' }}">
-                            <div class="form-check form-switch d-flex align-items-center gap-2 bg-dark p-2 px-3 rounded-pill border border-secondary shadow-sm">
+                        <div class="d-flex justify-content-center justify-content-md-end mb-3" id="selectAllContainer" style="{{ ($tab ?? 'owned') === 'owned' ? '' : 'display: none !important;' }}">
+                            <div class="form-check form-switch d-flex align-items-center justify-content-center gap-2 bg-dark p-2 px-3 rounded-pill border border-secondary shadow-sm w-100 w-md-auto">
                                 <input class="form-check-input mt-0" type="checkbox" id="selectAllVisible" onchange="toggleSelectAllVisible(this)" style="cursor: pointer;">
-                                <label class="form-check-label text-white small fw-bold text-uppercase" for="selectAllVisible" style="cursor: pointer;">{{ __('Seleziona Tutte Visibili') }}</label>
+                                <label class="form-check-label text-white small fw-bold text-uppercase text-nowrap" for="selectAllVisible" style="cursor: pointer;">{{ __('Seleziona Tutte Visibili') }}</label>
                             </div>
                         </div>
                         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4" id="cards-grid">
@@ -346,6 +346,15 @@
                             {{ __('Aggiungi Copie') }}
                         </button>
                         
+                        <button class="btn btn-sm fw-bold rounded-pill text-white d-flex align-items-center gap-1" style="background-color: #63b3ed; border: none;" onclick="massToggleWatchlist('add')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            {{ __('Monitora') }}
+                        </button>
+                        
+                        <button class="btn btn-sm fw-bold rounded-pill d-flex align-items-center gap-1" style="background-color: rgba(99,179,237,0.15); color: #63b3ed; border: none;" onclick="massToggleWatchlist('remove')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/><line x1="4" y1="4" x2="20" y2="20"></line></svg>
+                        </button>
+                        
                         <button class="btn btn-outline-danger btn-sm fw-bold rounded-pill d-flex align-items-center gap-1" onclick="massRemoveSelected()">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                             {{ __('Elimina') }}
@@ -359,6 +368,16 @@
                         <button class="btn btn-sm fw-bold rounded-pill text-white d-flex align-items-center gap-1" style="background: linear-gradient(135deg, #22c55e, #16a34a); border: none;" onclick="openIncomingArrivedModal()">
                             📦 {{ __('Sono Arrivate') }}
                         </button>
+
+                        <button class="btn btn-sm fw-bold rounded-pill text-white d-flex align-items-center gap-1" style="background-color: #63b3ed; border: none;" onclick="massToggleWatchlist('add')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            {{ __('Monitora') }}
+                        </button>
+
+                        <button class="btn btn-sm fw-bold rounded-pill d-flex align-items-center gap-1" style="background-color: rgba(99,179,237,0.15); color: #63b3ed; border: none;" onclick="massToggleWatchlist('remove')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/><line x1="4" y1="4" x2="20" y2="20"></line></svg>
+                        </button>
+
                         <button class="btn btn-outline-danger btn-sm fw-bold rounded-pill d-flex align-items-center gap-1" onclick="massCancelIncoming()">
                             ❌ {{ __('Annulla') }}
                         </button>
@@ -675,6 +694,62 @@
                     clearSelection();
                 } else {
                     alert('Errore durante l\'annullamento.');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+
+        window.massToggleWatchlist = async function(action) {
+            if (window.selectedCards.size === 0) return;
+            
+            const msg = action === 'add' ? 'Aggiungere le carte selezionate alla Watchlist?' : 'Rimuovere le carte selezionate dalla Watchlist?';
+            if (!confirm(msg)) return;
+            
+            try {
+                const res = await fetch('/watchlist/card/mass-toggle', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ 
+                        card_ids: Array.from(window.selectedCards).map(Number),
+                        action: action
+                    })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    if (window.showToast) window.showToast(data.message, 'success');
+                    
+                    window.selectedCards.forEach(id => {
+                        const cardEls = document.querySelectorAll('.card-item[data-card-id="' + id + '"]');
+                        cardEls.forEach(function(cardEl) {
+                            var imgArea = cardEl.querySelector('.card-image-area');
+                            if (action === 'add') {
+                                if (imgArea && !imgArea.querySelector('.watchlisted-badge')) {
+                                    var badge = document.createElement('div');
+                                    badge.className = 'watchlisted-badge';
+                                    badge.style.cssText = "position:absolute; top:12px; right:12px; z-index:25; background:rgba(99,179,237,0.9); color:#fff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+                                    badge.title = "In Watchlist";
+                                    badge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>';
+                                    if (imgArea.querySelector('.card-qty-badge')) {
+                                        badge.style.right = '42px';
+                                    }
+                                    imgArea.appendChild(badge);
+                                }
+                            } else {
+                                var badge = cardEl.querySelector('.watchlisted-badge');
+                                if (badge) badge.remove();
+                            }
+                        });
+                    });
+                    
+                    clearSelection();
+                } else {
+                    if (window.showToast) window.showToast('Errore durante l\'operazione.', 'danger');
                 }
             } catch (e) {
                 console.error(e);

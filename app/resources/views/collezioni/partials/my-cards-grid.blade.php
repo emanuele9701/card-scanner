@@ -2,7 +2,7 @@
     @php
         $cardIncoming = isset($incomingByCard) && isset($incomingByCard[$card->id]) ? $incomingByCard[$card->id] : collect();
     @endphp
-    @include('collezioni.singles.my-card', ['card' => $card, 'tab' => $tab ?? 'owned', 'cardIncoming' => $cardIncoming])
+    @include('collezioni.singles.my-card', ['card' => $card, 'tab' => $tab ?? 'owned', 'cardIncoming' => $cardIncoming, 'watchlistedCardIds' => $watchlistedCardIds ?? []])
 @empty
     <div class="col-12">
         <div class="card bg-secondary bg-opacity-10 border-secondary border rounded-4 p-4 text-center">

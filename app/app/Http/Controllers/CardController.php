@@ -206,6 +206,14 @@ class CardController extends Controller
             }
         ]);
         
+        $card->is_watchlisted = false;
+        if ($userId) {
+            $card->is_watchlisted = \Illuminate\Support\Facades\DB::table('user_card_watchlists')
+                ->where('user_id', $userId)
+                ->where('card_id', $card->id)
+                ->exists();
+        }
+        
         return response()->json($card);
     }
 }

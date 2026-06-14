@@ -415,6 +415,12 @@
                 </div>
             @endif
 
+            @if(isset($watchlistedCardIds) && in_array($card->id, $watchlistedCardIds))
+                <div class="watchlisted-badge" style="position:absolute; top:12px; right:{{ !$isMissingTab && $totalQty > 0 ? '42px' : '12px' }}; z-index:25; background:rgba(99,179,237,0.9); color:#fff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);" title="In Watchlist">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </div>
+            @endif
+
             <div class="card-number-badge">
                 #{{ str_pad($card->dexId, 3, '0', STR_PAD_LEFT) }}
             </div>
