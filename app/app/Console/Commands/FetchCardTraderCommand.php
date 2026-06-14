@@ -65,6 +65,8 @@ class FetchCardTraderCommand extends Command
         
         foreach ($expansions as $expDto) {
             if (!isset($gamesMap[$expDto->gameId])) continue;
+
+           
             
             $setsInsert[] = [
                 'external_game_id' => $gamesMap[$expDto->gameId],
@@ -98,14 +100,34 @@ class FetchCardTraderCommand extends Command
                 $this->warn("Set '{$tcgSet->name}' (Abbr: {$abbr}) non trovato su CardTrader. Salto...");
                 continue;
             }
-
             $this->info("Set associato: {$tcgSet->name} <-> CardTrader {$mappedSet->name}");
             
-            // Scarichiamo i blueprints per l'espansione
+            // Cerchiamo anche le sotto-espansioni (es. per "asc" troviamo "e-asc", "p-asc")
+            // Queste contengono le stesse carte in varianti diverse (Reverse Holo, Energy ecc.)
+            // ma con blueprint_id diversi che dobbiamo mappare alla stessa carta locale.
+            $subExpansions = TcgExternalProvidersSet::where('abbreviation', 'LIKE', '%-' . strtolower($abbr))
+                ->get();
+            
+            // Scarichiamo i blueprints per l'espansione principale
             $this->info("  Scarico blueprints...");
             $blueprintsData = $client->get("/blueprints/export", ['expansion_id' => $mappedSet->external_id]);
             $blueprints = $parser->parseBlueprints($blueprintsData);
-            $this->comment("    Trovati " . count($blueprints) . " blueprints totali per il set.");
+            $this->comment("    Trovati " . count($blueprints) . " blueprints dall'espansione principale.");
+
+            // Scarica blueprints anche dalle sotto-espansioni e uniscili
+            if ($subExpansions->isNotEmpty()) {
+                $subNames = $subExpansions->pluck('name')->implode(', ');
+                $this->comment("    Trovate " . $subExpansions->count() . " sotto-espansioni: {$subNames}");
+                
+                foreach ($subExpansions as $subExp) {
+                    $subBlueprintsData = $client->get("/blueprints/export", ['expansion_id' => $subExp->external_id]);
+                    $subBlueprints = $parser->parseBlueprints($subBlueprintsData);
+                    $this->comment("      -> {$subExp->name} ({$subExp->abbreviation}): " . count($subBlueprints) . " blueprints");
+                    $blueprints = array_merge($blueprints, $subBlueprints);
+                }
+            }
+            
+            $this->comment("    Totale blueprints (principale + sotto-espansioni): " . count($blueprints));
 
             // Filtro solo 'singles'
             $filteredBlueprints = array_filter($blueprints, function($bp) use ($singlesCategoryIds) {
@@ -179,9 +201,27 @@ class FetchCardTraderCommand extends Command
 
             $this->info("  Scarico i prezzi dal marketplace per l'intera espansione...");
             
-            // Una sola chiamata per espansione usando expansion_id sul marketplace (prezzi di TUTTI i venditori)
+            // Scarica i prodotti dall'espansione principale
             $marketplaceData = $client->get('/marketplace/products', ['expansion_id' => $mappedSet->external_id]);
             $allProducts = is_array($marketplaceData) ? $marketplaceData : [];
+            
+            // Scarica anche i prodotti dalle sotto-espansioni e uniscili
+            if ($subExpansions->isNotEmpty()) {
+                foreach ($subExpansions as $subExp) {
+                    $subMarketData = $client->get('/marketplace/products', ['expansion_id' => $subExp->external_id]);
+                    if (is_array($subMarketData)) {
+                        foreach ($subMarketData as $bpId => $listings) {
+                            if (isset($allProducts[$bpId])) {
+                                // Blueprint già presente: merge delle offerte
+                                $allProducts[$bpId] = array_merge($allProducts[$bpId], $listings);
+                            } else {
+                                $allProducts[$bpId] = $listings;
+                            }
+                        }
+                    }
+                }
+            }
+            
             if (empty($allProducts)) {
                 $this->warn("    Nessun prodotto trovato sul marketplace per questa espansione.");
                 continue;
