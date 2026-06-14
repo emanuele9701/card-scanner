@@ -124,6 +124,7 @@
         }
         
         $incomingBadge = '';
+        $isVariantIncoming = false;
         if ($isMissingTab && isset($cardIncoming)) {
             $foilTypeForVariant = match($vLow) {
                 'reverse' => 'reverse',
@@ -132,17 +133,26 @@
             };
             $variantIncoming = $cardIncoming->where('foil_type', $foilTypeForVariant);
             if ($variantIncoming->count() > 0) {
+                $isVariantIncoming = true;
                 $inc = $variantIncoming->first();
                 $qtyStr = $inc->quantity > 1 ? " x{$inc->quantity}" : "";
-                $titleStr = $inc->notes ? ' title="' . htmlspecialchars($inc->notes) . '" data-bs-toggle="tooltip"' : '';
-                $incomingBadge = '&nbsp;<span class="badge d-inline-flex align-items-center gap-1" style="background: rgba(251, 146, 60, 0.2); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.4); font-size: 0.55rem; padding: 2px 4px;"' . $titleStr . '>🚚' . $qtyStr . '</span>';
+                $titleStr = $inc->notes ? htmlspecialchars($inc->notes) : 'In Arrivo';
             }
         }
         
         if (isset($vMap[$vLow])) {
-            $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center ' . $vMap[$vLow][1] . '" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>' . $vMap[$vLow][0] . '</span>' . $extraInfo . '</span>' . $incomingBadge;
+            if ($isVariantIncoming) {
+                // Orange badge for incoming variants
+                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center" title="' . ucfirst($v) . ' – ' . $titleStr . '" style="font-size:0.55rem; padding: 2px 5px; min-width:18px; background: linear-gradient(135deg, #fb923c, #f59e0b); color: #1a1a2e; border: 1px solid rgba(251, 146, 60, 0.6); box-shadow: 0 0 6px rgba(251, 146, 60, 0.4);"><span>🚚 ' . $vMap[$vLow][0] . $qtyStr . '</span>' . $extraInfo . '</span>';
+            } else {
+                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center ' . $vMap[$vLow][1] . '" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>' . $vMap[$vLow][0] . '</span>' . $extraInfo . '</span>';
+            }
         } else {
-            $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center bg-light text-dark" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>'.strtoupper(substr($v, 0, 1)).'</span>' . $extraInfo . '</span>' . $incomingBadge;
+            if ($isVariantIncoming) {
+                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center" title="' . ucfirst($v) . ' – ' . $titleStr . '" style="font-size:0.55rem; padding: 2px 5px; min-width:18px; background: linear-gradient(135deg, #fb923c, #f59e0b); color: #1a1a2e; border: 1px solid rgba(251, 146, 60, 0.6); box-shadow: 0 0 6px rgba(251, 146, 60, 0.4);"><span>🚚 '.strtoupper(substr($v, 0, 1)) . $qtyStr . '</span>' . $extraInfo . '</span>';
+            } else {
+                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center bg-light text-dark" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>'.strtoupper(substr($v, 0, 1)).'</span>' . $extraInfo . '</span>';
+            }
         }
     }
     $variantsHtml = implode(' ', $variantBadges);

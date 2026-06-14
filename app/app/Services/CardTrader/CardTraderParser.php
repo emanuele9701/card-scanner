@@ -6,6 +6,7 @@ use App\Services\CardTrader\DTO\GameDto;
 use App\Services\CardTrader\DTO\CategoryDto;
 use App\Services\CardTrader\DTO\ExpansionDto;
 use App\Services\CardTrader\DTO\BlueprintDto;
+use App\Services\CardTrader\DTO\CT0BoxItemDto;
 
 class CardTraderParser
 {
@@ -47,5 +48,13 @@ class CardTraderParser
             $blueprints[] = BlueprintDto::fromArray($item);
         }
         return $blueprints;
+    }
+
+    /**
+     * @return CT0BoxItemDto[]
+     */
+    public function parseCT0BoxItems(array $data): array
+    {
+        return array_map(fn($item) => CT0BoxItemDto::fromArray($item), $data);
     }
 }

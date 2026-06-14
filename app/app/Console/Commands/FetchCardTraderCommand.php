@@ -130,8 +130,23 @@ class FetchCardTraderCommand extends Command
                 // Confronto come stringa per preservare gli zeri iniziali (es. "083")
                 $collectorNum = $bp->collectorNumber;
 
-                if (isset($tcgCards[(int)$collectorNum])) {
-                    $card = $tcgCards[(int)$collectorNum];
+                $card = null;
+                if (isset($tcgCards[$collectorNum])) {
+                    $card = $tcgCards[$collectorNum];
+                } else {
+                    $card = $tcgCards->first(function($c) use ($collectorNum) {
+                        return ltrim((string)$c->dexId, '0') === ltrim((string)$collectorNum, '0');
+                    });
+                }
+
+                if ($card) {
+                    // Previene violazioni di vincoli univoci: se questo external_id era 
+                    // assegnato per errore a un'altra carta, lo scolleghiamo.
+                    TcgExternalProvidersMapping::where('provider', 'cardtrader')
+                        ->where('external_id', $bp->id)
+                        ->where('card_id', '!=', $card->id)
+                        ->delete();
+
                     $mapping = TcgExternalProvidersMapping::firstOrCreate([
                         'card_id' => $card->id,
                         'provider' => 'cardtrader'

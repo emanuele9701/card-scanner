@@ -71,4 +71,8 @@ class CardTraderClient
 
         return $response->json() ?? [];
     }
+    public function getCT0BoxItems(): array
+    {
+        return $this->get('/ct0_box_items');
+    }
 }

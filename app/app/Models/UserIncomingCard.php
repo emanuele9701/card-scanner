@@ -19,6 +19,9 @@ class UserIncomingCard extends Model
         'is_altered',
         'quantity',
         'notes',
+        'source',
+        'external_id',
+        'condition',
     ];
 
     protected $casts = [
