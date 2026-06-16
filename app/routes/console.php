@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\FetchPokemonCommand;
+use App\Console\Commands\FetchCardTraderCommand;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -11,4 +12,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 
-Schedule::command(FetchPokemonCommand::class)->dailyAt('00:34');
+Schedule::command(FetchPokemonCommand::class)->dailyAt('00:00');
+Schedule::command(FetchCardTraderCommand::class)->dailyAt('02:00');

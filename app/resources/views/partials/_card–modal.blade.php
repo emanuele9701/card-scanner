@@ -245,9 +245,6 @@
                             <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
                                 <th class="modal-th">{{ __('Data') }}</th>
                                 <th class="modal-th">{{ __('Trend') }}</th>
-                                <th class="modal-th">{{ __('Media 1g') }}</th>
-                                <th class="modal-th">{{ __('Media 7g') }}</th>
-                                <th class="modal-th">{{ __('Media 30g') }}</th>
                                 <th class="modal-th">{{ __('Provider') }}</th>
                             </tr>
                         </thead>
@@ -475,7 +472,20 @@
             /* Storico prezzi */
             var tbody = document.getElementById('cm-prices-tbody');
             if (card.prices && card.prices.length) {
-                tbody.innerHTML = card.prices.map(function(p) {
+                // Filter table to last 3 days only
+                var now = new Date();
+                var threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
+                var recentPrices = card.prices.filter(function(p) {
+                    if (!p.created_at) return false;
+                    return new Date(p.created_at) >= threeDaysAgo;
+                });
+                
+                if (recentPrices.length === 0) {
+                    // If no prices in last 3 days, show the most recent one
+                    recentPrices = card.prices.slice(-1);
+                }
+                
+                tbody.innerHTML = recentPrices.map(function(p) {
                     var d = p.created_at ?
                         new Date(p.created_at).toLocaleDateString('it-IT', {
                             day: '2-digit',
@@ -484,23 +494,17 @@
                         }) :
                         '—';
                     var trendVal = variantSelect.value === 'holo' ? p.trend_holo : p.trend;
-                    var avg1Val = variantSelect.value === 'holo' ? p.avg_1d_holo : p.avg_1d;
-                    var avg7Val = variantSelect.value === 'holo' ? p.avg_7d_holo : p.avg_7d;
-                    var avg30Val = variantSelect.value === 'holo' ? p.avg_30d_holo : p.avg_30d;
                     return '<tr>' +
                         '<td class="modal-td">' + _esc(d) + '</td>' +
                         '<td class="modal-td" style="color:#fbb400;font-weight:600;">' + _price(trendVal || p.trend) +
                         '</td>' +
-                        '<td class="modal-td">' + _price(avg1Val || p.avg_1d) + '</td>' +
-                        '<td class="modal-td">' + _price(avg7Val || p.avg_7d) + '</td>' +
-                        '<td class="modal-td">' + _price(avg30Val || p.avg_30d) + '</td>' +
                         '<td class="modal-td" style="color:rgba(212,228,250,0.45);font-size:0.75rem;">' +
                         _esc(p.provider || '—') + '</td>' +
                         '</tr>';
                 }).join('');
             } else {
                 tbody.innerHTML =
-                    '<tr><td colspan="6" class="modal-td" ' +
+                    '<tr><td colspan="3" class="modal-td" ' +
                     'style="text-align:center;color:rgba(212,228,250,0.3);padding:1.5rem 0;">' +
                     (window.__trans ? window.__trans.no_price : 'Nessun prezzo disponibile') + '</td></tr>';
             }
