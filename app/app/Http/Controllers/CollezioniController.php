@@ -478,7 +478,7 @@ class CollezioniController extends Controller
         $stageOptions = $allCards->pluck('level_stage')->filter()->unique()->values();
 
         // Build lightweight JSON for client-side rendering
-        $allCardsJson = $allCards->map(function($card) {
+        $allCardsJson = $allCards->map(function($card) use ($watchlistedCardIds) {
             $latestPrice = $card->prices->sortByDesc('updated_at')->first();
             return [
                 'id'          => $card->id,
