@@ -44,13 +44,13 @@ class FetchPokemonSetJob implements ShouldQueue
      */
     public function handle(): void
     {
-        Log::info("FetchPokemonSetJob Iniziato per Set: {$this->tcgDexSetId}");
+        Log::channel('scheduler')->info("FetchPokemonSetJob Iniziato per Set: {$this->tcgDexSetId}");
         
         $tcgEn = new TCGdex($this->masterLang);
         $set = $tcgEn->set->get($this->tcgDexSetId);
         
         if (!$set) {
-            Log::error("Set {$this->tcgDexSetId} non trovato in TCGdex.");
+            Log::channel('scheduler')->error("Set {$this->tcgDexSetId} non trovato in TCGdex.");
             return;
         }
 
@@ -69,7 +69,7 @@ class FetchPokemonSetJob implements ShouldQueue
                     $translatedSets[$lang] = $map;
                 }
             } catch (\Exception $e) {
-                Log::warning("Impossibile recuperare traduzioni set [{$lang}] per {$this->tcgDexSetId}: " . $e->getMessage());
+                Log::channel('scheduler')->warning("Impossibile recuperare traduzioni set [{$lang}] per {$this->tcgDexSetId}: " . $e->getMessage());
             }
         }
 
@@ -250,6 +250,6 @@ class FetchPokemonSetJob implements ShouldQueue
             }
         });
 
-        Log::info("FetchPokemonSetJob Completato per Set: {$this->tcgDexSetId}");
+        Log::channel('scheduler')->info("FetchPokemonSetJob Completato per Set: {$this->tcgDexSetId}");
     }
 }

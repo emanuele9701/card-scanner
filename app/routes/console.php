@@ -12,5 +12,10 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 
-Schedule::command(FetchPokemonCommand::class)->dailyAt('00:00');
-Schedule::command(FetchCardTraderCommand::class)->dailyAt('02:00');
+Schedule::command(FetchPokemonCommand::class)
+    ->dailyAt('00:00')
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+Schedule::command(FetchCardTraderCommand::class)
+    ->dailyAt('02:00')
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
