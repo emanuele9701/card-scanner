@@ -311,7 +311,7 @@
 
         {{-- Colonna DX: Top Cards Carousel --}}
         <div class="col-12 col-lg-6 d-flex flex-column align-items-center mt-lg-0 mt-4">
-            @if(isset($topCards) && $topCards->count() > 0)
+            @if(!empty($topCards))
                 <h3 class="text-white fw-bold mb-4 d-flex align-items-center gap-2 align-self-lg-start align-self-center" style="font-size:1.15rem;">
                     <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#fbb400" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -324,10 +324,10 @@
                         @foreach($topCards as $index => $top)
                         <div class="carousel-item {{ $index === 0 ? 'active' : '' }}">
                             <div class="d-flex justify-content-center">
-                                <div class="top-card-item" style="width: 200px;" onclick="window.location='{{ route('cards.search', ['q' => $top['card']->name . ' ' . $top['card']->dexId]) }}'">
+                                <div class="top-card-item" style="width: 200px;" onclick="window.location='{{ route('cards.search', ['q' => $top['card']['name'] . ' ' . $top['card']['dexId']]) }}'">
                                     <div class="top-card-img-wrapper" style="padding-top: 139%;">
-                                        @if($top['card'] && $top['card']->url_image)
-                                            <img src="{{ $top['card']->url_image }}/low.png" alt="{{ $top['card']->name }}" loading="lazy" onerror="this.style.display='none'">
+                                        @if(!empty($top['card']) && !empty($top['card']['url_image']))
+                                            <img src="{{ $top['card']['url_image'] }}/low.png" alt="{{ $top['card']['name'] }}" loading="lazy" onerror="this.style.display='none'">
                                         @else
                                             <div class="bg-dark rounded d-flex flex-column align-items-center justify-content-center w-100 h-100 border border-secondary text-secondary" style="position: absolute; top: 0; left: 0;">
                                                 <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
@@ -337,8 +337,8 @@
                                             </div>
                                         @endif
                                     </div>
-                                    <h6 class="text-white mb-1 w-100 text-truncate fw-bold" style="font-size: 0.95rem;" title="{{ $top['card']?->name }}">{{ $top['card']?->name ?? __('Sconosciuta') }}</h6>
-                                    <p class="text-secondary mb-3 w-100 text-truncate" style="font-size: 0.75rem;">{{ $top['card']?->set?->name ?? '' }}</p>
+                                    <h6 class="text-white mb-1 w-100 text-truncate fw-bold" style="font-size: 0.95rem;" title="{{ $top['card']['name'] ?? '' }}">{{ $top['card']['name'] ?? __('Sconosciuta') }}</h6>
+                                    <p class="text-secondary mb-3 w-100 text-truncate" style="font-size: 0.75rem;">{{ $top['card']['set_name'] ?? '' }}</p>
                                     <div class="mt-auto w-100">
                                         <div class="top-card-price-badge" style="font-size: 0.9rem; padding: 0.35rem 0.8rem;">€ {{ number_format($top['total_price'], 2, ',', '.') }}</div>
                                         @if($top['quantity'] > 1)
@@ -380,7 +380,7 @@
     <div class="mb-4" x-data="{ showAll: false }">
         <h3 class="text-white fw-bold mb-4" style="font-size:1.25rem;">{{ __('Stato completamento set') }}</h3>
         
-        @if($setsStats->isEmpty())
+        @if(empty($setsStats))
             <div class="text-center p-5 stat-card">
                 <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="#4b5563" stroke-width="1.5" class="mb-3 mx-auto">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />

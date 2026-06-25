@@ -471,6 +471,15 @@ class FetchCardTraderCommand extends Command
             }
         }
 
+        $this->info("Invalidazione cache collezioni in corso...");
+        try {
+            app(\App\Services\DashboardCacheService::class)->invalidateAll();
+            app(\App\Services\CollectionCacheService::class)->invalidateAll();
+            $this->info("Cache invalidata con successo.");
+        } catch (\Exception $e) {
+            $this->error("Errore durante l'invalidazione della cache: " . $e->getMessage());
+        }
+
         $this->info("Procedura completata con successo!");
     }
 }

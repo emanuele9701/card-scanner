@@ -17,20 +17,9 @@ class CollezioniController extends Controller
 
     public function index() {
         $user = Auth::user();
+        $data = app(\App\Services\CollectionCacheService::class)->getForUser($user->id);
 
-        $collections = $user->collection()
-            ->with(['set.serie', 'card.prices'])
-            ->get();
-
-        if ($collections->isEmpty()) {
-            return view('collezioni.mie', [
-                'collezioni' => [],
-            ]);
-        }
-
-        return view('collezioni.mie', [
-            'collezioni' => $collections,
-        ]);
+        return view('collezioni.mie', $data);
     }
 
     public function export(Request $request)

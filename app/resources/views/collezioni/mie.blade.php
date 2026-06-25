@@ -203,54 +203,12 @@
 @endsection
 
 @section('content')
-    @php
-        $collections = collect($collezioni);
-        $series = $collections->groupBy(fn ($item) => $item->set?->serie?->name ?? __('Senza serie'));
-        $ownedCards = 0;
-        $totalSlots = 0;
-        $totalValue = 0;
-        $setCount = 0;
-        $completedSets = 0;
-
-        foreach ($collections->groupBy(fn ($item) => $item->set?->id ?? 0) as $setItems) {
-            $set = $setItems->first()->set;
-            if (! $set) continue;
-
-            $setCount++;
-            $ownedQty = $setItems->sum('quantity');
-            $uniqueOwnedQty = $setItems->unique('card_id')->count();
-            $cardTotal = $set->card_official ?? $set->card_total ?? 0;
-            $totalSlots += $cardTotal;
-            $ownedCards += $ownedQty;
-
-            $progress = $cardTotal > 0 ? round($uniqueOwnedQty / $cardTotal * 100) : 0;
-            if ($progress >= 100) {
-                $completedSets++;
-            }
-
-            foreach ($setItems as $item) {
-                $card = $item->card;
-                if (! $card) continue;
-                
-                $lastPrice = $card->prices->sortByDesc('updated_at')->first();
-                $value = 0;
-                if ($lastPrice) {
-                    $isHolo = false;
-                    if (is_array($item->variants)) {
-                        $isHolo = in_array('holo', array_map('strtolower', $item->variants)) || in_array('reverse', array_map('strtolower', $item->variants));
-                    }
-                    $value = $isHolo ? ($lastPrice->trend_holo ?? $lastPrice->avg_holo ?? $lastPrice->trend ?? $lastPrice->avg ?? 0) : ($lastPrice->trend ?? $lastPrice->avg ?? 0);
-                }
-                $totalValue += $value * $item->quantity;
-            }
-        }
-    @endphp
 
     <div class="container py-4" style="max-width: 1200px;">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="h3 text-white fw-bold mb-0">{{ __('Le mie collezioni') }}</h1>
-            @if(!$collections->isEmpty())
+            @if(!empty($seriesData))
                 <a href="{{ route('collezioni.mie.export') }}" class="btn btn-outline-light btn-sm rounded-pill px-3 d-flex align-items-center gap-2">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -260,7 +218,7 @@
             @endif
         </div>
         
-        @if($collections->isEmpty())
+        @if(empty($seriesData))
             {{-- Wizard / Empty State per PokeStash --}}
             <div class="row justify-content-center py-5 mt-4">
                 <div class="col-12 col-md-8 col-lg-6">
@@ -291,7 +249,7 @@
                 <div class="stat-box h-100">
                     <div class="stat-title">{{ __('VALORE TOTALE') }}</div>
                     <div class="stat-value text-warning">
-                        € {{ number_format($totalValue, 2, ',', '.') }}
+                        € {{ number_format($stats['totalValue'] ?? 0, 2, ',', '.') }}
                     </div>
                 </div>
             </div>
@@ -300,11 +258,11 @@
                 <div class="stat-box h-100">
                     <div class="stat-title">{{ __('CARTE TOTALI') }}</div>
                     <div class="stat-value">
-                        {{ number_format($ownedCards, 0, ',', '.') }}
-                        <span style="font-size: 14px; color: var(--text-muted); font-weight: 400;">/ {{ number_format($totalSlots, 0, ',', '.') }}</span>
+                        {{ number_format($stats['ownedCards'] ?? 0, 0, ',', '.') }}
+                        <span style="font-size: 14px; color: var(--text-muted); font-weight: 400;">/ {{ number_format($stats['totalSlots'] ?? 0, 0, ',', '.') }}</span>
                     </div>
                     <div class="progress-bar-container mt-3">
-                        <div class="progress-bar-fill" style="width: {{ $totalSlots > 0 ? min(100, round($ownedCards / $totalSlots * 100)) : 0 }}%;"></div>
+                        <div class="progress-bar-fill" style="width: {{ ($stats['totalSlots'] ?? 0) > 0 ? min(100, round(($stats['ownedCards'] ?? 0) / $stats['totalSlots'] * 100)) : 0 }}%;"></div>
                     </div>
                 </div>
             </div>
@@ -313,7 +271,7 @@
                 <div class="stat-box h-100">
                     <div class="stat-title">{{ __('SET COMPLETATI') }}</div>
                     <div class="stat-value">
-                        {{ $completedSets }}
+                        {{ $stats['completedSets'] ?? 0 }}
                         <span style="font-size: 14px; color: var(--text-muted); font-weight: 400;">{{ __('Set') }}</span>
                     </div>
                     <div style="font-size: 12px; color: var(--text-muted); margin-top: 10px; display: flex; align-items: center; gap: 6px;">
@@ -325,56 +283,26 @@
         </div>
 
         {{-- Series Sections --}}
-        @foreach ($series as $serieName => $items)
-            @php
-                $sets = $items->groupBy(fn ($item) => $item->set?->id ?? 0);
-            @endphp
-            
+        @foreach ($seriesData as $serie)
             <div class="series-header">
-                <h2 class="series-title">{{ $serieName }}</h2>
+                <h2 class="series-title">{{ $serie['name'] }}</h2>
                 <a href="#" class="view-all">{{ __('Vedi tutti') }}</a>
             </div>
 
             <div class="row g-4">
-                @foreach ($sets as $setItems)
-                    @php
-                        $set = $setItems->first()->set;
-                        if (!$set) continue;
-
-                        $ownedQty = $setItems->sum('quantity');
-                        $uniqueOwnedQty = $setItems->unique('card_id')->count();
-                        $cardTotal = $set->card_total ?? 0;
-                        $progress = $cardTotal > 0 ? min(100, round($uniqueOwnedQty / $cardTotal * 100)) : 0;
-                        
-                        $totalValueSet = $setItems->reduce(function ($carry, $item) {
-                            $card = $item->card;
-                            if (! $card) return $carry;
-                            
-                            $lastPrice = $card->prices->sortByDesc('updated_at')->first();
-                            $value = 0;
-                            if ($lastPrice) {
-                                $isHolo = false;
-                                if (is_array($item->variants)) {
-                                    $isHolo = in_array('holo', array_map('strtolower', $item->variants)) || in_array('reverse', array_map('strtolower', $item->variants));
-                                }
-                                $value = $isHolo ? ($lastPrice->trend_holo ?? $lastPrice->avg_holo ?? $lastPrice->trend ?? $lastPrice->avg ?? 0) : ($lastPrice->trend ?? $lastPrice->avg ?? 0);
-                            }
-                            return $carry + ($value * $item->quantity);
-                        }, 0);
-                    @endphp
-
+                @foreach ($serie['sets'] as $set)
                     <div class="col-12 col-md-6 col-lg-3">
-                        <a href="{{ route('collezioni.mie.set', $set) }}" class="set-card h-100">
+                        <a href="{{ route('collezioni.mie.set', $set['set_id']) }}" class="set-card h-100">
                             <div class="set-card-image">
-                                @if($set->logo)
-                                    <img src="{{ $set->logo }}.png" alt="{{ $set->name }}">
+                                @if(!empty($set['logo']))
+                                    <img src="{{ $set['logo'] }}.png" alt="{{ $set['name'] }}">
                                 @endif
                             </div>
                             <div class="set-card-content">
                                 <div class="set-header">
-                                    <h3 class="set-name">{{ $set->name }}</h3>
-                                    @if($set->symbol)
-                                        <div class="set-badge"><img src="{{ $set->symbol }}.png" alt="{{ __('Simbolo') }}" style="height: 1.5rem; object-fit: contain;"></div>
+                                    <h3 class="set-name">{{ $set['name'] }}</h3>
+                                    @if(!empty($set['symbol']))
+                                        <div class="set-badge"><img src="{{ $set['symbol'] }}.png" alt="{{ __('Simbolo') }}" style="height: 1.5rem; object-fit: contain;"></div>
                                     @else
                                         <div class="set-badge">{{ __('N/D') }}</div>
                                     @endif
@@ -383,24 +311,23 @@
                                 <div class="progress-section">
                                     <div class="progress-header">
                                         <span>{{ __('Collezione') }}</span>
-                                        <span class="progress-text-white">{{ $uniqueOwnedQty }} / {{ $cardTotal }}</span>
+                                        <span class="progress-text-white">{{ $set['unique_owned'] }} / {{ $set['card_total'] }}</span>
                                     </div>
                                     <div class="progress-bar-container">
-                                        <div class="progress-bar-fill" style="width: {{ $progress }}%;"></div>
+                                        <div class="progress-bar-fill" style="width: {{ $set['progress'] }}%;"></div>
                                     </div>
                                 </div>
 
                                 <div class="set-footer">
                                     <span class="est-value-label">{{ __('VALORE STIMATO') }}</span>
-                                    <span class="est-value-amount">€ {{ number_format($totalValueSet, 2, ',', '.') }}</span>
+                                    <span class="est-value-amount">€ {{ number_format($set['total_value'], 2, ',', '.') }}</span>
                                 </div>
                             </div>
                         </a>
                     </div>
                 @endforeach
             </div>
-                @endforeach
-            </div>
+        @endforeach
         @endif
     </div>
 @endsection

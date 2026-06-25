@@ -5,6 +5,8 @@ namespace App\Providers;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
+use App\Models\UserCardCollection;
+use App\Observers\UserCardCollectionObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        UserCardCollection::observe(UserCardCollectionObserver::class);
+
         if ($this->app->runningInConsole() || ! $this->app->bound('request')) {
             return;
         }
