@@ -524,7 +524,9 @@
                 window._priceChart = null;
             }
 
-            var validPrices = (card.priceHistory && card.priceHistory.length > 0 ? card.priceHistory : (card.prices || [])).filter(function(e) { return !!e.created_at; });
+            // Combine priceHistory and current prices to ensure all providers are included (e.g. Cardtrader)
+            var allPriceRecords = (card.priceHistory || []).concat(card.prices || []);
+            var validPrices = allPriceRecords.filter(function(e) { return !!e.created_at; });
             
             var filterCond = document.getElementById('cm-filter-cond').value;
             var filterVariant = document.getElementById('cm-filter-variant').value;
@@ -542,7 +544,7 @@
                 });
             }
 
-            if (validPrices.length > 1) {
+            if (validPrices.length > 0) {
                 chartContainer.style.display = '';
                 chartEmpty.style.display = 'none';
 
@@ -558,6 +560,7 @@
                 var providerColors = {
                     'cardmarket': { line: '#fbb400', bg: 'rgba(251, 180, 0, 0.1)' },
                     'tcgplayer':  { line: '#63b3ed', bg: 'rgba(99, 179, 237, 0.1)' },
+                    'cardtrader': { line: '#4ade80', bg: 'rgba(74, 222, 128, 0.1)' },
                     'default':    { line: '#9ae6b4', bg: 'rgba(154, 230, 180, 0.1)' }
                 };
                 var colorIndex = 0;
