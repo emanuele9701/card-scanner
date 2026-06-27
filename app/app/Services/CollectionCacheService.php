@@ -38,13 +38,39 @@ class CollectionCacheService
 
     private function computeCollectionData(int $userId): array
     {
-        $collections = UserCardCollection::where('user_id', $userId)
-            ->with(['set.serie', 'card.prices'])
-            ->get();
+        $ownedCards = 0;
+        $totalSlots = 0;
+        $totalValue = 0;
+        $setCount = 0;
+        $completedSets = 0;
 
-        if ($collections->isEmpty()) {
+        $setsData = [];
+
+        UserCardCollection::where('user_id', $userId)
+            ->with(['set.serie', 'card.prices' => function($q) {
+                $q->latest('updated_at');
+            }])
+            ->lazy(500)
+            ->each(function ($item) use (&$setsData, &$ownedCards, &$totalValue) {
+                $ownedCards += $item->quantity;
+                $price = $item->getCalculatedPrice();
+                $itemValue = $price * $item->quantity;
+                $totalValue += $itemValue;
+                
+                $setId = $item->set_id;
+                if (!isset($setsData[$setId])) {
+                    $setsData[$setId] = [
+                        'set' => $item->set,
+                        'uniqueCardIds' => [],
+                        'totalValue' => 0
+                    ];
+                }
+                $setsData[$setId]['uniqueCardIds'][$item->card_id] = true;
+                $setsData[$setId]['totalValue'] += $itemValue;
+            });
+
+        if (empty($setsData)) {
             return [
-                'collezioni' => [],
                 'stats' => [
                     'totalValue' => 0,
                     'ownedCards' => 0,
@@ -56,95 +82,44 @@ class CollectionCacheService
             ];
         }
 
-        $ownedCards = 0;
-        $totalSlots = 0;
-        $totalValue = 0;
-        $setCount = 0;
-        $completedSets = 0;
-
-        $groupedBySet = $collections->groupBy(fn ($item) => $item->set?->id ?? 0);
-
-        foreach ($groupedBySet as $setItems) {
-            $set = $setItems->first()->set;
+        $seriesGroups = [];
+        foreach ($setsData as $setId => $data) {
+            $set = $data['set'];
             if (!$set) continue;
-
+            
             $setCount++;
-            $ownedQty = $setItems->sum('quantity');
-            $uniqueOwnedQty = $setItems->unique('card_id')->count();
             $cardTotal = $set->card_official ?? $set->card_total ?? 0;
             $totalSlots += $cardTotal;
-            $ownedCards += $ownedQty;
-
-            $progress = $cardTotal > 0 ? round($uniqueOwnedQty / $cardTotal * 100) : 0;
+            
+            $uniqueOwnedQty = count($data['uniqueCardIds']);
+            $progress = $cardTotal > 0 ? min(100, round($uniqueOwnedQty / $cardTotal * 100)) : 0;
+            
             if ($progress >= 100) {
                 $completedSets++;
             }
-
-            foreach ($setItems as $item) {
-                $card = $item->card;
-                if (!$card) continue;
-
-                $lastPrice = $card->prices->sortByDesc('updated_at')->first();
-                $value = 0;
-                if ($lastPrice) {
-                    $foil = strtolower(trim($item->foil_type ?? ''));
-                    $isHolo = in_array($foil, ['holo', 'reverse']);
-                    $value = $isHolo
-                        ? ($lastPrice->trend_holo ?? $lastPrice->avg_holo ?? $lastPrice->trend ?? $lastPrice->avg ?? 0)
-                        : ($lastPrice->trend ?? $lastPrice->avg ?? 0);
-                }
-                $totalValue += $value * $item->quantity;
+            
+            $serieName = $set->serie->name ?? __('Senza serie');
+            if (!isset($seriesGroups[$serieName])) {
+                $seriesGroups[$serieName] = [];
             }
+            
+            $seriesGroups[$serieName][] = [
+                'set_id' => $set->id,
+                'name' => $set->name,
+                'logo' => $set->logo,
+                'symbol' => $set->symbol,
+                'unique_owned' => $uniqueOwnedQty,
+                'card_total' => $cardTotal,
+                'progress' => $progress,
+                'total_value' => $data['totalValue'],
+            ];
         }
 
-        // Pre-compute series data for the view
-        $groupedBySerie = $collections->groupBy(fn ($item) => $item->set?->serie?->name ?? __('Senza serie'));
         $seriesData = [];
-
-        foreach ($groupedBySerie as $serieName => $items) {
-            $setsInSerie = [];
-            $setGroups = $items->groupBy(fn ($item) => $item->set?->id ?? 0);
-
-            foreach ($setGroups as $setItems) {
-                $set = $setItems->first()->set;
-                if (!$set) continue;
-
-                $ownedQty = $setItems->sum('quantity');
-                $uniqueOwnedQty = $setItems->unique('card_id')->count();
-                $cardTotal = $set->card_total ?? 0;
-                $progress = $cardTotal > 0 ? min(100, round($uniqueOwnedQty / $cardTotal * 100)) : 0;
-
-                $totalValueSet = 0;
-                foreach ($setItems as $item) {
-                    $card = $item->card;
-                    if (!$card) continue;
-                    $lastPrice = $card->prices->sortByDesc('updated_at')->first();
-                    $value = 0;
-                    if ($lastPrice) {
-                        $foil = strtolower(trim($item->foil_type ?? ''));
-                        $isHolo = in_array($foil, ['holo', 'reverse']);
-                        $value = $isHolo
-                            ? ($lastPrice->trend_holo ?? $lastPrice->avg_holo ?? $lastPrice->trend ?? $lastPrice->avg ?? 0)
-                            : ($lastPrice->trend ?? $lastPrice->avg ?? 0);
-                    }
-                    $totalValueSet += $value * $item->quantity;
-                }
-
-                $setsInSerie[] = [
-                    'set_id' => $set->id,
-                    'name' => $set->name,
-                    'logo' => $set->logo,
-                    'symbol' => $set->symbol,
-                    'unique_owned' => $uniqueOwnedQty,
-                    'card_total' => $cardTotal,
-                    'progress' => $progress,
-                    'total_value' => $totalValueSet,
-                ];
-            }
-
+        foreach ($seriesGroups as $serieName => $setsInSerie) {
             $seriesData[] = [
                 'name' => $serieName,
-                'sets' => $setsInSerie,
+                'sets' => $setsInSerie
             ];
         }
 

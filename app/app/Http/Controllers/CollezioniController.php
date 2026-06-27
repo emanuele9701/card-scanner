@@ -21,248 +21,6 @@ class CollezioniController extends Controller
 
         return view('collezioni.mie', $data);
     }
-
-    public function export(Request $request)
-    {
-        $user = Auth::user();
-        $collections = \App\Models\UserCardCollection::with(['card', 'card.set', 'card.prices'])
-            ->where('user_id', $user->id)
-            ->get();
-            
-        $csvHeader = ['Card Name', 'Set', 'Rarity', 'Condition', 'Variants', 'Quantity', 'Estimated Unit Value', 'Estimated Total Value'];
-        $csvData = [];
-        
-        foreach ($collections as $item) {
-            $card = $item->card;
-            if (!$card) continue;
-            
-            $price = 0;
-            $priceModel = $card->prices->first();
-            if ($priceModel) {
-                $isHoloOrReverse = false;
-                if (is_array($item->variants)) {
-                    $variantsLower = array_map('strtolower', $item->variants);
-                    $isHoloOrReverse = in_array('holo', $variantsLower) || in_array('reverse', $variantsLower);
-                }
-                if ($isHoloOrReverse) {
-                    $price = $priceModel->trend_holo ?? $priceModel->avg_holo ?? $priceModel->trend ?? $priceModel->avg ?? 0;
-                } else {
-                    $price = $priceModel->trend ?? $priceModel->avg ?? 0;
-                }
-            }
-            
-            $csvData[] = [
-                $card->name,
-                $card->set->name ?? '',
-                $card->rarity ?? '',
-                $item->condition ?? 'NM',
-                is_array($item->variants) ? implode(', ', $item->variants) : '',
-                $item->quantity,
-                number_format((float)$price, 2, '.', ''),
-                number_format((float)$price * $item->quantity, 2, '.', ''),
-            ];
-        }
-        
-        $filename = "pokestash_collection_" . date('Y-m-d') . ".csv";
-        
-        return response()->streamDownload(function() use ($csvHeader, $csvData) {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, $csvHeader);
-            foreach ($csvData as $row) {
-                fputcsv($handle, $row);
-            }
-            fclose($handle);
-        }, $filename, [
-            'Content-Type' => 'text/csv; charset=utf-8',
-        ]);
-    }
-
-    /**
-     * Esporta un file Excel (.xlsx) con 3 fogli: Possedute, Mancanti, Doppie
-     */
-    public function exportSetExcel(Request $request, TCGSet $set)
-    {
-        $user = Auth::user();
-
-        // Fetch all cards for this set with user's collection and prices
-        $allCards = TCGCard::where('set_id', $set->id)
-            ->with(['prices', 'collectors' => function($q) use ($user) {
-                $q->where('user_id', $user->id);
-            }])
-            ->orderBy('dexId', 'asc')
-            ->get();
-
-        $incomingCardsSet = \App\Models\UserIncomingCard::where('user_id', $user->id)
-            ->where('set_id', $set->id)
-            ->get()->groupBy('card_id');
-
-        $ownedRows = [];
-        $missingRows = [];
-        $doppieRows = [];
-
-        foreach ($allCards as $card) {
-            $produced = $card->produced_variants;
-            if (empty($produced)) {
-                $produced = ['normal'];
-            }
-            $producedUnique = array_unique(array_map('strtolower', $produced));
-
-            $ownedVariants = [];
-            $variantCounts = [];
-
-            foreach ($card->collectors as $coll) {
-                $foil = strtolower(trim($coll->foil_type ?: 'normal'));
-                $ownedVariants[] = $foil;
-                if (!isset($variantCounts[$foil])) {
-                    $variantCounts[$foil] = 0;
-                }
-                $variantCounts[$foil] += $coll->quantity;
-
-                // Add row per copy to owned sheet
-                $priceModel = $card->prices->first();
-                $isHolo = in_array($foil, ['holo', 'reverse']);
-                $price = 0;
-                if ($priceModel) {
-                    $price = $isHolo
-                        ? ($priceModel->trend_holo ?? $priceModel->avg_holo ?? $priceModel->trend ?? $priceModel->avg ?? 0)
-                        : ($priceModel->trend ?? $priceModel->avg ?? 0);
-                }
-
-                $ownedRows[] = [
-                    $card->dexId,
-                    $card->name,
-                    $card->rarity ?? '',
-                    ucfirst($foil),
-                    strtoupper($coll->language ?? 'IT'),
-                    $coll->condition ?? 'NM',
-                    $coll->quantity,
-                    $coll->is_first_edition ? 'Sì' : 'No',
-                    round((float)$price, 2),
-                    round((float)$price * $coll->quantity, 2),
-                ];
-            }
-
-            $ownedVariantsUnique = array_unique($ownedVariants);
-            $missingVariants = array_values(array_diff($producedUnique, $ownedVariantsUnique));
-
-            // Check incoming status per variant
-            $incomingVariantsList = [];
-            if ($incomingCardsSet->has($card->id)) {
-                foreach ($incomingCardsSet->get($card->id) as $inc) {
-                    $incomingVariantsList[] = strtolower(trim($inc->foil_type ?: 'normal'));
-                }
-            }
-
-            foreach ($missingVariants as $variant) {
-                $isIncoming = in_array($variant, $incomingVariantsList);
-                $missingRows[] = [
-                    $card->dexId,
-                    $card->name,
-                    $card->rarity ?? '',
-                    ucfirst($variant),
-                    $isIncoming ? 'Sì' : 'No',
-                ];
-            }
-
-            foreach ($variantCounts as $variant => $count) {
-                if ($count > 1) {
-                    $doppieRows[] = [
-                        $card->dexId,
-                        $card->name,
-                        $card->rarity ?? '',
-                        ucfirst($variant),
-                        $count,
-                        $count - 1,
-                    ];
-                }
-            }
-        }
-
-        // Build Excel
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-
-        // ─── Sheet 1: Possedute ───
-        $sheet1 = $spreadsheet->getActiveSheet();
-        $sheet1->setTitle('Possedute');
-        $headers1 = ['#', 'Nome', 'Rarità', 'Variante', 'Lingua', 'Condizione', 'Quantità', '1ª Edizione', 'Valore Unit.', 'Valore Tot.'];
-        $sheet1->fromArray($headers1, null, 'A1');
-        if (!empty($ownedRows)) {
-            $sheet1->fromArray($ownedRows, null, 'A2');
-        }
-        $this->styleExcelSheet($sheet1, count($headers1), count($ownedRows) + 1);
-
-        // ─── Sheet 2: Mancanti ───
-        $sheet2 = $spreadsheet->createSheet();
-        $sheet2->setTitle('Mancanti');
-        $headers2 = ['#', 'Nome', 'Rarità', 'Variante', 'In Arrivo'];
-        $sheet2->fromArray($headers2, null, 'A1');
-        if (!empty($missingRows)) {
-            $sheet2->fromArray($missingRows, null, 'A2');
-        }
-        $this->styleExcelSheet($sheet2, count($headers2), count($missingRows) + 1);
-
-        // ─── Sheet 3: Doppie ───
-        $sheet3 = $spreadsheet->createSheet();
-        $sheet3->setTitle('Doppie');
-        $headers3 = ['#', 'Nome', 'Rarità', 'Variante', 'Quantità Totale', 'Extra'];
-        $sheet3->fromArray($headers3, null, 'A1');
-        if (!empty($doppieRows)) {
-            $sheet3->fromArray($doppieRows, null, 'A2');
-        }
-        $this->styleExcelSheet($sheet3, count($headers3), count($doppieRows) + 1);
-
-        // Select first sheet
-        $spreadsheet->setActiveSheetIndex(0);
-
-        // Stream download
-        $setName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $set->name);
-        $filename = "Collezione_{$setName}_" . date('Y-m-d') . ".xlsx";
-
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-
-        return response()->streamDownload(function() use ($writer) {
-            $writer->save('php://output');
-        }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Cache-Control' => 'max-age=0',
-        ]);
-    }
-
-    /**
-     * Applica stile professionale all'header di un foglio Excel.
-     */
-    private function styleExcelSheet(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $colCount, int $lastRow): void
-    {
-        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colCount);
-
-        // Header style
-        $headerStyle = [
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
-            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '1a1a2e']],
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
-            'borders' => ['bottom' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_MEDIUM, 'color' => ['rgb' => 'f59e0b']]],
-        ];
-        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray($headerStyle);
-
-        // Auto-size columns
-        for ($i = 1; $i <= $colCount; $i++) {
-            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i);
-            $sheet->getColumnDimension($col)->setAutoSize(true);
-        }
-
-        // Zebra striping
-        for ($row = 2; $row <= $lastRow; $row++) {
-            if ($row % 2 === 0) {
-                $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getFill()
-                    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
-                    ->getStartColor()->setRGB('f0f4fa');
-            }
-        }
-
-        // Freeze top row
-        $sheet->freezePane('A2');
-    }
-
     public function missingGlobal(Request $request)
     {
         $user = Auth::user();
@@ -492,122 +250,97 @@ class CollezioniController extends Controller
 
         return view('collezioni.set-detail', compact('set', 'typeOptions', 'stageOptions', 'allCardsJson', 'isSetWatchlisted', 'watchlistedCardIds'));
     }
-
-    public function addCardToCollection(TCGCard $card) {
-        $user = Auth::user();
-
-        if(!$card->collectors()->where('user_id',$user->id)->first()) {
-            // Aggiungo
-            $card->collectors()->create([
-                'user_id' => $user->id,
-                'set_id' => $card->set_id,
-                'serie_id' => $card->set->serie_id
-            ]);            
-            return response()->json(['esito' => true, 'message' => __('Carta aggiunta')]);
-        }
-        
-        return response()->json(['esito' => false, 'message' => __('Carta già inserita')]);
-    }
-
-    /**
-     * Mostra il dettaglio di un singolo set della collezione dell'utente.
-     */
     public function showMySet(Request $request, TCGSet $set): View|JsonResponse
     {
         $user = Auth::user();
-        $language = $user->language ?? app()->getLocale();
-
-        $perPage = (int) $request->input('per_page', 100);
-        $allowedPerPage = [100, 200, 300];
-        if (! in_array($perPage, $allowedPerPage, true)) {
-            $perPage = 100;
-        }
-
-        $search = $request->input('search');
-        $typeFilter = $request->input('type');
-        $stageFilter = $request->input('stage');
-        $sort = $request->input('sort', 'dex_asc');
-
+        $perPage = $request->input('per_page', 24);
         $tab = $request->input('tab', 'owned');
-
-        // Fetch all matching cards from DB based on filters
-        $allCardsQuery = \App\Models\TCGCard::where('set_id', $set->id)
-            ->with(['prices', 'collectors' => function($q) use ($user) {
-                $q->where('user_id', $user->id);
-            }]);
-
-        if ($search) {
-            $allCardsQuery->where('name', 'like', '%' . $search . '%');
-        }
-
-        if ($typeFilter) {
-            $allCardsQuery->whereJsonContains('types', $typeFilter);
-        }
-
-        if ($stageFilter) {
-            $allCardsQuery->where('level_stage', $stageFilter);
-        }
-
-        match ($sort) {
-            'name_desc' => $allCardsQuery->orderBy('name', 'desc'),
-            'name_asc' => $allCardsQuery->orderBy('name', 'asc'),
-            'rarity_desc' => $allCardsQuery->orderBy('rarity', 'desc'),
-            'rarity_asc' => $allCardsQuery->orderBy('rarity', 'asc'),
-            'dex_desc' => $allCardsQuery->orderBy('dexId', 'desc'),
-            default => $allCardsQuery->orderBy('dexId', 'asc'),
-        };
-
+        
         $filterLanguage = $request->input('filter_language');
         $filterCondition = $request->input('filter_condition');
         $filterVariant = $request->input('filter_variant');
-        $filterIncoming = $request->input('filter_incoming'); // 'all', 'only_incoming', 'only_missing'
+        $filterIncoming = $request->input('filter_incoming');
 
-        $allCards = $allCardsQuery->get();
+        // Pre-fetch incoming cards for this set
+        $incomingCardsSet = \App\Models\IncomingCard::where('user_id', $user->id)
+            ->whereHas('card', function($q) use ($set) {
+                $q->where('set_id', $set->id);
+            })
+            ->get()
+            ->groupBy('card_id');
 
-        $ownedCards = collect();
-        $missingCards = collect();
-        $doppieCards = collect();
+        // Base Query
+        $query = \App\Models\TCGCard::where('set_id', $set->id)->orderBy('dexId', 'asc');
 
-        $incomingCardsSet = \App\Models\UserIncomingCard::where('user_id', $user->id)
-            ->where('set_id', $set->id)
-            ->get()->groupBy('card_id');
+        // Apply Tab Filter at DB level for memory efficiency
+        if ($tab === 'owned') {
+            $query->whereHas('collectors', function($q) use ($user, $filterLanguage, $filterCondition) {
+                $q->where('user_id', $user->id);
+                if ($filterLanguage) $q->where('language', $filterLanguage);
+                if ($filterCondition) $q->where('condition', $filterCondition);
+            });
+        } elseif ($tab === 'missing') {
+            $query->whereDoesntHave('collectors', function($q) use ($user) {
+                $q->where('user_id', $user->id);
+            });
+            if ($filterIncoming === 'only_incoming') {
+                $query->whereIn('id', $incomingCardsSet->keys());
+            } elseif ($filterIncoming === 'only_missing') {
+                $query->whereNotIn('id', $incomingCardsSet->keys());
+            }
+        } elseif ($tab === 'doppie') {
+            // Simplified DB doppie check: has copies > 1
+            $query->whereHas('collectors', function($q) use ($user) {
+                $q->where('user_id', $user->id)->where('quantity', '>', 1);
+            });
+        }
 
-        foreach ($allCards as $card) {
-            $produced = $card->produced_variants;
-            if (empty($produced)) {
-                $produced = ['normal'];
+        // Apply variant filter roughly at DB level if specified
+        if ($filterVariant && $tab !== 'missing') {
+            $query->whereHas('collectors', function($q) use ($user, $filterVariant) {
+                $q->where('user_id', $user->id);
+                if ($filterVariant === 'firstedition') {
+                    $q->where('is_first_edition', true);
+                } else {
+                    $q->where('foil_type', $filterVariant);
+                }
+            });
+        }
+
+        // Paginate directly from DB
+        $userCards = $query->paginate($perPage)->withQueryString();
+
+        // Eager load collectors and prices ONLY for the paginated items
+        $cardIds = $userCards->pluck('id')->toArray();
+        $cardsWithRelations = \App\Models\TCGCard::with([
+            'prices',
+            'collectors' => function($q) use ($user) {
+                $q->where('user_id', $user->id);
+            }
+        ])->whereIn('id', $cardIds)->get()->keyBy('id');
+
+        // Compute variant badges ONLY for the paginated items
+        foreach ($userCards as $card) {
+            $fullCard = $cardsWithRelations->get($card->id);
+            $card->prices = $fullCard ? $fullCard->prices : collect();
+            $card->collectors = $fullCard ? $fullCard->collectors : collect();
+
+            $produced = $card->variants ?? [];
+            if (is_string($produced)) {
+                $produced = json_decode($produced, true) ?? [];
+            }
+            if (!is_array($produced) || empty($produced)) {
+                $produced = ['normal', 'reverse', 'holo'];
             }
 
             $ownedVariants = [];
             $variantCounts = [];
-            $hasMatchingCopies = false;
-            $hasCopies = $card->collectors->count() > 0;
 
             foreach ($card->collectors as $coll) {
-                if ($filterLanguage && strtolower(trim($coll->language)) !== strtolower(trim($filterLanguage))) {
-                    continue;
-                }
-                if ($filterCondition && strtolower(trim($coll->condition)) !== strtolower(trim($filterCondition))) {
-                    continue;
-                }
-
                 $feats = [];
                 if ($coll->foil_type) $feats[] = strtolower(trim($coll->foil_type));
                 if ($coll->is_first_edition) $feats[] = 'firstedition';
                 if (empty($feats)) $feats[] = 'normal';
-
-                if ($filterVariant) {
-                    $vMatch = false;
-                    foreach ($feats as $f) {
-                        if ($f === strtolower(trim($filterVariant))) {
-                            $vMatch = true;
-                            break;
-                        }
-                    }
-                    if (!$vMatch) continue;
-                }
-
-                $hasMatchingCopies = true;
 
                 foreach ($feats as $variantItemLow) {
                     $ownedVariants[] = $variantItemLow;
@@ -617,7 +350,7 @@ class CollezioniController extends Controller
                     $variantCounts[$variantItemLow] += $coll->quantity;
                 }
             }
-            // Normalize variants to lowercase to avoid duplicates like 'Holo' and 'holo'
+
             $ownedVariantsUnique = array_unique($ownedVariants);
             $producedUnique = array_unique(array_map('strtolower', $produced));
 
@@ -628,14 +361,11 @@ class CollezioniController extends Controller
                 foreach ($incomingCardsSet->get($card->id) as $inc) {
                     $foil = strtolower(trim($inc->foil_type ?: 'normal'));
                     $incomingVariants[] = $foil;
-                    if ($inc->is_first_edition) {
-                        $incomingVariants[] = 'firstedition';
-                    }
+                    if ($inc->is_first_edition) $incomingVariants[] = 'firstedition';
                 }
             }
             $incomingVariantsUnique = array_unique($incomingVariants);
 
-            $missingVariants = array_values(array_diff($producedUnique, $ownedVariantsUnique));
             $missingIncoming = array_values(array_intersect($missingVariants, $incomingVariantsUnique));
             $pureMissing = array_values(array_diff($missingVariants, $incomingVariantsUnique));
 
@@ -651,61 +381,24 @@ class CollezioniController extends Controller
             $card->missing_incoming_variants = $missingIncoming;
             $card->pure_missing_variants = $pureMissing;
             $card->doppie_variants = $doppieVariants;
-
-            // Apply tab filters
-            // OWNED and DOPPIE
-            $shouldKeepOwned = true;
-            if ($hasCopies && !$hasMatchingCopies) {
-                $shouldKeepOwned = false;
-            }
-            if ($filterLanguage || $filterCondition || $filterVariant) {
-                if (!$hasMatchingCopies) {
-                    $shouldKeepOwned = false;
-                }
-            }
-
-            if ($shouldKeepOwned && count($ownedVariantsUnique) > 0) {
-                $ownedCards->push($card);
-            }
-            if ($shouldKeepOwned && count($doppieVariants) > 0) {
-                $doppieCards->push($card);
-            }
-
-            // MISSING
-            $shouldKeepMissing = true;
-            if ($filterIncoming === 'only_incoming') {
-                if (count($missingIncoming) === 0) {
-                    $shouldKeepMissing = false;
-                }
-            } elseif ($filterIncoming === 'only_missing') {
-                if (count($pureMissing) === 0) {
-                    $shouldKeepMissing = false;
-                }
-            }
-
-            if ($shouldKeepMissing && count($missingVariants) > 0) {
-                $missingCards->push($card);
-            }
         }
 
-        $collectionToPaginate = match($tab) {
-            'missing' => $missingCards,
-            'doppie' => $doppieCards,
-            default => $ownedCards,
-        };
+        // Totals for Tabs via Fast DB Aggregates
+        $ownedTotal = \App\Models\TCGCard::where('set_id', $set->id)->whereHas('collectors', function($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->count();
+        
+        $missingTotal = \App\Models\TCGCard::where('set_id', $set->id)->whereDoesntHave('collectors', function($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->count();
+        
+        $doppieTotal = \App\Models\UserCardCollection::where('user_id', $user->id)
+            ->where('set_id', $set->id)
+            ->where('quantity', '>', 1)
+            ->distinct('card_id')
+            ->count('card_id');
 
-        $userCards = null;
-        $sellers = null;
-
-        $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage();
-        $userCards = new \Illuminate\Pagination\LengthAwarePaginator(
-            $collectionToPaginate->forPage($currentPage, $perPage)->values(),
-            $collectionToPaginate->count(),
-            $perPage,
-            $currentPage,
-            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
-        );
-
+        // Setup filter options
         $allUserCardsForOptions = \App\Models\UserCardCollection::where('user_id', $user->id)
             ->where('set_id', $set->id)
             ->with('card')
@@ -714,13 +407,8 @@ class CollezioniController extends Controller
         $typeOptions = $allUserCardsForOptions->flatMap(fn ($c) => $c->card && is_array($c->card->types) ? $c->card->types : [])->unique()->sort()->values();
         $stageOptions = $allUserCardsForOptions->map(fn ($c) => $c->card ? $c->card->level_stage : null)->filter()->unique()->values();
 
-        $ownedTotal = $ownedCards->count();
-        $missingTotal = $missingCards->count();
-        $doppieTotal = $doppieCards->count();
-
         $incomingByCard = collect();
         if ($tab === 'missing') {
-            $cardIds = $userCards->pluck('id')->toArray();
             $incomingByCard = $incomingCardsSet->filter(function($val, $key) use ($cardIds) {
                 return in_array($key, $cardIds);
             });
@@ -736,7 +424,7 @@ class CollezioniController extends Controller
                 
             $watchlistedCardIds = \Illuminate\Support\Facades\DB::table('user_card_watchlists')
                 ->where('user_id', $user->id)
-                ->whereIn('card_id', $collectionToPaginate->pluck('id'))
+                ->whereIn('card_id', $cardIds)
                 ->pluck('card_id')
                 ->toArray();
         }
@@ -769,237 +457,6 @@ class CollezioniController extends Controller
         ));
     }
 
-    public function getCardCopies(TCGCard $card) {
-        $user = Auth::user();
-        $copies = \App\Models\UserCardCollection::where('user_id', $user->id)
-            ->where('card_id', $card->id)
-            ->get();
-        return response()->json($copies);
-    }
-
-    public function addCardCopy(Request $request, TCGCard $card) {
-        $request->validate([
-            'condition' => 'required|in:NM,LP,MP,HP,DMG',
-            'language' => 'nullable|string',
-            'foil_type' => 'nullable|in:normal,holo,reverse',
-            'is_first_edition' => 'boolean',
-            'is_signed' => 'boolean',
-            'is_altered' => 'boolean',
-            'quantity' => 'required|integer|min:1',
-        ]);
-        
-        $user = Auth::user();
-        
-        $existing = \App\Models\UserCardCollection::where('user_id', $user->id)
-            ->where('card_id', $card->id)
-            ->where('condition', $request->condition)
-            ->where('language', $request->language ?: 'en')
-            ->where('foil_type', $request->foil_type ?: 'normal')
-            ->where('is_first_edition', $request->boolean('is_first_edition'))
-            ->where('is_signed', $request->boolean('is_signed'))
-            ->where('is_altered', $request->boolean('is_altered'))
-            ->first();
-
-        if ($existing) {
-            $existing->quantity += $request->quantity;
-            $existing->save();
-        } else {
-            \App\Models\UserCardCollection::create([
-                'user_id' => $user->id,
-                'card_id' => $card->id,
-                'set_id' => $card->set_id,
-                'serie_id' => $card->set->serie_id ?? $card->set?->serie_id,
-                'condition' => $request->condition,
-                'language' => $request->language ?: 'en',
-                'foil_type' => $request->foil_type ?: 'normal',
-                'is_first_edition' => $request->boolean('is_first_edition'),
-                'is_signed' => $request->boolean('is_signed'),
-                'is_altered' => $request->boolean('is_altered'),
-                'quantity' => $request->quantity,
-            ]);
-        }
-        
-        return response()->json(['success' => true]);
-    }
-
-    public function updateCardCopy(Request $request, \App\Models\UserCardCollection $copy) {
-        if ($copy->user_id !== Auth::id()) {
-            abort(403);
-        }
-        $request->validate([
-            'quantity' => 'required|integer|min:0',
-        ]);
-        
-        if ($request->quantity == 0) {
-            $copy->delete();
-        } else {
-            $copy->quantity = $request->quantity;
-            $copy->save();
-        }
-        
-        return response()->json(['success' => true]);
-    }
-
-    public function deleteCardCopy(\App\Models\UserCardCollection $copy) {
-        if ($copy->user_id !== Auth::id()) {
-            abort(403);
-        }
-        $copy->delete();
-        return response()->json(['success' => true]);
-    }
-
-    public function removeCardFromCollection(TCGCard $card) {
-        $user = Auth::user();
-        \App\Models\UserCardCollection::where('user_id', $user->id)
-            ->where('card_id', $card->id)
-            ->delete();
-        
-        return response()->json(['success' => true]);
-    }
-
-    public function getMassCardCopies(Request $request)
-    {
-        $request->validate([
-            'card_ids' => 'required|array',
-            'card_ids.*' => 'integer|exists:tcg_cards,id'
-        ]);
-
-        $userId = Auth::id();
-        
-        $copies = UserCardCollection::with(['card', 'card.set'])
-            ->where('user_id', $userId)
-            ->whereIn('card_id', $request->card_ids)
-            ->get();
-            
-        // Group by card_id for frontend convenience
-        $grouped = [];
-        foreach($copies as $copy) {
-            $cid = $copy->card_id;
-            if(!isset($grouped[$cid])) {
-                $grouped[$cid] = [
-                    'card' => $copy->card,
-                    'copies' => []
-                ];
-            }
-            $grouped[$cid]['copies'][] = $copy;
-        }
-
-        return response()->json(array_values($grouped));
-    }
-
-    public function massAddCopies(Request $request)
-    {
-        $request->validate([
-            'card_ids' => 'required|array',
-            'card_ids.*' => 'integer|exists:tcg_cards,id',
-            'condition' => 'required|in:NM,LP,MP,HP,DMG',
-            'language' => 'nullable|string',
-            'foil_type' => 'nullable|in:normal,holo,reverse',
-            'is_first_edition' => 'boolean',
-            'is_signed' => 'boolean',
-            'is_altered' => 'boolean',
-            'quantity' => 'required|integer|min:1',
-        ]);
-
-        $userId = Auth::id();
-        $condition = $request->condition;
-        
-        $language = $request->language ?: 'en';
-        $foil_type = $request->foil_type ?: 'normal';
-        $is_first_edition = $request->boolean('is_first_edition');
-        $is_signed = $request->boolean('is_signed');
-        $is_altered = $request->boolean('is_altered');
-
-        DB::beginTransaction();
-        try {
-            foreach ($request->card_ids as $cardId) {
-                // Check if copy already exists
-                $existing = UserCardCollection::where('user_id', $userId)
-                    ->where('card_id', $cardId)
-                    ->where('condition', $condition)
-                    ->where('language', $language)
-                    ->where('foil_type', $foil_type)
-                    ->where('is_first_edition', $is_first_edition)
-                    ->where('is_signed', $is_signed)
-                    ->where('is_altered', $is_altered)
-                    ->first();
-
-                if ($existing) {
-                    $existing->quantity += $request->quantity;
-                    $existing->save();
-                } else {
-                    $card = \App\Models\TCGCard::find($cardId);
-                    if ($card) {
-                        UserCardCollection::create([
-                            'user_id' => $userId,
-                            'card_id' => $cardId,
-                            'set_id' => $card->set_id,
-                            'serie_id' => $card->set->serie_id ?? $card->set?->serie_id,
-                            'condition' => $condition,
-                            'language' => $language,
-                            'foil_type' => $foil_type,
-                            'is_first_edition' => $is_first_edition,
-                            'is_signed' => $is_signed,
-                            'is_altered' => $is_altered,
-                            'quantity' => $request->quantity,
-                        ]);
-                    }
-                }
-            }
-            DB::commit();
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function massUpdateQuantities(Request $request)
-    {
-        $request->validate([
-            'updates' => 'required|array',
-            'updates.*' => 'integer|min:0'
-        ]);
-
-        $userId = Auth::id();
-
-        DB::beginTransaction();
-        try {
-            foreach ($request->updates as $copyId => $newQty) {
-                $copy = UserCardCollection::where('id', $copyId)
-                    ->where('user_id', $userId)
-                    ->first();
-                
-                if ($copy) {
-                    if ($newQty == 0) {
-                        $copy->delete();
-                    } else {
-                        $copy->quantity = $newQty;
-                        $copy->save();
-                    }
-                }
-            }
-            DB::commit();
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function massRemoveCards(Request $request) {
-        $request->validate([
-            'card_ids' => 'required|array',
-            'card_ids.*' => 'integer'
-        ]);
-        
-        $user = Auth::user();
-        \App\Models\UserCardCollection::where('user_id', $user->id)
-            ->whereIn('card_id', $request->card_ids)
-            ->delete();
-            
-        return response()->json(['success' => true]);
-    }
 
     public function missingCards(TCGSet $set) {
         $user = Auth::user();
@@ -1013,189 +470,4 @@ class CollezioniController extends Controller
         return response()->json($missingCards);
     }
 
-    // ─── Incoming Cards (In Arrivo) ─────────────────────────────────────
-
-    /**
-     * Segna una o più carte come "in arrivo".
-     */
-    public function addIncoming(Request $request): JsonResponse
-    {
-        $request->validate([
-            'card_ids' => 'required|array',
-            'card_ids.*' => 'integer|exists:tcg_cards,id',
-            'language' => 'nullable|string',
-            'foil_type' => 'nullable|in:normal,holo,reverse',
-            'is_first_edition' => 'boolean',
-            'is_signed' => 'boolean',
-            'is_altered' => 'boolean',
-            'quantity' => 'integer|min:1',
-            'notes' => 'nullable|string|max:500',
-        ]);
-
-        $userId = Auth::id();
-        $language = $request->language ?: 'en';
-        $foilType = $request->foil_type ?: 'normal';
-        $isFirstEdition = $request->boolean('is_first_edition');
-        $isSigned = $request->boolean('is_signed');
-        $isAltered = $request->boolean('is_altered');
-        $quantity = $request->quantity ?? 1;
-        $notes = $request->notes;
-
-        DB::beginTransaction();
-        try {
-            foreach ($request->card_ids as $cardId) {
-                $card = TCGCard::find($cardId);
-                if (!$card) continue;
-
-                // Check for existing identical incoming entry
-                $existing = \App\Models\UserIncomingCard::where('user_id', $userId)
-                    ->where('card_id', $cardId)
-                    ->where('language', $language)
-                    ->where('foil_type', $foilType)
-                    ->where('is_first_edition', $isFirstEdition)
-                    ->where('is_signed', $isSigned)
-                    ->where('is_altered', $isAltered)
-                    ->first();
-
-                if ($existing) {
-                    $existing->quantity += $quantity;
-                    if ($notes) $existing->notes = $notes;
-                    $existing->save();
-                } else {
-                    \App\Models\UserIncomingCard::create([
-                        'user_id' => $userId,
-                        'card_id' => $cardId,
-                        'set_id' => $card->set_id,
-                        'language' => $language,
-                        'foil_type' => $foilType,
-                        'is_first_edition' => $isFirstEdition,
-                        'is_signed' => $isSigned,
-                        'is_altered' => $isAltered,
-                        'quantity' => $quantity,
-                        'notes' => $notes,
-                    ]);
-                }
-            }
-            DB::commit();
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * Le carte "in arrivo" sono arrivate: spostale in collezione.
-     */
-    public function arrivedIncoming(Request $request): JsonResponse
-    {
-        $request->validate([
-            'incoming_ids' => 'required|array',
-            'incoming_ids.*' => 'integer|exists:user_incoming_cards,id',
-            'condition' => 'required|in:NM,LP,MP,HP,DMG',
-        ]);
-
-        $userId = Auth::id();
-
-        DB::beginTransaction();
-        try {
-            foreach ($request->incoming_ids as $incomingId) {
-                $incoming = \App\Models\UserIncomingCard::where('id', $incomingId)
-                    ->where('user_id', $userId)
-                    ->first();
-
-                if (!$incoming) continue;
-
-                $card = TCGCard::find($incoming->card_id);
-                if (!$card) continue;
-
-                // Check if identical copy exists in collection
-                $existing = UserCardCollection::where('user_id', $userId)
-                    ->where('card_id', $incoming->card_id)
-                    ->where('condition', $request->condition)
-                    ->where('language', $incoming->language)
-                    ->where('foil_type', $incoming->foil_type)
-                    ->where('is_first_edition', $incoming->is_first_edition)
-                    ->where('is_signed', $incoming->is_signed)
-                    ->where('is_altered', $incoming->is_altered)
-                    ->first();
-
-                if ($existing) {
-                    $existing->quantity += $incoming->quantity;
-                    $existing->save();
-                } else {
-                    UserCardCollection::create([
-                        'user_id' => $userId,
-                        'card_id' => $incoming->card_id,
-                        'set_id' => $incoming->set_id,
-                        'serie_id' => $card->set->serie_id ?? null,
-                        'condition' => $request->condition,
-                        'language' => $incoming->language,
-                        'foil_type' => $incoming->foil_type,
-                        'is_first_edition' => $incoming->is_first_edition,
-                        'is_signed' => $incoming->is_signed,
-                        'is_altered' => $incoming->is_altered,
-                        'quantity' => $incoming->quantity,
-                    ]);
-                }
-
-                // Remove the incoming record
-                $incoming->delete();
-            }
-            DB::commit();
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * Rimuovi lo status "in arrivo" (annulla ordine).
-     */
-    public function removeIncoming(Request $request): JsonResponse
-    {
-        $request->validate([
-            'incoming_ids' => 'nullable|array',
-            'incoming_ids.*' => 'integer',
-            'card_ids' => 'nullable|array',
-            'card_ids.*' => 'integer',
-        ]);
-
-        $userId = Auth::id();
-
-        $query = \App\Models\UserIncomingCard::where('user_id', $userId);
-        
-        if ($request->has('incoming_ids') && !empty($request->incoming_ids)) {
-            $query->whereIn('id', $request->incoming_ids);
-        } elseif ($request->has('card_ids') && !empty($request->card_ids)) {
-            $query->whereIn('card_id', $request->card_ids);
-        } else {
-            return response()->json(['success' => false, 'message' => 'Nessun ID fornito']);
-        }
-        
-        $query->delete();
-
-        return response()->json(['success' => true]);
-    }
-
-    /**
-     * Restituisci le carte in arrivo per i card_id specificati.
-     */
-    public function getIncomingCards(Request $request): JsonResponse
-    {
-        $request->validate([
-            'card_ids' => 'required|array',
-            'card_ids.*' => 'integer',
-        ]);
-
-        $userId = Auth::id();
-
-        $incoming = \App\Models\UserIncomingCard::with('card')
-            ->where('user_id', $userId)
-            ->whereIn('card_id', $request->card_ids)
-            ->get();
-
-        return response()->json($incoming);
-    }
 }

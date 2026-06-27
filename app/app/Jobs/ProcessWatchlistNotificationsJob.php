@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Notification;
 
 class ProcessWatchlistNotificationsJob implements ShouldQueue
 {
@@ -55,15 +56,13 @@ class ProcessWatchlistNotificationsJob implements ShouldQueue
             $diff = $change['new_trend'] - $change['old_trend'];
             $diffStr = ($diff > 0 ? '+' : '') . number_format($diff, 2) . '€';
             
-            $cardName = TCGCard::find($cId)?->name ?? "Carta #{$cId}";
+            $cardName = $cardWatchlists->get($cId)->first()->card->name ?? "Carta #{$cId}";
             $message = "Il prezzo di {$cardName} ({$change['condition']}, {$change['language']}" . ($change['is_reverse'] ? ', Foil' : '') . ") è cambiato: {$change['new_trend']}€ ({$diffStr}).";
 
-            $usersToNotify = $cardWatchlists->get($cId)->pluck('user')->unique('id');
+            $usersToNotify = $cardWatchlists->get($cId)->pluck('user')->unique('id')->filter();
 
-            foreach ($usersToNotify as $user) {
-                if ($user) {
-                    $user->notify(new PriceTrendNotification($message, 'card', $change));
-                }
+            if ($usersToNotify->isNotEmpty()) {
+                Notification::send($usersToNotify, new PriceTrendNotification($message, 'card', $change));
             }
         }
 
@@ -85,19 +84,16 @@ class ProcessWatchlistNotificationsJob implements ShouldQueue
             
             $message = "{$count} carte dell'espansione {$setName} hanno subito una variazione di prezzo.";
 
-            $usersToNotify = $setWatchlists->get($sId)->pluck('user')->unique('id');
+            $usersToNotify = $setWatchlists->get($sId)->pluck('user')->unique('id')->filter();
 
-            foreach ($usersToNotify as $user) {
-                if ($user) {
-                    // Aggreghiamo i dati per la notifica
-                    $data = [
-                        'set_id' => $sId,
-                        'set_name' => $setName,
-                        'changes_count' => $count,
-                        'changes' => $changes->take(5)->toArray() // Includiamo solo le prime 5 per evitare payload enormi
-                    ];
-                    $user->notify(new PriceTrendNotification($message, 'set', $data));
-                }
+            if ($usersToNotify->isNotEmpty()) {
+                $data = [
+                    'set_id' => $sId,
+                    'set_name' => $setName,
+                    'changes_count' => $count,
+                    'changes' => $changes->take(5)->toArray()
+                ];
+                Notification::send($usersToNotify, new PriceTrendNotification($message, 'set', $data));
             }
         }
     }

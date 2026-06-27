@@ -46,27 +46,48 @@ class DashboardCacheService
 
         $totalSetsOwned = $userSets->count();
 
-        $collections = UserCardCollection::where('user_id', $userId)
-            ->with(['card.prices' => function($q) {
-                $q->latest('updated_at');
-            }])
-            ->get();
-
         $totalEstimatedValue = 0;
         $totalCardsOwned = 0;
         $setValue = [];
+        $topCardsCandidate = [];
 
-        foreach ($collections as $item) {
-            $totalCardsOwned += $item->quantity;
-            $price = $this->resolvePrice($item);
-            $itemValue = $price * $item->quantity;
-            $totalEstimatedValue += $itemValue;
+        UserCardCollection::where('user_id', $userId)
+            ->with(['card.set', 'card.prices' => function($q) {
+                $q->latest('updated_at');
+            }])
+            ->lazy(500)
+            ->each(function ($item) use (&$totalCardsOwned, &$totalEstimatedValue, &$setValue, &$topCardsCandidate) {
+                $totalCardsOwned += $item->quantity;
+                $price = $item->getCalculatedPrice();
+                $itemValue = $price * $item->quantity;
+                $totalEstimatedValue += $itemValue;
 
-            if (!isset($setValue[$item->set_id])) {
-                $setValue[$item->set_id] = 0;
-            }
-            $setValue[$item->set_id] += $itemValue;
-        }
+                if (!isset($setValue[$item->set_id])) {
+                    $setValue[$item->set_id] = 0;
+                }
+                $setValue[$item->set_id] += $itemValue;
+
+                if ($itemValue > 0) {
+                    $topCardsCandidate[] = [
+                        'card' => $item->card ? [
+                            'id' => $item->card->id,
+                            'name' => $item->card->name,
+                            'url_image' => $item->card->url_image,
+                            'rarity' => $item->card->rarity,
+                            'dexId' => $item->card->dexId,
+                            'set_name' => $item->card->set->name ?? '',
+                        ] : null,
+                        'quantity' => $item->quantity,
+                        'unit_price' => $price,
+                        'total_price' => $itemValue,
+                    ];
+                    
+                    if (count($topCardsCandidate) > 50) {
+                        usort($topCardsCandidate, fn($a, $b) => $b['total_price'] <=> $a['total_price']);
+                        $topCardsCandidate = array_slice($topCardsCandidate, 0, 10);
+                    }
+                }
+            });
 
         $setsStats = $userSets->map(function ($userSet) use ($setValue) {
             $cardTotal = $userSet->set->card_total ?? 0;
@@ -86,22 +107,8 @@ class DashboardCacheService
             ];
         })->sortByDesc('completion_percentage')->values()->toArray();
 
-        $topCards = collect($collections)->map(function ($item) {
-            $price = $this->resolvePrice($item);
-            return [
-                'card' => $item->card ? [
-                    'id' => $item->card->id,
-                    'name' => $item->card->name,
-                    'url_image' => $item->card->url_image,
-                    'rarity' => $item->card->rarity,
-                    'dexId' => $item->card->dexId,
-                    'set_name' => $item->card->set->name ?? '',
-                ] : null,
-                'quantity' => $item->quantity,
-                'unit_price' => $price,
-                'total_price' => $price * $item->quantity,
-            ];
-        })->sortByDesc('total_price')->take(5)->values()->toArray();
+        usort($topCardsCandidate, fn($a, $b) => $b['total_price'] <=> $a['total_price']);
+        $topCards = array_slice($topCardsCandidate, 0, 5);
 
         return compact(
             'totalSetsOwned',
@@ -110,22 +117,5 @@ class DashboardCacheService
             'setsStats',
             'topCards'
         );
-    }
-
-    private function resolvePrice(UserCardCollection $item): float
-    {
-        $priceModel = $item->card?->prices->first();
-        if (!$priceModel) return 0;
-
-        $isHoloOrReverse = false;
-        $foil = strtolower(trim($item->foil_type ?? ''));
-        if (in_array($foil, ['holo', 'reverse'])) {
-            $isHoloOrReverse = true;
-        }
-
-        if ($isHoloOrReverse) {
-            return (float) ($priceModel->trend_holo ?? $priceModel->avg_holo ?? $priceModel->trend ?? $priceModel->avg ?? 0);
-        }
-        return (float) ($priceModel->trend ?? $priceModel->avg ?? 0);
     }
 }

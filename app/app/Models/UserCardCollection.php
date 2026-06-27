@@ -101,4 +101,24 @@ class UserCardCollection extends Model implements HasMedia
     {
         return $this->belongsTo(TCGSeries::class, 'serie_id', 'id');
     }
+
+    /**
+     * Calcola il prezzo della carta in base alle varianti possedute (foil/normal).
+     */
+    public function getCalculatedPrice(): float
+    {
+        $priceModel = $this->card?->prices->first();
+        if (!$priceModel) {
+            return 0.0;
+        }
+
+        $foil = strtolower(trim($this->foil_type ?? ''));
+        $isHoloOrReverse = in_array($foil, ['holo', 'reverse']);
+
+        if ($isHoloOrReverse) {
+            return (float) ($priceModel->trend_holo ?? $priceModel->avg_holo ?? $priceModel->trend ?? $priceModel->avg ?? 0);
+        }
+
+        return (float) ($priceModel->trend ?? $priceModel->avg ?? 0);
+    }
 }

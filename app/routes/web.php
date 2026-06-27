@@ -22,33 +22,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Collezioni
     Route::prefix('collezioni')->name('collezioni.')->group(function () {
         Route::get('/mie', [CollezioniController::class, 'index'])->name('mie');
-        Route::get('/mie/export', [CollezioniController::class, 'export'])->name('mie.export');
+        Route::get('/mie/export', [\App\Http\Controllers\CollectionExportController::class, 'export'])->name('mie.export');
         Route::get('/mancanti', [CollezioniController::class, 'missingGlobal'])->name('mancanti');
         Route::get('/mie/set/{set}', [CollezioniController::class, 'showMySet'])->name('mie.set');
-        Route::get('/mie/set/{set}/export-excel', [CollezioniController::class, 'exportSetExcel'])->name('mie.set.exportExcel');
+        Route::get('/mie/set/{set}/export-excel', [\App\Http\Controllers\CollectionExportController::class, 'exportSetExcel'])->name('mie.set.exportExcel');
         Route::get('/disponibili', [CollezioniController::class, 'disponibili'])->name('disponibili');
         Route::get('/set/{set}', [CollezioniController::class, 'showSet'])->name('set');
         Route::get('/set/{set}/missing-cards', [CollezioniController::class, 'missingCards'])->name('set.missing');
 
         // Incoming cards (in arrivo)
-        Route::post('/incoming/add', [CollezioniController::class, 'addIncoming'])->name('incoming.add');
-        Route::post('/incoming/arrived', [CollezioniController::class, 'arrivedIncoming'])->name('incoming.arrived');
-        Route::post('/incoming/remove', [CollezioniController::class, 'removeIncoming'])->name('incoming.remove');
-        Route::post('/incoming/list', [CollezioniController::class, 'getIncomingCards'])->name('incoming.list');
+        Route::post('/incoming/add', [\App\Http\Controllers\IncomingCardController::class, 'addIncoming'])->name('incoming.add');
+        Route::post('/incoming/arrived', [\App\Http\Controllers\IncomingCardController::class, 'arrivedIncoming'])->name('incoming.arrived');
+        Route::post('/incoming/remove', [\App\Http\Controllers\IncomingCardController::class, 'removeIncoming'])->name('incoming.remove');
+        Route::post('/incoming/list', [\App\Http\Controllers\IncomingCardController::class, 'getIncomingCards'])->name('incoming.list');
 
         // Mass actions — MUST be before /cards/{card} to avoid wildcard capture
-        Route::delete('/cards/mass-remove', [CollezioniController::class, 'massRemoveCards'])->name('cards.massRemove');
-        Route::post('/cards/mass-add', [CollezioniController::class, 'massAddCopies'])->name('cards.massAdd');
-        Route::post('/cards/mass-copies', [CollezioniController::class, 'getMassCardCopies'])->name('cards.massCopies');
-        Route::put('/copies/mass-update', [CollezioniController::class, 'massUpdateQuantities'])->name('copies.massUpdate');
+        Route::delete('/cards/mass-remove', [\App\Http\Controllers\MassActionController::class, 'massRemoveCards'])->name('cards.massRemove');
+        Route::post('/cards/mass-add', [\App\Http\Controllers\MassActionController::class, 'massAddCopies'])->name('cards.massAdd');
+        Route::post('/cards/mass-copies', [\App\Http\Controllers\MassActionController::class, 'getMassCardCopies'])->name('cards.massCopies');
+        Route::put('/copies/mass-update', [\App\Http\Controllers\MassActionController::class, 'massUpdateQuantities'])->name('copies.massUpdate');
 
         // Single card routes
-        Route::post('/cards/{card}', [CollezioniController::class, 'addCardToCollection'])->name('cards.addToCollection');
-        Route::get('/cards/{card}/copies', [CollezioniController::class, 'getCardCopies'])->name('cards.getCopies');
-        Route::post('/cards/{card}/copies', [CollezioniController::class, 'addCardCopy'])->name('cards.addCopy');
-        Route::put('/copies/{copy}', [CollezioniController::class, 'updateCardCopy'])->name('copies.update');
-        Route::delete('/copies/{copy}', [CollezioniController::class, 'deleteCardCopy'])->name('copies.delete');
-        Route::delete('/cards/{card}/collection', [CollezioniController::class, 'removeCardFromCollection'])->name('cards.removeFromCollection');
+        Route::post('/cards/{card}', [\App\Http\Controllers\CardCopyController::class, 'addCardToCollection'])->name('cards.addToCollection');
+        Route::get('/cards/{card}/copies', [\App\Http\Controllers\CardCopyController::class, 'getCardCopies'])->name('cards.getCopies');
+        Route::post('/cards/{card}/copies', [\App\Http\Controllers\CardCopyController::class, 'addCardCopy'])->name('cards.addCopy');
+        Route::put('/copies/{copy}', [\App\Http\Controllers\CardCopyController::class, 'updateCardCopy'])->name('copies.update');
+        Route::delete('/copies/{copy}', [\App\Http\Controllers\CardCopyController::class, 'deleteCardCopy'])->name('copies.delete');
+        Route::delete('/cards/{card}/collection', [\App\Http\Controllers\CardCopyController::class, 'removeCardFromCollection'])->name('cards.removeFromCollection');
     });
 
     Route::prefix('cards')->name('cards.')->group(function () {
