@@ -244,7 +244,7 @@ class FetchCardTraderCommand extends Command
                     $val = $priceCents / 100;
                     $props = $listing['properties_hash'] ?? [];
                     
-                    $condition = $props['condition'] ?? 'Unknown';
+                    $condition = $this->mapCondition($props['condition'] ?? null) ?? 'Unknown';
                     $language = $props['pokemon_language'] ?? ($props['mtg_language'] ?? ($props['language'] ?? 'en'));
                     $isFirstEd = !empty($props['first_edition']);
                     $isAltered = !empty($props['altered']);
@@ -481,5 +481,35 @@ class FetchCardTraderCommand extends Command
         }
 
         $this->info("Procedura completata con successo!");
+    }
+
+    /**
+     * Mappa la condizione di CardTrader nei 5 gradi base
+     */
+    private function mapCondition(?string $ctCondition): ?string
+    {
+        if (!$ctCondition) {
+            return null;
+        }
+
+        $ctCondition = strtolower($ctCondition);
+
+        if (str_contains($ctCondition, 'mint')) { // Mint, Near Mint
+            return 'NM';
+        }
+        if (str_contains($ctCondition, 'lightly') || str_contains($ctCondition, 'slightly')) {
+            return 'LP';
+        }
+        if (str_contains($ctCondition, 'moderately') || $ctCondition === 'played') {
+            return 'MP';
+        }
+        if (str_contains($ctCondition, 'heavily')) {
+            return 'HP';
+        }
+        if (str_contains($ctCondition, 'poor') || str_contains($ctCondition, 'damaged')) {
+            return 'DMG';
+        }
+
+        return null;
     }
 }

@@ -472,18 +472,44 @@
             /* Storico prezzi */
             var tbody = document.getElementById('cm-prices-tbody');
             if (card.prices && card.prices.length) {
-                // Filter table to last 3 days only
+                // Raggruppa i prezzi per provider per garantire l'ultimo prezzo di ciascuno
                 var now = new Date();
                 var threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
-                var recentPrices = card.prices.filter(function(p) {
-                    if (!p.created_at) return false;
-                    return new Date(p.created_at) >= threeDaysAgo;
+                
+                var pricesByProvider = {};
+                card.prices.forEach(function(p) {
+                    var prov = p.provider || 'unknown';
+                    if (!pricesByProvider[prov]) {
+                        pricesByProvider[prov] = [];
+                    }
+                    pricesByProvider[prov].push(p);
                 });
                 
-                if (recentPrices.length === 0) {
-                    // If no prices in last 3 days, show the most recent one
-                    recentPrices = card.prices.slice(-1);
-                }
+                var recentPrices = [];
+                Object.keys(pricesByProvider).forEach(function(prov) {
+                    var provPrices = pricesByProvider[prov];
+                    // Ordina decrescente per data
+                    provPrices.sort(function(a, b) {
+                        return new Date(b.created_at) - new Date(a.created_at);
+                    });
+                    
+                    // Prendi i prezzi negli ultimi 3 giorni
+                    var provRecent = provPrices.filter(function(p) {
+                        return p.created_at && new Date(p.created_at) >= threeDaysAgo;
+                    });
+                    
+                    // Se il provider non ha prezzi negli ultimi 3 giorni, mostra il suo ultimo prezzo disponibile
+                    if (provRecent.length === 0 && provPrices.length > 0) {
+                        provRecent = [provPrices[0]];
+                    }
+                    
+                    recentPrices = recentPrices.concat(provRecent);
+                });
+                
+                // Ordina la lista finale per data in modo decrescente
+                recentPrices.sort(function(a, b) {
+                    return new Date(b.created_at) - new Date(a.created_at);
+                });
                 
                 tbody.innerHTML = recentPrices.map(function(p) {
                     var d = p.created_at ?
