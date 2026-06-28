@@ -244,39 +244,38 @@
             </div>
         @else
         {{-- Stats Row --}}
-        <div class="row g-4 mb-5">
-            <div class="col-12 col-md-4">
-                <div class="stat-box h-100">
-                    <div class="stat-title">{{ __('VALORE TOTALE') }}</div>
-                    <div class="stat-value text-warning">
-                        € {{ number_format($stats['totalValue'] ?? 0, 2, ',', '.') }}
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-12 col-md-4">
-                <div class="stat-box h-100">
-                    <div class="stat-title">{{ __('CARTE TOTALI') }}</div>
-                    <div class="stat-value">
+        <div class="row g-2 g-md-4 mb-5">
+            <div class="col-6 col-md-4">
+                <div class="stat-box h-100 p-3 p-md-4" style="padding: 16px;">
+                    <div class="stat-title text-truncate" style="font-size: 10px;">{{ __('CARTE TOTALI') }}</div>
+                    <div class="stat-value" style="font-size: 20px;">
                         {{ number_format($stats['ownedCards'] ?? 0, 0, ',', '.') }}
-                        <span style="font-size: 14px; color: var(--text-muted); font-weight: 400;">/ {{ number_format($stats['totalSlots'] ?? 0, 0, ',', '.') }}</span>
+                        <span style="font-size: 12px; color: var(--text-muted); font-weight: 400;">/ {{ number_format($stats['totalSlots'] ?? 0, 0, ',', '.') }}</span>
                     </div>
-                    <div class="progress-bar-container mt-3">
+                    <div class="progress-bar-container mt-2">
                         <div class="progress-bar-fill" style="width: {{ ($stats['totalSlots'] ?? 0) > 0 ? min(100, round(($stats['ownedCards'] ?? 0) / $stats['totalSlots'] * 100)) : 0 }}%;"></div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-12 col-md-4">
-                <div class="stat-box h-100">
-                    <div class="stat-title">{{ __('SET COMPLETATI') }}</div>
-                    <div class="stat-value">
+            <div class="col-6 col-md-4">
+                <div class="stat-box h-100 p-3 p-md-4" style="padding: 16px;">
+                    <div class="stat-title text-truncate" style="font-size: 10px;">{{ __('SET COMPLETATI') }}</div>
+                    <div class="stat-value" style="font-size: 20px;">
                         {{ $stats['completedSets'] ?? 0 }}
-                        <span style="font-size: 14px; color: var(--text-muted); font-weight: 400;">{{ __('Set') }}</span>
                     </div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 10px; display: flex; align-items: center; gap: 6px;">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        {{ __('Stato collezione Master') }}
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 8px; display: flex; align-items: center; gap: 4px; line-height: 1.2;">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="text-truncate">{{ __('Stato Master') }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <div class="stat-box h-100 p-3 p-md-4 d-flex flex-row flex-md-column align-items-center align-items-md-start justify-content-between justify-content-md-center" style="padding: 16px;">
+                    <div class="stat-title mb-0 mb-md-2">{{ __('VALORE TOTALE') }}</div>
+                    <div class="stat-value text-warning m-0">
+                        € {{ number_format($stats['totalValue'] ?? 0, 2, ',', '.') }}
                     </div>
                 </div>
             </div>

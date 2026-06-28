@@ -210,6 +210,11 @@
                             <option value="es">ES</option>
                             <option value="pt">PT</option>
                         </select>
+                        <select id="cm-filter-edition" class="form-select form-select-sm bg-dark text-white border-secondary" style="font-size:0.75rem;" onchange="renderChart()">
+                            <option value="">{{ __('Tutte le Ed.') }}</option>
+                            <option value="0">{{ __('Unlimited') }}</option>
+                            <option value="1">{{ __('1ª Edizione') }}</option>
+                        </select>
                         <select id="cm-filter-cond" class="form-select form-select-sm bg-dark text-white border-secondary" style="font-size:0.75rem;" onchange="renderChart()">
                             <option value="">{{ __('Tutte Cond.') }}</option>
                             <option value="NM">NM</option>
@@ -219,6 +224,7 @@
                             <option value="DMG">DMG</option>
                         </select>
                         <select id="cm-filter-variant" class="form-select form-select-sm bg-dark text-white border-secondary" style="font-size:0.75rem;" onchange="renderChart()">
+                            <option value="">{{ __('Tutte Varianti') }}</option>
                             <option value="normal">{{ __('Normal') }}</option>
                             <option value="holo">{{ __('Holo / Foil') }}</option>
                         </select>
@@ -418,9 +424,8 @@
             }
 
             /* Prezzo */
-            var trend = card.prices && card.prices[0] ? card.prices[0].trend : null;
-            document.getElementById('cm-price').innerHTML =
-                '<span class="fw-bold" style="color:#fbb400;font-size:1rem;">' + _price(trend) + '</span>';
+            /* Prezzo temporaneo in caricamento */
+            document.getElementById('cm-price').innerHTML = '<span style="color:rgba(212,228,250,0.4);">...</span>';
 
             window._currentCard = card;
             var btnManage = document.getElementById('cm-manage-copies-btn');
@@ -429,13 +434,15 @@
             var condSelect = document.getElementById('cm-filter-cond');
             var variantSelect = document.getElementById('cm-filter-variant');
             var langSelect = document.getElementById('cm-filter-lang');
+            var editionSelect = document.getElementById('cm-filter-edition');
             condSelect.value = "";
-            variantSelect.value = "normal";
+            variantSelect.value = "";
             langSelect.value = "";
+            if (editionSelect) editionSelect.value = "";
 
             if (card.collectors && card.collectors.length > 0) {
                 btnManage.style.display = 'inline-flex';
-                // Find highest value condition/variant (simplified heuristic: first one is NM/Holo preferred)
+                // Find highest value condition/variant (simplified heuristic: first one is NM preferred)
                 var bestCopy = card.collectors[0];
                 card.collectors.forEach(function(c) {
                     if(c.condition === 'NM') bestCopy = c;
@@ -443,20 +450,22 @@
                 
                 condSelect.value = bestCopy.condition || "";
                 
-                if (bestCopy.variants && Array.isArray(bestCopy.variants)) {
-                    var vLower = bestCopy.variants.map(function(v) { return v.toLowerCase(); });
-                    if (vLower.indexOf('holo') !== -1 || vLower.indexOf('reverse') !== -1) {
-                        variantSelect.value = "holo";
-                    }
-                    
-                    // Look for languages in variants
-                    var langs = ['it', 'en', 'jp', 'fr', 'de', 'es', 'pt'];
-                    for(var i=0; i<langs.length; i++) {
-                        if (vLower.indexOf(langs[i]) !== -1) {
-                            langSelect.value = langs[i];
-                            break;
-                        }
-                    }
+                // Cerca la lingua esatta
+                if (bestCopy.language) {
+                    langSelect.value = bestCopy.language.toLowerCase();
+                }
+                
+                // Cerca l'edizione
+                if (editionSelect) {
+                    editionSelect.value = bestCopy.is_first_edition ? "1" : "0";
+                }
+                
+                // Cerca la variante
+                var foil = (bestCopy.foil_type || '').toLowerCase();
+                if (foil === 'holo' || foil === 'reverse') {
+                    variantSelect.value = "holo";
+                } else {
+                    variantSelect.value = "normal";
                 }
             } else {
                 btnManage.style.display = 'none';
@@ -467,73 +476,8 @@
             document.getElementById('cm-monitor-btn').style.backgroundColor = 'rgba(99,179,237,0.15)';
             document.getElementById('cm-monitor-btn').style.color = '#63b3ed';
 
+            // renderChart si occuperà ora di aggiornare sia il grafico che la tabella storico e il label prezzo
             renderChart();
-            
-            /* Storico prezzi */
-            var tbody = document.getElementById('cm-prices-tbody');
-            if (card.prices && card.prices.length) {
-                // Raggruppa i prezzi per provider per garantire l'ultimo prezzo di ciascuno
-                var now = new Date();
-                var threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
-                
-                var pricesByProvider = {};
-                card.prices.forEach(function(p) {
-                    var prov = p.provider || 'unknown';
-                    if (!pricesByProvider[prov]) {
-                        pricesByProvider[prov] = [];
-                    }
-                    pricesByProvider[prov].push(p);
-                });
-                
-                var recentPrices = [];
-                Object.keys(pricesByProvider).forEach(function(prov) {
-                    var provPrices = pricesByProvider[prov];
-                    // Ordina decrescente per data
-                    provPrices.sort(function(a, b) {
-                        return new Date(b.created_at) - new Date(a.created_at);
-                    });
-                    
-                    // Prendi i prezzi negli ultimi 3 giorni
-                    var provRecent = provPrices.filter(function(p) {
-                        return p.created_at && new Date(p.created_at) >= threeDaysAgo;
-                    });
-                    
-                    // Se il provider non ha prezzi negli ultimi 3 giorni, mostra il suo ultimo prezzo disponibile
-                    if (provRecent.length === 0 && provPrices.length > 0) {
-                        provRecent = [provPrices[0]];
-                    }
-                    
-                    recentPrices = recentPrices.concat(provRecent);
-                });
-                
-                // Ordina la lista finale per data in modo decrescente
-                recentPrices.sort(function(a, b) {
-                    return new Date(b.created_at) - new Date(a.created_at);
-                });
-                
-                tbody.innerHTML = recentPrices.map(function(p) {
-                    var d = p.created_at ?
-                        new Date(p.created_at).toLocaleDateString('it-IT', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                        }) :
-                        '—';
-                    var trendVal = variantSelect.value === 'holo' ? p.trend_holo : p.trend;
-                    return '<tr>' +
-                        '<td class="modal-td">' + _esc(d) + '</td>' +
-                        '<td class="modal-td" style="color:#fbb400;font-weight:600;">' + _price(trendVal || p.trend) +
-                        '</td>' +
-                        '<td class="modal-td" style="color:rgba(212,228,250,0.45);font-size:0.75rem;">' +
-                        _esc(p.provider || '—') + '</td>' +
-                        '</tr>';
-                }).join('');
-            } else {
-                tbody.innerHTML =
-                    '<tr><td colspan="3" class="modal-td" ' +
-                    'style="text-align:center;color:rgba(212,228,250,0.3);padding:1.5rem 0;">' +
-                    (window.__trans ? window.__trans.no_price : 'Nessun prezzo disponibile') + '</td></tr>';
-            }
         }
 
         /* ── renderChart ──────────────────────────────────────────────────────── */
@@ -543,6 +487,8 @@
             
             var chartContainer = document.getElementById('cm-chart-container');
             var chartEmpty = document.getElementById('cm-chart-empty');
+            var tbody = document.getElementById('cm-prices-tbody');
+            var priceLabel = document.getElementById('cm-price');
             
             // Destroy previous chart if exists
             if (window._priceChart) {
@@ -550,13 +496,14 @@
                 window._priceChart = null;
             }
 
-            // Combine priceHistory and current prices to ensure all providers are included (e.g. Cardtrader)
+            // Combine priceHistory and current prices
             var allPriceRecords = (card.priceHistory || []).concat(card.prices || []);
             var validPrices = allPriceRecords.filter(function(e) { return !!e.created_at; });
             
             var filterCond = document.getElementById('cm-filter-cond').value;
             var filterVariant = document.getElementById('cm-filter-variant').value;
             var filterLang = document.getElementById('cm-filter-lang').value;
+            var filterEdition = document.getElementById('cm-filter-edition') ? document.getElementById('cm-filter-edition').value : "";
             
             if (filterCond) {
                 validPrices = validPrices.filter(function(e) {
@@ -570,11 +517,99 @@
                 });
             }
 
+            if (filterEdition !== "") {
+                var isFirstEd = filterEdition === "1" ? 1 : 0;
+                validPrices = validPrices.filter(function(e) {
+                    var eEd = e.is_first_edition ? 1 : 0;
+                    return eEd === isFirstEd;
+                });
+            }
+
+            var isNativelyHolo = ((card.rarity || '').toLowerCase().match(/(holo|secret|ultra|vmax|vstar|ex|illust|shiny)/) !== null);
+
+            if (filterVariant === 'holo') {
+                validPrices = validPrices.filter(function(e) {
+                    if (isNativelyHolo) {
+                        return true; 
+                    } else {
+                        return e.is_reverse == 1 || e.trend_holo || e.avg_holo;
+                    }
+                });
+            } else if (filterVariant === 'normal') {
+                validPrices = validPrices.filter(function(e) {
+                    return e.is_reverse != 1;
+                });
+            }
+
+            var getPriceValue = function(e) {
+                if (filterVariant === 'holo' && !isNativelyHolo) {
+                    if (e.is_reverse) return e.trend || e.avg || 0;
+                    return e.trend_holo || e.avg_holo || e.trend || e.avg || 0;
+                }
+                return e.trend || e.avg || 0;
+            };
+
+            // Ordina tutti i prezzi validi per data discendente
+            validPrices.sort(function(a, b) {
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+
+            // 1. Aggiorna Label "Ultimo prezzo"
+            if (validPrices.length > 0) {
+                var latest = validPrices[0];
+                var val = getPriceValue(latest);
+                priceLabel.innerHTML = '<span class="fw-bold" style="color:#fbb400;font-size:1rem;">' + _price(val) + '</span>';
+            } else {
+                priceLabel.innerHTML = '<span style="color:rgba(212,228,250,0.4);">—</span>';
+            }
+
+            // 2. Aggiorna Tabella "Storico Prezzi"
+            if (validPrices.length > 0) {
+                var now = new Date();
+                var threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
+                
+                var pricesByProvider = {};
+                validPrices.forEach(function(p) {
+                    var prov = p.provider || 'unknown';
+                    if (!pricesByProvider[prov]) pricesByProvider[prov] = [];
+                    pricesByProvider[prov].push(p);
+                });
+                
+                var recentPrices = [];
+                Object.keys(pricesByProvider).forEach(function(prov) {
+                    var provPrices = pricesByProvider[prov];
+                    var provRecent = provPrices.filter(function(p) {
+                        return new Date(p.created_at) >= threeDaysAgo;
+                    });
+                    if (provRecent.length === 0 && provPrices.length > 0) {
+                        provRecent = [provPrices[0]];
+                    }
+                    recentPrices = recentPrices.concat(provRecent);
+                });
+                
+                recentPrices.sort(function(a, b) {
+                    return new Date(b.created_at) - new Date(a.created_at);
+                });
+                
+                tbody.innerHTML = recentPrices.map(function(p) {
+                    var d = p.created_at ? new Date(p.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+                    var trendVal = getPriceValue(p);
+                    
+                    return '<tr>' +
+                        '<td class="modal-td">' + _esc(d) + '</td>' +
+                        '<td class="modal-td" style="color:#fbb400;font-weight:600;">' + _price(trendVal) + '</td>' +
+                        '<td class="modal-td" style="color:rgba(212,228,250,0.45);font-size:0.75rem;">' + _esc(p.provider || '—') + '</td>' +
+                        '</tr>';
+                }).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="3" class="modal-td" style="text-align:center;color:rgba(212,228,250,0.3);padding:1.5rem 0;">' + (window.__trans ? window.__trans.no_price : 'Nessun prezzo disponibile') + '</td></tr>';
+            }
+
+            // 3. Aggiorna Grafico
             if (validPrices.length > 0) {
                 chartContainer.style.display = '';
                 chartEmpty.style.display = 'none';
 
-                // Group by provider
                 var providerData = {};
                 validPrices.forEach(function(entry) {
                     var prov = entry.provider || 'cardmarket';
@@ -582,7 +617,6 @@
                     providerData[prov].push(entry);
                 });
 
-                // Provider color mapping
                 var providerColors = {
                     'cardmarket': { line: '#fbb400', bg: 'rgba(251, 180, 0, 0.1)' },
                     'tcgplayer':  { line: '#63b3ed', bg: 'rgba(99, 179, 237, 0.1)' },
@@ -597,7 +631,7 @@
 
                 var datasets = [];
                 var allLabels = new Set();
-
+                
                 // We need a unified x-axis. Build from all prices sorted by date.
                 var allEntries = validPrices.slice().sort(function(a, b) {
                     return new Date(a.created_at) - new Date(b.created_at);
@@ -624,13 +658,7 @@
                     var dataByDate = {};
                     entries.forEach(function(e) {
                         var key = new Date(e.created_at).toISOString().split('T')[0];
-                        // If variant is holo, use trend_holo or avg_holo
-                        var val = 0;
-                        if(filterVariant === 'holo') {
-                            val = e.trend_holo || e.avg_holo || e.trend || e.avg || 0;
-                        } else {
-                            val = e.trend || e.avg || 0;
-                        }
+                        var val = getPriceValue(e);
                         dataByDate[key] = parseFloat(val);
                     });
 

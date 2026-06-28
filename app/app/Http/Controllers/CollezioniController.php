@@ -85,16 +85,26 @@ class CollezioniController extends Controller
             $produced = $card->produced_variants;
             if (empty($produced)) $produced = ['normal'];
 
+            $producedUnique = array_unique(array_map('strtolower', $produced));
+
             $ownedVariants = [];
             foreach ($card->collectors as $coll) {
-                if ($coll->foil_type) $ownedVariants[] = strtolower(trim($coll->foil_type));
-                if ($coll->is_first_edition) $ownedVariants[] = 'firstedition';
-            }
-            if (empty($ownedVariants)) {
-                $ownedVariants[] = 'normal';
+                $foil = $coll->foil_type ? strtolower(trim($coll->foil_type)) : null;
+                if (!$foil || $foil === 'normal') {
+                    if (!in_array('normal', $producedUnique) && in_array('holo', $producedUnique)) {
+                        $foil = 'holo';
+                    } elseif (!in_array('normal', $producedUnique) && in_array('reverse', $producedUnique)) {
+                        $foil = 'reverse';
+                    } else {
+                        $foil = 'normal';
+                    }
+                }
+                $ownedVariants[] = $foil;
+                if ($coll->is_first_edition) {
+                    $ownedVariants[] = 'firstedition';
+                }
             }
             $ownedVariantsUnique = array_unique($ownedVariants);
-            $producedUnique = array_unique(array_map('strtolower', $produced));
 
             $missingVariants = array_values(array_diff($producedUnique, $ownedVariantsUnique));
 
@@ -327,15 +337,25 @@ class CollezioniController extends Controller
             if (empty($produced)) {
                 $produced = ['normal'];
             }
+            $producedUnique = array_unique(array_map('strtolower', $produced));
 
             $ownedVariants = [];
             $variantCounts = [];
 
             foreach ($card->collectors as $coll) {
                 $feats = [];
-                if ($coll->foil_type) $feats[] = strtolower(trim($coll->foil_type));
+                $foil = $coll->foil_type ? strtolower(trim($coll->foil_type)) : null;
+                if (!$foil || $foil === 'normal') {
+                    if (!in_array('normal', $producedUnique) && in_array('holo', $producedUnique)) {
+                        $foil = 'holo';
+                    } elseif (!in_array('normal', $producedUnique) && in_array('reverse', $producedUnique)) {
+                        $foil = 'reverse';
+                    } else {
+                        $foil = 'normal';
+                    }
+                }
+                $feats[] = $foil;
                 if ($coll->is_first_edition) $feats[] = 'firstedition';
-                if (empty($feats)) $feats[] = 'normal';
 
                 foreach ($feats as $variantItemLow) {
                     $ownedVariants[] = $variantItemLow;
@@ -347,14 +367,21 @@ class CollezioniController extends Controller
             }
 
             $ownedVariantsUnique = array_unique($ownedVariants);
-            $producedUnique = array_unique(array_map('strtolower', $produced));
-
             $missingVariants = array_values(array_diff($producedUnique, $ownedVariantsUnique));
 
             $incomingVariants = [];
             if ($incomingCardsSet->has($card->id)) {
                 foreach ($incomingCardsSet->get($card->id) as $inc) {
-                    $foil = strtolower(trim($inc->foil_type ?: 'normal'));
+                    $foil = $inc->foil_type ? strtolower(trim($inc->foil_type)) : null;
+                    if (!$foil || $foil === 'normal') {
+                        if (!in_array('normal', $producedUnique) && in_array('holo', $producedUnique)) {
+                            $foil = 'holo';
+                        } elseif (!in_array('normal', $producedUnique) && in_array('reverse', $producedUnique)) {
+                            $foil = 'reverse';
+                        } else {
+                            $foil = 'normal';
+                        }
+                    }
                     $incomingVariants[] = $foil;
                     if ($inc->is_first_edition) $incomingVariants[] = 'firstedition';
                 }

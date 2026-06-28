@@ -261,48 +261,48 @@
                 <p class="text-secondary mb-0" style="font-size:0.875rem;">{{ __('Panoramica e statistiche della tua collezione') }}</p>
             </div>
 
-            <div class="row g-3">
+            <div class="row g-2 g-md-3">
                 {{-- Set Posseduti --}}
-                <div class="col-12 col-md-6">
-                    <div class="stat-card p-4 d-flex flex-column align-items-start gap-3 h-100">
-                        <div class="stat-icon" style="background-color: rgba(99, 102, 241, 0.15);">
-                            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#818cf8" stroke-width="2">
+                <div class="col-6 col-md-4">
+                    <div class="stat-card p-3 p-md-4 d-flex flex-column align-items-start gap-2 gap-md-3 h-100">
+                        <div class="stat-icon" style="background-color: rgba(99, 102, 241, 0.15); width: 40px; height: 40px;">
+                            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#818cf8" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                             </svg>
                         </div>
                         <div>
-                            <p class="text-secondary mb-1 fw-medium" style="font-size: 0.85rem;">{{ __('Set Posseduti') }}</p>
-                            <h3 class="text-white mb-0 fw-bold">{{ $totalSetsOwned }}</h3>
+                            <p class="text-secondary mb-0 fw-medium text-truncate" style="font-size: 0.8rem;">{{ __('Set') }}</p>
+                            <h3 class="text-white mb-0 fw-bold fs-4 fs-md-3">{{ $totalSetsOwned }}</h3>
                         </div>
                     </div>
                 </div>
 
                 {{-- Carte Totali --}}
-                <div class="col-12 col-md-6">
-                    <div class="stat-card p-4 d-flex flex-column align-items-start gap-3 h-100">
-                        <div class="stat-icon" style="background-color: rgba(16, 185, 129, 0.15);">
-                            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#34d399" stroke-width="2">
+                <div class="col-6 col-md-4">
+                    <div class="stat-card p-3 p-md-4 d-flex flex-column align-items-start gap-2 gap-md-3 h-100">
+                        <div class="stat-icon" style="background-color: rgba(16, 185, 129, 0.15); width: 40px; height: 40px;">
+                            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#34d399" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                             </svg>
                         </div>
                         <div>
-                            <p class="text-secondary mb-1 fw-medium" style="font-size: 0.85rem;">{{ __('Carte Totali') }}</p>
-                            <h3 class="text-white mb-0 fw-bold">{{ $totalCardsOwned }}</h3>
+                            <p class="text-secondary mb-0 fw-medium text-truncate" style="font-size: 0.8rem;">{{ __('Carte') }}</p>
+                            <h3 class="text-white mb-0 fw-bold fs-4 fs-md-3">{{ $totalCardsOwned }}</h3>
                         </div>
                     </div>
                 </div>
 
                 {{-- Valore Stimato --}}
-                <div class="col-12 col-md-6">
-                    <div class="stat-card p-4 d-flex flex-column align-items-start gap-3 h-100">
-                        <div class="stat-icon" style="background-color: rgba(245, 158, 11, 0.15);">
-                            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#fbbf24" stroke-width="2">
+                <div class="col-12 col-md-4">
+                    <div class="stat-card p-3 p-md-4 d-flex flex-row flex-md-column align-items-center align-items-md-start gap-3 h-100">
+                        <div class="stat-icon flex-shrink-0" style="background-color: rgba(245, 158, 11, 0.15); width: 40px; height: 40px;">
+                            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#fbbf24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                         <div>
-                            <p class="text-secondary mb-1 fw-medium" style="font-size: 0.85rem;">{{ __('Valore Stimato') }}</p>
-                            <h3 class="text-white mb-0 fw-bold">€ {{ number_format($totalEstimatedValue, 2, ',', '.') }}</h3>
+                            <p class="text-secondary mb-0 mb-md-1 fw-medium" style="font-size: 0.8rem;">{{ __('Valore Stimato') }}</p>
+                            <h3 class="text-white mb-0 fw-bold fs-4 fs-md-3">€ {{ number_format($totalEstimatedValue, 2, ',', '.') }}</h3>
                         </div>
                     </div>
                 </div>

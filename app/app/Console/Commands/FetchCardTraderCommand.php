@@ -152,6 +152,12 @@ class FetchCardTraderCommand extends Command
                 // Confronto come stringa per preservare gli zeri iniziali (es. "083")
                 $collectorNum = $bp->collectorNumber;
 
+                // Rimuoviamo l'eventuale "/132" dal collector number
+                if (str_contains($collectorNum, '/')) {
+                    $parts = explode('/', $collectorNum);
+                    $collectorNum = trim($parts[0]);
+                }
+
                 $card = null;
                 if (isset($tcgCards[$collectorNum])) {
                     $card = $tcgCards[$collectorNum];

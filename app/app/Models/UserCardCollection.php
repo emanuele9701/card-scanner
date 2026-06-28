@@ -103,11 +103,76 @@ class UserCardCollection extends Model implements HasMedia
     }
 
     /**
+     * Trova il miglior record di prezzo corrispondente a lingua, condizione, edizione e variante.
+     */
+    public function getMatchingPriceModel()
+    {
+        if (!$this->card || $this->card->prices->isEmpty()) {
+            return null;
+        }
+
+        $prices = $this->card->prices;
+
+        $foil = strtolower(trim($this->foil_type ?? ''));
+        $isHoloOrReverse = in_array($foil, ['holo', 'reverse']);
+
+        // 1. Match Esatto (Lingua, Condizione, Edizione, Variante)
+        $match = $prices
+            ->where('language', $this->language)
+            ->where('condition', $this->condition)
+            ->where('is_first_edition', (bool)$this->is_first_edition)
+            ->where('is_reverse', $isHoloOrReverse)
+            ->sortByDesc('updated_at')
+            ->first();
+
+        if ($match) {
+            return $match;
+        }
+
+        // 2. Fallback 1: Ignora edizione, match Variante, Lingua, Condizione
+        $match = $prices
+            ->where('language', $this->language)
+            ->where('condition', $this->condition)
+            ->where('is_reverse', $isHoloOrReverse)
+            ->sortByDesc('updated_at')
+            ->first();
+
+        if ($match) {
+            return $match;
+        }
+
+        // 3. Fallback 2: Ignora Variante, match Lingua e Condizione 
+        // (utile per vecchi record dove si useranno le vecchie colonne _holo)
+        $match = $prices
+            ->where('language', $this->language)
+            ->where('condition', $this->condition)
+            ->sortByDesc('updated_at')
+            ->first();
+
+        if ($match) {
+            return $match;
+        }
+
+        // 4. Fallback 3: Match solo Lingua
+        $match = $prices
+            ->where('language', $this->language)
+            ->sortByDesc('updated_at')
+            ->first();
+
+        if ($match) {
+            return $match;
+        }
+
+        // 5. Fallback Estremo: Ultimo prezzo inserito
+        return $prices->sortByDesc('updated_at')->first();
+    }
+
+    /**
      * Calcola il prezzo della carta in base alle varianti possedute (foil/normal).
      */
     public function getCalculatedPrice(): float
     {
-        $priceModel = $this->card?->prices->first();
+        $priceModel = $this->getMatchingPriceModel();
         if (!$priceModel) {
             return 0.0;
         }
@@ -115,7 +180,10 @@ class UserCardCollection extends Model implements HasMedia
         $foil = strtolower(trim($this->foil_type ?? ''));
         $isHoloOrReverse = in_array($foil, ['holo', 'reverse']);
 
-        if ($isHoloOrReverse) {
+        // Se l'utente ha una variante foil e il record trovato NON ha is_reverse = true
+        // (quindi siamo cascati nel Fallback 2 o successivi), tentiamo di usare le vecchie colonne holo.
+        // Altrimenti, per le nuove righe multi-dimensionali, 'trend' o 'avg' è già il prezzo holo corretto!
+        if ($isHoloOrReverse && !$priceModel->is_reverse) {
             return (float) ($priceModel->trend_holo ?? $priceModel->avg_holo ?? $priceModel->trend ?? $priceModel->avg ?? 0);
         }
 

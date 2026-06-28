@@ -82,13 +82,7 @@
             $conditions[] = $copy->condition;
         }
         
-        $isHolo = false;
-        if (is_array($copy->variants) && count($copy->variants) > 0) {
-            $isHolo = in_array('holo', array_map('strtolower', $copy->variants)) || in_array('reverse', array_map('strtolower', $copy->variants));
-        }
-        
-        $value = $isHolo ? ($price->trend_holo ?? $price->avg_holo ?? $price->trend ?? $price->avg ?? 0) : ($price->trend ?? $price->avg ?? 0);
-        $totalValue += $value * $copy->quantity;
+        $totalValue += $copy->getCalculatedPrice() * $copy->quantity;
     }
     
     $conditionsText = implode(', ', $conditions);
@@ -117,12 +111,32 @@
     if(empty($listToMap)) $listToMap = ['normal'];
     
     foreach($listToMap as $v) {
-        $vLow = strtolower(str_replace(' ', '', $v));
+        $parts = explode('|', $v);
+        $vLowRaw = strtolower(str_replace(' ', '', $parts[0]));
+        $langRaw = $parts[1] ?? '';
+        
+        $vLow = $vLowRaw; // The variant key for map lookup
+
         $extraInfo = '';
-        if ($isDoppieTab && isset($card->doppie_variants[$vLow])) {
-            $extraInfo = '<span class="ms-1 fw-bold" style="font-size: 0.5rem; opacity: 0.9;">x' . $card->doppie_variants[$vLow] . '</span>';
+        if ($isDoppieTab && isset($card->doppie_variants[$v])) {
+            $extraInfo = '<span class="ms-1 fw-bold" style="font-size: 0.5rem; opacity: 0.9;">x' . $card->doppie_variants[$v] . '</span>';
         }
         
+        $langFlagHtml = '';
+        if ($langRaw) {
+            $langFlagStr = match($langRaw) {
+                'it' => '🇮🇹',
+                'en' => '🇬🇧',
+                'fr' => '🇫🇷',
+                'de' => '🇩🇪',
+                'es' => '🇪🇸',
+                'jp', 'ja' => '🇯🇵',
+                'pt' => '🇵🇹',
+                default => strtoupper($langRaw)
+            };
+            $langFlagHtml = '<span style="font-size: 0.6rem; margin-left: 3px;">' . $langFlagStr . '</span>';
+        }
+
         $incomingBadge = '';
         $isVariantIncoming = false;
         if ($isMissingTab && isset($cardIncoming)) {
@@ -143,15 +157,15 @@
         if (isset($vMap[$vLow])) {
             if ($isVariantIncoming) {
                 // Orange badge for incoming variants
-                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center" title="' . ucfirst($v) . ' – ' . $titleStr . '" style="font-size:0.55rem; padding: 2px 5px; min-width:18px; background: linear-gradient(135deg, #fb923c, #f59e0b); color: #1a1a2e; border: 1px solid rgba(251, 146, 60, 0.6); box-shadow: 0 0 6px rgba(251, 146, 60, 0.4);"><span>🚚 ' . $vMap[$vLow][0] . $qtyStr . '</span>' . $extraInfo . '</span>';
+                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center" title="' . ucfirst($vLow) . ' – ' . $titleStr . '" style="font-size:0.55rem; padding: 2px 5px; min-width:18px; background: linear-gradient(135deg, #fb923c, #f59e0b); color: #1a1a2e; border: 1px solid rgba(251, 146, 60, 0.6); box-shadow: 0 0 6px rgba(251, 146, 60, 0.4);"><span>🚚 ' . $vMap[$vLow][0] . $langFlagHtml . $qtyStr . '</span>' . $extraInfo . '</span>';
             } else {
-                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center ' . $vMap[$vLow][1] . '" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>' . $vMap[$vLow][0] . '</span>' . $extraInfo . '</span>';
+                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center ' . $vMap[$vLow][1] . '" title="'.ucfirst($vLow).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>' . $vMap[$vLow][0] . $langFlagHtml . '</span>' . $extraInfo . '</span>';
             }
         } else {
             if ($isVariantIncoming) {
-                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center" title="' . ucfirst($v) . ' – ' . $titleStr . '" style="font-size:0.55rem; padding: 2px 5px; min-width:18px; background: linear-gradient(135deg, #fb923c, #f59e0b); color: #1a1a2e; border: 1px solid rgba(251, 146, 60, 0.6); box-shadow: 0 0 6px rgba(251, 146, 60, 0.4);"><span>🚚 '.strtoupper(substr($v, 0, 1)) . $qtyStr . '</span>' . $extraInfo . '</span>';
+                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center" title="' . ucfirst($vLow) . ' – ' . $titleStr . '" style="font-size:0.55rem; padding: 2px 5px; min-width:18px; background: linear-gradient(135deg, #fb923c, #f59e0b); color: #1a1a2e; border: 1px solid rgba(251, 146, 60, 0.6); box-shadow: 0 0 6px rgba(251, 146, 60, 0.4);"><span>🚚 '.strtoupper(substr($vLow, 0, 1)) . $langFlagHtml . $qtyStr . '</span>' . $extraInfo . '</span>';
             } else {
-                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center bg-light text-dark" title="'.ucfirst($v).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>'.strtoupper(substr($v, 0, 1)).'</span>' . $extraInfo . '</span>';
+                $variantBadges[] = '<span class="badge rounded-pill d-inline-flex align-items-center justify-content-center bg-light text-dark" title="'.ucfirst($vLow).'" style="font-size:0.55rem; padding: 2px 5px; min-width:18px;"><span>'.strtoupper(substr($vLow, 0, 1)) . $langFlagHtml . '</span>' . $extraInfo . '</span>';
             }
         }
     }

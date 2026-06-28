@@ -91,7 +91,16 @@ class CollectionExportController extends Controller
             $variantCounts = [];
 
             foreach ($card->collectors as $coll) {
-                $foil = strtolower(trim($coll->foil_type ?: 'normal'));
+                $foil = $coll->foil_type ? strtolower(trim($coll->foil_type)) : null;
+                if (!$foil || $foil === 'normal') {
+                    if (!in_array('normal', $producedUnique) && in_array('holo', $producedUnique)) {
+                        $foil = 'holo';
+                    } elseif (!in_array('normal', $producedUnique) && in_array('reverse', $producedUnique)) {
+                        $foil = 'reverse';
+                    } else {
+                        $foil = 'normal';
+                    }
+                }
                 $ownedVariants[] = $foil;
                 if (!isset($variantCounts[$foil])) {
                     $variantCounts[$foil] = 0;
@@ -122,7 +131,17 @@ class CollectionExportController extends Controller
             $incomingVariantsList = [];
             if ($incomingCardsSet->has($card->id)) {
                 foreach ($incomingCardsSet->get($card->id) as $inc) {
-                    $incomingVariantsList[] = strtolower(trim($inc->foil_type ?: 'normal'));
+                    $foil = $inc->foil_type ? strtolower(trim($inc->foil_type)) : null;
+                    if (!$foil || $foil === 'normal') {
+                        if (!in_array('normal', $producedUnique) && in_array('holo', $producedUnique)) {
+                            $foil = 'holo';
+                        } elseif (!in_array('normal', $producedUnique) && in_array('reverse', $producedUnique)) {
+                            $foil = 'reverse';
+                        } else {
+                            $foil = 'normal';
+                        }
+                    }
+                    $incomingVariantsList[] = $foil;
                 }
             }
 

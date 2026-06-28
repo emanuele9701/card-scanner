@@ -21,10 +21,23 @@ class CardCopyController extends Controller
 
         if(!$card->collectors()->where('user_id',$user->id)->first()) {
             // Aggiungo
+            $foilTypeToSave = 'normal';
+            $produced = $card->produced_variants ?? [];
+            if (empty($produced)) $produced = ['normal'];
+            $producedUnique = array_unique(array_map('strtolower', $produced));
+            if (!in_array('normal', $producedUnique)) {
+                if (in_array('holo', $producedUnique)) {
+                    $foilTypeToSave = 'holo';
+                } elseif (in_array('reverse', $producedUnique)) {
+                    $foilTypeToSave = 'reverse';
+                }
+            }
+
             $card->collectors()->create([
                 'user_id' => $user->id,
                 'set_id' => $card->set_id,
-                'serie_id' => $card->set->serie_id
+                'serie_id' => $card->set->serie_id,
+                'foil_type' => $foilTypeToSave
             ]);            
             return response()->json(['esito' => true, 'message' => __('Carta aggiunta')]);
         }
@@ -44,12 +57,27 @@ class CardCopyController extends Controller
         ]);
         
         $user = Auth::user();
+
+        $foilTypeToSave = $request->foil_type ?: 'normal';
+        if ($foilTypeToSave === 'normal') {
+            $produced = $card->produced_variants ?? [];
+            if (empty($produced)) $produced = ['normal'];
+            $producedUnique = array_unique(array_map('strtolower', $produced));
+            
+            if (!in_array('normal', $producedUnique)) {
+                if (in_array('holo', $producedUnique)) {
+                    $foilTypeToSave = 'holo';
+                } elseif (in_array('reverse', $producedUnique)) {
+                    $foilTypeToSave = 'reverse';
+                }
+            }
+        }
         
         $existing = \App\Models\UserCardCollection::where('user_id', $user->id)
             ->where('card_id', $card->id)
             ->where('condition', $request->condition)
             ->where('language', $request->language ?: 'en')
-            ->where('foil_type', $request->foil_type ?: 'normal')
+            ->where('foil_type', $foilTypeToSave)
             ->where('is_first_edition', $request->boolean('is_first_edition'))
             ->where('is_signed', $request->boolean('is_signed'))
             ->where('is_altered', $request->boolean('is_altered'))
@@ -66,7 +94,7 @@ class CardCopyController extends Controller
                 'serie_id' => $card->set->serie_id ?? $card->set?->serie_id,
                 'condition' => $request->condition,
                 'language' => $request->language ?: 'en',
-                'foil_type' => $request->foil_type ?: 'normal',
+                'foil_type' => $foilTypeToSave,
                 'is_first_edition' => $request->boolean('is_first_edition'),
                 'is_signed' => $request->boolean('is_signed'),
                 'is_altered' => $request->boolean('is_altered'),
