@@ -262,10 +262,8 @@ class CollezioniController extends Controller
         $filterIncoming = $request->input('filter_incoming');
 
         // Pre-fetch incoming cards for this set
-        $incomingCardsSet = \App\Models\IncomingCard::where('user_id', $user->id)
-            ->whereHas('card', function($q) use ($set) {
-                $q->where('set_id', $set->id);
-            })
+        $incomingCardsSet = \App\Models\UserIncomingCard::where('user_id', $user->id)
+            ->where('set_id', $set->id)
             ->get()
             ->groupBy('card_id');
 
@@ -325,12 +323,9 @@ class CollezioniController extends Controller
             $card->prices = $fullCard ? $fullCard->prices : collect();
             $card->collectors = $fullCard ? $fullCard->collectors : collect();
 
-            $produced = $card->variants ?? [];
-            if (is_string($produced)) {
-                $produced = json_decode($produced, true) ?? [];
-            }
-            if (!is_array($produced) || empty($produced)) {
-                $produced = ['normal', 'reverse', 'holo'];
+            $produced = $card->produced_variants;
+            if (empty($produced)) {
+                $produced = ['normal'];
             }
 
             $ownedVariants = [];

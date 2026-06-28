@@ -31,7 +31,12 @@ class CollectionExportController extends Controller
                 $card->set->name ?? '',
                 $card->rarity ?? '',
                 $item->condition ?? 'NM',
-                is_array($item->variants) ? implode(', ', $item->variants) : '',
+                collect([
+                    $item->foil_type ?: 'normal',
+                    $item->is_first_edition ? '1st Edition' : null,
+                    $item->is_signed ? 'Signed' : null,
+                    $item->is_altered ? 'Altered' : null,
+                ])->filter()->implode(', '),
                 $item->quantity,
                 number_format((float)$price, 2, '.', ''),
                 number_format((float)$price * $item->quantity, 2, '.', ''),

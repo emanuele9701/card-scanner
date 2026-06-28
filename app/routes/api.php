@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Api\CardController;
+
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserCardCollectionController;
 use App\Http\Controllers\Api\WatchlistController;
