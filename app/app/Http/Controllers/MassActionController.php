@@ -152,4 +152,98 @@ class MassActionController extends Controller
             
         return response()->json(['success' => true]);
     }
+
+    /**
+     * Bulk add missing cards to a collection with per-row attributes.
+     */
+    public function bulkAddMissingCards(Request $request, \App\Models\TCGSet $set)
+    {
+        $request->validate([
+            'cards' => 'required|array|min:1',
+            'cards.*.card_id' => 'required|integer|exists:tcg_cards,id',
+            'cards.*.quantity' => 'required|integer|min:1|max:999',
+            'cards.*.language' => 'required|string|in:it,en,jp,fr,de,es,pt',
+            'cards.*.condition' => 'required|string|in:NM,LP,MP,HP,DMG',
+            'cards.*.foil_type' => 'nullable|in:normal,holo,reverse',
+            'cards.*.is_first_edition' => 'boolean',
+            'cards.*.is_signed' => 'boolean',
+            'cards.*.is_altered' => 'boolean',
+        ]);
+
+        $userId = Auth::id();
+        $added = 0;
+        $failed = 0;
+        $errors = [];
+
+        DB::beginTransaction();
+        try {
+            foreach ($request->cards as $entry) {
+                $card = \App\Models\TCGCard::where('id', $entry['card_id'])
+                    ->where('set_id', $set->id)
+                    ->first();
+
+                if (!$card) {
+                    $failed++;
+                    $errors[] = [
+                        'card_id' => $entry['card_id'],
+                        'message' => 'Carta non trovata nel set.',
+                    ];
+                    continue;
+                }
+
+                $language = $entry['language'] ?? 'it';
+                $condition = $entry['condition'] ?? 'NM';
+                $foilType = $entry['foil_type'] ?? 'normal';
+                $isFirstEdition = !empty($entry['is_first_edition']);
+                $isSigned = !empty($entry['is_signed']);
+                $isAltered = !empty($entry['is_altered']);
+
+                $existing = UserCardCollection::where('user_id', $userId)
+                    ->where('card_id', $card->id)
+                    ->where('condition', $condition)
+                    ->where('language', $language)
+                    ->where('foil_type', $foilType)
+                    ->where('is_first_edition', $isFirstEdition)
+                    ->where('is_signed', $isSigned)
+                    ->where('is_altered', $isAltered)
+                    ->first();
+
+                if ($existing) {
+                    $existing->quantity += $entry['quantity'];
+                    $existing->save();
+                } else {
+                    UserCardCollection::create([
+                        'user_id' => $userId,
+                        'card_id' => $card->id,
+                        'set_id' => $set->id,
+                        'serie_id' => $set->serie_id,
+                        'condition' => $condition,
+                        'language' => $language,
+                        'foil_type' => $foilType,
+                        'is_first_edition' => $isFirstEdition,
+                        'is_signed' => $isSigned,
+                        'is_altered' => $isAltered,
+                        'quantity' => $entry['quantity'],
+                    ]);
+                }
+
+                $added++;
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'added' => $added,
+                'failed' => $failed,
+                'errors' => $errors,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

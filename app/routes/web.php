@@ -41,6 +41,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/cards/mass-add', [\App\Http\Controllers\MassActionController::class, 'massAddCopies'])->name('cards.massAdd');
         Route::post('/cards/mass-copies', [\App\Http\Controllers\MassActionController::class, 'getMassCardCopies'])->name('cards.massCopies');
         Route::put('/copies/mass-update', [\App\Http\Controllers\MassActionController::class, 'massUpdateQuantities'])->name('copies.massUpdate');
+        Route::post('/set/{set}/bulk-add', [\App\Http\Controllers\MassActionController::class, 'bulkAddMissingCards'])->name('set.bulkAdd');
 
         // Single card routes
         Route::post('/cards/{card}', [\App\Http\Controllers\CardCopyController::class, 'addCardToCollection'])->name('cards.addToCollection');
