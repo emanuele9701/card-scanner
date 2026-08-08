@@ -310,7 +310,7 @@
                                 <label class="form-check-label text-white small fw-bold text-uppercase text-nowrap" for="selectAllVisible" style="cursor: pointer;">{{ __('Seleziona Tutte Visibili') }}</label>
                             </div>
                         </div>
-                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4" id="cards-grid">
+                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-6 g-4" id="cards-grid">
                             @include('collezioni.partials.my-cards-grid', ['userCards' => $userCards, 'tab' => $tab ?? 'owned'])
                         </div>
 
