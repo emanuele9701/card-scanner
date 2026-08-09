@@ -356,9 +356,34 @@
         align-items: center;
         justify-content: center;
     }
+
+    /* ─── Image Popup ────────────────────────────────────────────── */
+    .bulk-card-preview {
+        position: fixed;
+        z-index: 9999;
+        background: #111827;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 0.5rem;
+        padding: 0.3rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+        pointer-events: none;
+    }
+
+    .bulk-card-preview img {
+        width: 180px;
+        height: auto;
+        border-radius: 0.25rem;
+        display: block;
+    }
 </style>
 
 <div id="missing-cards-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulk-add-title">
+
+    {{-- Popup immagine (fuori dal contenitore con overflow) --}}
+    <div id="bulk-card-preview" class="bulk-card-preview" style="display: none;">
+        <img id="bulk-card-preview-img" src="" alt="">
+    </div>
+
     <div onclick="bulkTryClose()" class="position-absolute inset-0 w-100 h-100"></div>
     <div class="bulk-modal-content position-relative" style="z-index:10;">
 
@@ -372,9 +397,13 @@
                     <span id="bulk-total-count" class="text-secondary" style="font-size: 0.8rem;"></span>
                 </div>
                 <div class="d-flex align-items-center gap-3">
-                    <input type="text" id="bulk-search" class="bulk-search-input" placeholder="{{ __('Cerca carta...') }}" autocomplete="off">
+                    <input type="text" id="bulk-search" class="bulk-search-input"
+                        placeholder="{{ __('Cerca carta...') }}" autocomplete="off">
                     <button onclick="bulkTryClose()" class="btn-modal-close" aria-label="{{ __('Chiudi') }}">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6L6 18M6 6l12 12" />
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -382,16 +411,19 @@
 
         {{-- ─── Toolbar ─────────────────────────────────────────────── --}}
         <div class="bulk-toolbar">
-            <button type="button" class="bulk-toolbar-btn" onclick="bulkSelectAllVisible()" title="{{ __('Imposta qty=1 a tutte le carte visibili') }}">
+            <button type="button" class="bulk-toolbar-btn" onclick="bulkSelectAllVisible()"
+                title="{{ __('Imposta qty=1 a tutte le carte visibili') }}">
                 {{ __('Seleziona visibili') }}
             </button>
-            <button type="button" class="bulk-toolbar-btn" onclick="bulkDeselectAll()" title="{{ __('Rimuovi tutte le selezioni') }}">
+            <button type="button" class="bulk-toolbar-btn" onclick="bulkDeselectAll()"
+                title="{{ __('Rimuovi tutte le selezioni') }}">
                 {{ __('Deseleziona') }}
             </button>
 
             <div class="bulk-toolbar-divider"></div>
 
-            <span class="text-secondary" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em;">{{ __('Applica a selezionate:') }}</span>
+            <span class="text-secondary"
+                style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em;">{{ __('Applica a selezionate:') }}</span>
 
             <select id="bulk-toolbar-lang" class="bulk-toolbar-select" title="{{ __('Lingua') }}">
                 <option value="it">IT</option>
@@ -435,7 +467,10 @@
         {{-- ─── Empty state ─────────────────────────────────────────── --}}
         <div id="bulk-empty" class="flex-grow-1 bulk-state-panel" style="display:none;">
             <div class="text-center text-secondary py-5">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-3" style="opacity:0.3;"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="1.5" class="mb-3" style="opacity:0.3;">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                 <p class="mb-0 fw-bold" style="font-size: 1rem;">{{ __('Hai completato questo set!') }}</p>
                 <p class="small mb-0">{{ __('Non ci sono carte mancanti.') }}</p>
             </div>
@@ -478,134 +513,149 @@
 </div>
 
 <script>
-(function() {
-    'use strict';
+    (function() {
+        'use strict';
 
-    // ─── State ──────────────────────────────────────────────────────
-    let bulkRows = [];
-    let searchFilter = '';
-    let isSubmitting = false;
-    const defaultLang = '{{ Auth::user()->language ?? "it" }}';
-    const defaultCond = 'NM';
-    const defaultFoil = 'normal';
+        // ─── State ──────────────────────────────────────────────────────
+        let bulkRows = [];
+        let searchFilter = '';
+        let isSubmitting = false;
+        const defaultLang = '{{ Auth::user()->language ?? 'it' }}';
+        const defaultCond = 'NM';
+        const defaultFoil = 'normal';
 
-    // ─── DOM refs (cached on first open) ────────────────────────────
-    let $overlay, $loading, $empty, $tableWrap, $tbody, $submitBtn, $selInfo, $totalCount, $search;
+        // ─── DOM refs (cached on first open) ────────────────────────────
+        let $overlay, $loading, $empty, $tableWrap, $tbody, $submitBtn, $selInfo, $totalCount, $search;
 
-    function cacheDom() {
-        $overlay = document.getElementById('missing-cards-overlay');
-        $loading = document.getElementById('bulk-loading');
-        $empty = document.getElementById('bulk-empty');
-        $tableWrap = document.getElementById('bulk-table-wrap');
-        $tbody = document.getElementById('bulk-tbody');
-        $submitBtn = document.getElementById('bulk-submit-btn');
-        $selInfo = document.getElementById('bulk-selection-info');
-        $totalCount = document.getElementById('bulk-total-count');
-        $search = document.getElementById('bulk-search');
-    }
-
-    // ─── Open / Close ───────────────────────────────────────────────
-    window.openMissingCardsModal = function() {
-        cacheDom();
-        bulkRows = [];
-        searchFilter = '';
-        isSubmitting = false;
-        if ($search) $search.value = '';
-
-        $overlay.style.display = 'flex';
-        $loading.style.display = 'flex';
-        $empty.style.display = 'none';
-        $tableWrap.style.display = 'none';
-
-        requestAnimationFrame(() => $overlay.classList.add('is-open'));
-        document.body.style.overflow = 'hidden';
-
-        fetchMissingCards();
-    };
-
-    window.closeMissingCardsModal = function(force) {
-        if (!force && hasChanges() && !isSubmitting) {
-            if (!confirm('{{ __("Hai modifiche non salvate. Vuoi davvero chiudere?") }}')) return;
+        function cacheDom() {
+            $overlay = document.getElementById('missing-cards-overlay');
+            $loading = document.getElementById('bulk-loading');
+            $empty = document.getElementById('bulk-empty');
+            $tableWrap = document.getElementById('bulk-table-wrap');
+            $tbody = document.getElementById('bulk-tbody');
+            $submitBtn = document.getElementById('bulk-submit-btn');
+            $selInfo = document.getElementById('bulk-selection-info');
+            $totalCount = document.getElementById('bulk-total-count');
+            $search = document.getElementById('bulk-search');
         }
-        $overlay.classList.remove('is-open');
-        setTimeout(() => {
-            $overlay.style.display = 'none';
-            document.body.style.overflow = '';
-        }, 300);
-    };
 
-    window.bulkTryClose = function() {
-        closeMissingCardsModal(false);
-    };
+        // ─── Open / Close ───────────────────────────────────────────────
+        window.openMissingCardsModal = function() {
+            cacheDom();
+            bulkRows = [];
+            searchFilter = '';
+            isSubmitting = false;
+            if ($search) $search.value = '';
 
-    // Esc to close
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && $overlay && $overlay.classList.contains('is-open')) {
-            bulkTryClose();
-        }
-    });
-
-    // ─── Fetch data ─────────────────────────────────────────────────
-    async function fetchMissingCards() {
-        try {
-            const res = await fetch(`{{ route('collezioni.set.missing', ['set' => $set->id]) }}`);
-            const data = await res.json();
-            initRows(data);
-        } catch(e) {
-            console.error('Error fetching missing cards:', e);
-            $loading.style.display = 'none';
-        }
-    }
-
-    function initRows(cards) {
-        bulkRows = cards.map(card => ({
-            cardId: card.id,
-            cardNumber: card.dexId || '',
-            name: card.name || '',
-            rarity: card.rarity || '',
-            quantity: 0,
-            language: defaultLang,
-            condition: defaultCond,
-            foilType: defaultFoil,
-            firstEdition: false,
-            signed: false,
-            altered: false,
-            _error: false,
-        }));
-
-        $loading.style.display = 'none';
-
-        if (bulkRows.length === 0) {
-            $empty.style.display = 'flex';
-            $tableWrap.style.display = 'none';
-        } else {
+            $overlay.style.display = 'flex';
+            $loading.style.display = 'flex';
             $empty.style.display = 'none';
-            $tableWrap.style.display = 'block';
-            $totalCount.textContent = bulkRows.length + ' {{ __("carte mancanti") }}';
-            renderTable();
+            $tableWrap.style.display = 'none';
+
+            requestAnimationFrame(() => $overlay.classList.add('is-open'));
+            document.body.style.overflow = 'hidden';
+
+            fetchMissingCards();
+        };
+
+        window.closeMissingCardsModal = function(force) {
+            if (!force && hasChanges() && !isSubmitting) {
+                if (!confirm('{{ __('Hai modifiche non salvate. Vuoi davvero chiudere?') }}')) return;
+            }
+            $overlay.classList.remove('is-open');
+            setTimeout(() => {
+                $overlay.style.display = 'none';
+                document.body.style.overflow = '';
+            }, 300);
+        };
+
+        window.bulkTryClose = function() {
+            closeMissingCardsModal(false);
+        };
+
+        // Esc to close
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && $overlay && $overlay.classList.contains('is-open')) {
+                bulkTryClose();
+            }
+        });
+
+        // ─── Fetch data ─────────────────────────────────────────────────
+        async function fetchMissingCards() {
+            try {
+                const res = await fetch(`{{ route('collezioni.set.missing', ['set' => $set->id]) }}`);
+                const data = await res.json();
+                initRows(data);
+            } catch (e) {
+                console.error('Error fetching missing cards:', e);
+                $loading.style.display = 'none';
+            }
         }
 
-        updateFooter();
-    }
+        function initRows(cards) {
+            bulkRows = cards.map(card => ({
+                cardId: card.id,
+                cardNumber: card.dexId || '',
+                name: card.name || '',
+                rarity: card.rarity || '',
+                urlImage: card.url_image || '',
+                quantity: 0,
+                language: defaultLang,
+                condition: defaultCond,
+                foilType: defaultFoil,
+                firstEdition: false,
+                signed: false,
+                altered: false,
+                _error: false,
+            }));
 
-    // ─── Render ─────────────────────────────────────────────────────
-    function renderTable() {
-        const filter = searchFilter.toLowerCase().trim();
-        let html = '';
+            $loading.style.display = 'none';
 
-        for (let i = 0; i < bulkRows.length; i++) {
-            const row = bulkRows[i];
-
-            // Search filter
-            if (filter && !row.name.toLowerCase().includes(filter) && !row.cardNumber.toLowerCase().includes(filter)) {
-                continue;
+            if (bulkRows.length === 0) {
+                $empty.style.display = 'flex';
+                $tableWrap.style.display = 'none';
+            } else {
+                $empty.style.display = 'none';
+                $tableWrap.style.display = 'block';
+                $totalCount.textContent = bulkRows.length + ' {{ __('carte mancanti') }}';
+                renderTable();
             }
 
-            const rowClass = row._error ? 'bulk-row-error' : (row.quantity > 0 ? 'bulk-row-active' : '');
-            const qtyClass = row.quantity > 0 ? 'has-value' : '';
+            updateFooter();
+        }
 
-            html += `<tr class="${rowClass}" data-idx="${i}" onclick="bulkToggleRow(event, ${i})">
-                <td style="color: #94a3b8; font-size: 0.78rem;">#${escHtml(row.cardNumber)}</td>
+        // ─── Render ─────────────────────────────────────────────────────
+        function renderTable() {
+            const filter = searchFilter.toLowerCase().trim();
+            let html = '';
+
+            for (let i = 0; i < bulkRows.length; i++) {
+                const row = bulkRows[i];
+
+                // Search filter
+                if (filter && !row.name.toLowerCase().includes(filter) && !row.cardNumber.toLowerCase().includes(
+                        filter)) {
+                    continue;
+                }
+
+                const rowClass = row._error ? 'bulk-row-error' : (row.quantity > 0 ? 'bulk-row-active' : '');
+                const qtyClass = row.quantity > 0 ? 'has-value' : '';
+                row.urlImage = row.urlImage + "/high.png";
+                html += `<tr class="${rowClass}" data-idx="${i}" onclick="bulkToggleRow(event, ${i})">
+                <td style="color: #94a3b8; font-size: 0.78rem;">
+                    <div class="d-flex align-items-center gap-1">
+                        <span>#${escHtml(row.cardNumber)}</span>
+                        ${row.urlImage ? `
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-secondary" style="cursor: pointer; flex-shrink: 0;"
+                            onmouseenter="bulkShowImage(event, '${escHtml(row.urlImage)}')"
+                            onmousemove="bulkMoveImage(event)"
+                            onmouseleave="bulkHideImage()">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                        ` : ''}
+                    </div>
+                </td>
                 <td>
                     <span class="fw-medium">${escHtml(row.name)}</span>
                 </td>
@@ -659,268 +709,311 @@
                     </div>
                 </td>
             </tr>`;
-        }
-
-        $tbody.innerHTML = html;
-    }
-
-    function escHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    // ─── Row interactions ───────────────────────────────────────────
-    window.bulkToggleRow = function(event, idx) {
-        // Prevent toggle if clicking on interactive elements
-        const tagName = event.target.tagName.toLowerCase();
-        if (tagName === 'input' || tagName === 'select' || tagName === 'button') {
-            return;
-        }
-
-        const row = bulkRows[idx];
-        row.quantity = row.quantity > 0 ? 0 : 1;
-        renderTable();
-        updateFooter();
-    };
-
-    window.bulkSetQty = function(idx, val) {
-        let v = parseInt(val, 10);
-        if (isNaN(v) || v < 0) v = 0;
-        if (v > 999) v = 999;
-        bulkRows[idx].quantity = v;
-        // Update just this input's class and footer, avoid full re-render for performance
-        const input = $tbody.querySelector(`input[data-idx="${idx}"]`);
-        if (input) {
-            input.value = v;
-            input.classList.toggle('has-value', v > 0);
-            const tr = input.closest('tr');
-            if (tr) {
-                tr.classList.toggle('bulk-row-active', v > 0);
-                tr.classList.remove('bulk-row-error');
             }
+
+            $tbody.innerHTML = html;
         }
-        updateFooter();
-    };
 
-    window.bulkSetField = function(idx, field, value) {
-        bulkRows[idx][field] = value;
-    };
-
-    window.bulkToggleAttr = function(idx, attr) {
-        bulkRows[idx][attr] = !bulkRows[idx][attr];
-        const row = bulkRows[idx];
-        // Update button visually without full re-render
-        const tr = $tbody.querySelector(`tr[data-idx="${idx}"]`);
-        if (tr) {
-            const btns = tr.querySelectorAll('.bulk-attr-toggle');
-            btns.forEach(btn => {
-                const t = btn.title;
-                let key = null;
-                if (t === '1ª Edizione') key = 'firstEdition';
-                else if (t === 'Signed') key = 'signed';
-                else if (t === 'Altered') key = 'altered';
-                if (key) {
-                    btn.classList.toggle('active', row[key]);
-                    btn.setAttribute('aria-pressed', row[key]);
-                }
-            });
+        function escHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
         }
-    };
 
-    // ─── Toolbar actions ────────────────────────────────────────────
-    window.bulkSelectAllVisible = function() {
-        const filter = searchFilter.toLowerCase().trim();
-        for (let i = 0; i < bulkRows.length; i++) {
-            const row = bulkRows[i];
-            if (filter && !row.name.toLowerCase().includes(filter) && !row.cardNumber.toLowerCase().includes(filter)) continue;
-            if (row.quantity === 0) row.quantity = 1;
-        }
-        renderTable();
-        updateFooter();
-    };
-
-    window.bulkDeselectAll = function() {
-        for (let i = 0; i < bulkRows.length; i++) {
-            bulkRows[i].quantity = 0;
-        }
-        renderTable();
-        updateFooter();
-    };
-
-    window.bulkApplyLang = function() {
-        const lang = document.getElementById('bulk-toolbar-lang').value;
-        applyToSelected('language', lang);
-    };
-
-    window.bulkApplyCond = function() {
-        const cond = document.getElementById('bulk-toolbar-cond').value;
-        applyToSelected('condition', cond);
-    };
-
-    window.bulkApplyFoil = function() {
-        const foil = document.getElementById('bulk-toolbar-foil').value;
-        applyToSelected('foilType', foil);
-    };
-
-    function applyToSelected(field, value) {
-        let changed = 0;
-        for (let i = 0; i < bulkRows.length; i++) {
-            if (bulkRows[i].quantity > 0) {
-                bulkRows[i][field] = value;
-                changed++;
+        // ─── Row interactions ───────────────────────────────────────────
+        window.bulkToggleRow = function(event, idx) {
+            // Prevent toggle if clicking on interactive elements
+            const tagName = event.target.tagName.toLowerCase();
+            if (tagName === 'input' || tagName === 'select' || tagName === 'button' || tagName === 'svg' ||
+                tagName === 'path' || tagName === 'circle') {
+                return;
             }
-        }
-        if (changed === 0) {
-            if (window.showToast) window.showToast('{{ __("Nessuna carta selezionata (qty > 0)") }}', 'warning');
-            return;
-        }
-        renderTable();
-        if (window.showToast) window.showToast(changed + ' {{ __("carte aggiornate") }}', 'success');
-    }
 
-    window.bulkResetAll = function() {
-        for (let i = 0; i < bulkRows.length; i++) {
-            bulkRows[i].quantity = 0;
-            bulkRows[i].language = defaultLang;
-            bulkRows[i].condition = defaultCond;
-            bulkRows[i].foilType = defaultFoil;
-            bulkRows[i].firstEdition = false;
-            bulkRows[i].signed = false;
-            bulkRows[i].altered = false;
-            bulkRows[i]._error = false;
-        }
-        renderTable();
-        updateFooter();
-    };
-
-    // ─── Search ─────────────────────────────────────────────────────
-    let searchTimeout;
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchEl = document.getElementById('bulk-search');
-        if (searchEl) {
-            searchEl.addEventListener('input', function() {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => {
-                    searchFilter = this.value;
-                    renderTable();
-                }, 200);
-            });
-        }
-    });
-
-    // ─── Footer update ──────────────────────────────────────────────
-    function updateFooter() {
-        const count = getSelectedCount();
-        const totalQty = getTotalQuantity();
-
-        if (count > 0) {
-            $submitBtn.disabled = false;
-            const label = totalQty === 1 ? '{{ __("Aggiungi 1 carta") }}' : '{{ __("Aggiungi") }} ' + totalQty + ' {{ __("carte") }}';
-            $submitBtn.textContent = label;
-            $selInfo.style.display = 'inline-block';
-            $selInfo.textContent = count + ' {{ __("righe") }}';
-        } else {
-            $submitBtn.disabled = true;
-            $submitBtn.textContent = '{{ __("Nessuna carta selezionata") }}';
-            $selInfo.style.display = 'none';
-        }
-    }
-
-    function getSelectedCount() {
-        return bulkRows.filter(r => r.quantity > 0).length;
-    }
-
-    function getTotalQuantity() {
-        return bulkRows.reduce((sum, r) => sum + (r.quantity > 0 ? r.quantity : 0), 0);
-    }
-
-    function hasChanges() {
-        return bulkRows.some(r => r.quantity > 0);
-    }
-
-    // ─── Submit ─────────────────────────────────────────────────────
-    window.bulkSubmit = async function() {
-        if (isSubmitting) return;
-        const selected = bulkRows.filter(r => r.quantity > 0);
-        if (selected.length === 0) return;
-
-        isSubmitting = true;
-        $submitBtn.disabled = true;
-        $submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> {{ __("Aggiungendo...") }}';
-
-        const payload = {
-            cards: selected.map(r => ({
-                card_id: r.cardId,
-                quantity: r.quantity,
-                language: r.language,
-                condition: r.condition,
-                foil_type: r.foilType,
-                is_first_edition: r.firstEdition,
-                is_signed: r.signed,
-                is_altered: r.altered,
-            })),
+            const row = bulkRows[idx];
+            row.quantity = row.quantity > 0 ? 0 : 1;
+            renderTable();
+            updateFooter();
         };
 
-        try {
-            const res = await fetch(`{{ route('collezioni.set.bulkAdd', ['set' => $set->id]) }}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                },
-                body: JSON.stringify(payload),
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                if (data.failed > 0) {
-                    // Partial error
-                    if (window.showToast) {
-                        window.showToast(data.added + ' {{ __("carte aggiunte") }}, ' + data.failed + ' {{ __("non inserite") }}', 'warning');
-                    }
-                    // Mark failed rows
-                    if (data.errors && data.errors.length > 0) {
-                        const failedIds = new Set(data.errors.map(e => e.card_id));
-                        for (let i = 0; i < bulkRows.length; i++) {
-                            if (failedIds.has(bulkRows[i].cardId)) {
-                                bulkRows[i]._error = true;
-                            } else if (bulkRows[i].quantity > 0) {
-                                bulkRows[i].quantity = 0; // Clear successfully added
-                            }
-                        }
-                        renderTable();
-                        updateFooter();
-                    }
-                    isSubmitting = false;
-                } else {
-                    // Full success
-                    if (window.showToast) {
-                        window.showToast(data.added + ' {{ __("carte aggiunte alla collezione!") }}', 'success');
-                    }
-                    isSubmitting = true; // Keep true to skip close confirmation
-                    closeMissingCardsModal(true);
-                    // Reload the grid
-                    if (typeof reloadCardsGrid === 'function') {
-                        reloadCardsGrid(1);
-                    } else {
-                        window.location.reload();
-                    }
+        window.bulkSetQty = function(idx, val) {
+            let v = parseInt(val, 10);
+            if (isNaN(v) || v < 0) v = 0;
+            if (v > 999) v = 999;
+            bulkRows[idx].quantity = v;
+            // Update just this input's class and footer, avoid full re-render for performance
+            const input = $tbody.querySelector(`input[data-idx="${idx}"]`);
+            if (input) {
+                input.value = v;
+                input.classList.toggle('has-value', v > 0);
+                const tr = input.closest('tr');
+                if (tr) {
+                    tr.classList.toggle('bulk-row-active', v > 0);
+                    tr.classList.remove('bulk-row-error');
                 }
+            }
+            updateFooter();
+        };
+
+        window.bulkSetField = function(idx, field, value) {
+            bulkRows[idx][field] = value;
+        };
+
+        window.bulkToggleAttr = function(idx, attr) {
+            bulkRows[idx][attr] = !bulkRows[idx][attr];
+            const row = bulkRows[idx];
+            // Update button visually without full re-render
+            const tr = $tbody.querySelector(`tr[data-idx="${idx}"]`);
+            if (tr) {
+                const btns = tr.querySelectorAll('.bulk-attr-toggle');
+                btns.forEach(btn => {
+                    const t = btn.title;
+                    let key = null;
+                    if (t === '1ª Edizione') key = 'firstEdition';
+                    else if (t === 'Signed') key = 'signed';
+                    else if (t === 'Altered') key = 'altered';
+                    if (key) {
+                        btn.classList.toggle('active', row[key]);
+                        btn.setAttribute('aria-pressed', row[key]);
+                    }
+                });
+            }
+        };
+
+        // ─── Image Hover Popup ──────────────────────────────────────────
+        window.bulkShowImage = function(event, src) {
+            const preview = document.getElementById('bulk-card-preview');
+            const img = document.getElementById('bulk-card-preview-img');
+            if (!preview || !img || !src) return;
+
+            img.src = src;
+            preview.style.display = 'block';
+
+            bulkMoveImage(event); // Posiziona subito
+        };
+
+        window.bulkMoveImage = function(event) {
+            const preview = document.getElementById('bulk-card-preview');
+            if (!preview || preview.style.display === 'none') return;
+
+            const x = event.clientX + 20;
+            let y = event.clientY + 20;
+
+            // Evita che esca dallo schermo
+            const maxH = window.innerHeight;
+            const h = preview.offsetHeight || 260; // stima altezza immagine
+            if (y + h > maxH) {
+                y = maxH - h - 10;
+            }
+
+            preview.style.left = x + 'px';
+            preview.style.top = y + 'px';
+        };
+
+        window.bulkHideImage = function() {
+            const preview = document.getElementById('bulk-card-preview');
+            if (preview) preview.style.display = 'none';
+        };
+
+        // ─── Toolbar actions ────────────────────────────────────────────
+        window.bulkSelectAllVisible = function() {
+            const filter = searchFilter.toLowerCase().trim();
+            for (let i = 0; i < bulkRows.length; i++) {
+                const row = bulkRows[i];
+                if (filter && !row.name.toLowerCase().includes(filter) && !row.cardNumber.toLowerCase()
+                    .includes(filter)) continue;
+                if (row.quantity === 0) row.quantity = 1;
+            }
+            renderTable();
+            updateFooter();
+        };
+
+        window.bulkDeselectAll = function() {
+            for (let i = 0; i < bulkRows.length; i++) {
+                bulkRows[i].quantity = 0;
+            }
+            renderTable();
+            updateFooter();
+        };
+
+        window.bulkApplyLang = function() {
+            const lang = document.getElementById('bulk-toolbar-lang').value;
+            applyToSelected('language', lang);
+        };
+
+        window.bulkApplyCond = function() {
+            const cond = document.getElementById('bulk-toolbar-cond').value;
+            applyToSelected('condition', cond);
+        };
+
+        window.bulkApplyFoil = function() {
+            const foil = document.getElementById('bulk-toolbar-foil').value;
+            applyToSelected('foilType', foil);
+        };
+
+        function applyToSelected(field, value) {
+            let changed = 0;
+            for (let i = 0; i < bulkRows.length; i++) {
+                if (bulkRows[i].quantity > 0) {
+                    bulkRows[i][field] = value;
+                    changed++;
+                }
+            }
+            if (changed === 0) {
+                if (window.showToast) window.showToast('{{ __('Nessuna carta selezionata (qty > 0)') }}',
+                    'warning');
+                return;
+            }
+            renderTable();
+            if (window.showToast) window.showToast(changed + ' {{ __('carte aggiornate') }}', 'success');
+        }
+
+        window.bulkResetAll = function() {
+            for (let i = 0; i < bulkRows.length; i++) {
+                bulkRows[i].quantity = 0;
+                bulkRows[i].language = defaultLang;
+                bulkRows[i].condition = defaultCond;
+                bulkRows[i].foilType = defaultFoil;
+                bulkRows[i].firstEdition = false;
+                bulkRows[i].signed = false;
+                bulkRows[i].altered = false;
+                bulkRows[i]._error = false;
+            }
+            renderTable();
+            updateFooter();
+        };
+
+        // ─── Search ─────────────────────────────────────────────────────
+        let searchTimeout;
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchEl = document.getElementById('bulk-search');
+            if (searchEl) {
+                searchEl.addEventListener('input', function() {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        searchFilter = this.value;
+                        renderTable();
+                    }, 200);
+                });
+            }
+        });
+
+        // ─── Footer update ──────────────────────────────────────────────
+        function updateFooter() {
+            const count = getSelectedCount();
+            const totalQty = getTotalQuantity();
+
+            if (count > 0) {
+                $submitBtn.disabled = false;
+                const label = totalQty === 1 ? '{{ __('Aggiungi 1 carta') }}' : '{{ __('Aggiungi') }} ' +
+                    totalQty + ' {{ __('carte') }}';
+                $submitBtn.textContent = label;
+                $selInfo.style.display = 'inline-block';
+                $selInfo.textContent = count + ' {{ __('righe') }}';
             } else {
-                if (window.showToast) window.showToast(data.message || '{{ __("Errore durante il salvataggio.") }}', 'danger');
+                $submitBtn.disabled = true;
+                $submitBtn.textContent = '{{ __('Nessuna carta selezionata') }}';
+                $selInfo.style.display = 'none';
+            }
+        }
+
+        function getSelectedCount() {
+            return bulkRows.filter(r => r.quantity > 0).length;
+        }
+
+        function getTotalQuantity() {
+            return bulkRows.reduce((sum, r) => sum + (r.quantity > 0 ? r.quantity : 0), 0);
+        }
+
+        function hasChanges() {
+            return bulkRows.some(r => r.quantity > 0);
+        }
+
+        // ─── Submit ─────────────────────────────────────────────────────
+        window.bulkSubmit = async function() {
+            if (isSubmitting) return;
+            const selected = bulkRows.filter(r => r.quantity > 0);
+            if (selected.length === 0) return;
+
+            isSubmitting = true;
+            $submitBtn.disabled = true;
+            $submitBtn.innerHTML =
+                '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> {{ __('Aggiungendo...') }}';
+
+            const payload = {
+                cards: selected.map(r => ({
+                    card_id: r.cardId,
+                    quantity: r.quantity,
+                    language: r.language,
+                    condition: r.condition,
+                    foil_type: r.foilType,
+                    is_first_edition: r.firstEdition,
+                    is_signed: r.signed,
+                    is_altered: r.altered,
+                })),
+            };
+
+            try {
+                const res = await fetch(`{{ route('collezioni.set.bulkAdd', ['set' => $set->id]) }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    if (data.failed > 0) {
+                        // Partial error
+                        if (window.showToast) {
+                            window.showToast(data.added + ' {{ __('carte aggiunte') }}, ' + data.failed +
+                                ' {{ __('non inserite') }}', 'warning');
+                        }
+                        // Mark failed rows
+                        if (data.errors && data.errors.length > 0) {
+                            const failedIds = new Set(data.errors.map(e => e.card_id));
+                            for (let i = 0; i < bulkRows.length; i++) {
+                                if (failedIds.has(bulkRows[i].cardId)) {
+                                    bulkRows[i]._error = true;
+                                } else if (bulkRows[i].quantity > 0) {
+                                    bulkRows[i].quantity = 0; // Clear successfully added
+                                }
+                            }
+                            renderTable();
+                            updateFooter();
+                        }
+                        isSubmitting = false;
+                    } else {
+                        // Full success
+                        if (window.showToast) {
+                            window.showToast(data.added + ' {{ __('carte aggiunte alla collezione!') }}',
+                                'success');
+                        }
+                        isSubmitting = true; // Keep true to skip close confirmation
+                        closeMissingCardsModal(true);
+                        // Reload the grid
+                        if (typeof reloadCardsGrid === 'function') {
+                            reloadCardsGrid(1);
+                        } else {
+                            window.location.reload();
+                        }
+                    }
+                } else {
+                    if (window.showToast) window.showToast(data.message ||
+                        '{{ __('Errore durante il salvataggio.') }}', 'danger');
+                    isSubmitting = false;
+                    updateFooter();
+                }
+            } catch (e) {
+                console.error('Bulk add error:', e);
+                if (window.showToast) window.showToast('{{ __('Errore di rete. Riprova.') }}', 'danger');
                 isSubmitting = false;
                 updateFooter();
             }
-        } catch(e) {
-            console.error('Bulk add error:', e);
-            if (window.showToast) window.showToast('{{ __("Errore di rete. Riprova.") }}', 'danger');
-            isSubmitting = false;
-            updateFooter();
-        }
-    };
+        };
 
-})();
+    })();
 </script>
