@@ -2,91 +2,59 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ProfileUpdateRequest;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
-use Inertia\Inertia;
+use Illuminate\Support\Facades\Redirect;
+use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
     /**
-     * Show user profile
+     * Display the user's profile form.
      */
-    public function show()
+    public function edit(Request $request): View
     {
-        return Inertia::render('Profile/Show', [
-            'user' => Auth::user()
+        return view('profile.edit', [
+            'user' => $request->user(),
         ]);
     }
 
     /**
-     * Show edit profile form
+     * Update the user's profile information.
      */
-    public function edit()
+    public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        return Inertia::render('Profile/Edit', [
-            'user' => Auth::user()
-        ]);
-    }
+        $request->user()->fill($request->validated());
 
-    /**
-     * Update user profile
-     */
-    public function update(Request $request)
-    {
-        $user = Auth::user();
-
-        $validated = $request->validate([
-            'first_name' => ['nullable', 'string', 'max:100'],
-            'last_name' => ['nullable', 'string', 'max:100'],
-            'birth_date' => ['nullable', 'date'],
-            'phone' => ['nullable', 'string', 'max:20'],
-        ]);
-
-        $user->update($validated);
-
-        return redirect()->route('profile.show')->with('success', 'Profilo aggiornato!');
-    }
-
-    /**
-     * Update user avatar
-     */
-    public function updateAvatar(Request $request)
-    {
-        $request->validate([
-            'avatar' => ['required', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
-        ]);
-
-        $user = Auth::user();
-
-        // Delete old avatar if exists
-        if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
-            Storage::disk('public')->delete($user->avatar);
+        if ($request->user()->isDirty('email')) {
+            $request->user()->email_verified_at = null;
         }
 
-        // Store new avatar
-        $path = $request->file('avatar')->store('avatars', 'public');
-        $user->update(['avatar' => $path]);
+        $request->user()->save();
 
-        return redirect()->route('profile.show')->with('success', 'Avatar aggiornato!');
+        return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
     /**
-     * Update password
+     * Delete the user's account.
      */
-    public function updatePassword(Request $request)
+    public function destroy(Request $request): RedirectResponse
     {
-        $request->validate([
-            'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        $request->validateWithBag('userDeletion', [
+            'password' => ['required', 'current_password'],
         ]);
 
-        $user = Auth::user();
-        $user->update([
-            'password' => Hash::make($request->password),
-        ]);
+        $user = $request->user();
 
-        return redirect()->route('profile.show')->with('success', 'Password aggiornata!');
+        Auth::logout();
+
+        $user->delete();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return Redirect::to('/');
     }
 }

@@ -1,739 +1,633 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-bs-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Card Scanner')</title>
-
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- Google Fonts -->
+    <title>@yield('title', 'PokeStash') — PokeStash</title>
+    <meta name="description" content="@yield('meta_description', __('Gestisci la tua collezione di carte collezionabili.'))">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
-
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
-        :root {
-            --pokemon-yellow: #FFCB05;
-            --pokemon-yellow-light: #FFE066;
-            --pokemon-blue: #3D7DCA;
-            --pokemon-dark-blue: #003A70;
-            --pokemon-red: #CC0000;
-            --pokemon-red-light: #FF4444;
-            --bg-gradient-start: #0f0c29;
-            --bg-gradient-mid: #302b63;
-            --bg-gradient-end: #24243e;
-
-            /* Pokemon Type Colors */
-            --type-fire: #F08030;
-            --type-water: #6890F0;
-            --type-grass: #78C850;
-            --type-electric: #F8D030;
-            --type-psychic: #F85888;
-            --type-fighting: #C03028;
-            --type-dark: #705848;
-            --type-steel: #B8B8D0;
-            --type-fairy: #EE99AC;
-            --type-dragon: #7038F8;
-            --type-normal: #A8A878;
-            --type-colorless: #A8A8A8;
-        }
-
-        /* Demo Banner */
-        .demo-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(90deg, #ff9966, #ff5e62);
-            color: white;
-            z-index: 1001;
-            font-size: 0.85rem;
-            font-weight: 600;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-        }
-
-        .banner-content {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            text-align: center;
-            line-height: 1.2;
-        }
-
-        * {
+        body {
+            background-color: #030712;
             font-family: 'Inter', sans-serif;
         }
 
-        body {
-            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 50%, var(--bg-gradient-end) 100%);
-            min-height: 100vh;
-            color: #fff;
-            display: flex;
-            flex-direction: column;
+        /* Fix Tailwind CSS conflict with Bootstrap's collapse */
+        .collapse.show {
+            visibility: visible !important;
         }
 
-        /* Navbar Improvements */
-        .navbar {
-            background: rgba(0, 0, 0, 0.4) !important;
+        /* Navbar */
+        #main-navbar {
+            background-color: rgba(3, 7, 18, 0.8) !important;
             backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 0.75rem 0;
-            top: 40px;
-            /* Offset for banner */
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
         }
 
-        .navbar-brand {
-            font-weight: 800;
-            color: var(--pokemon-yellow) !important;
-            font-size: 1.4rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: transform 0.3s ease;
-        }
-
-        .navbar-brand:hover {
-            transform: scale(1.02);
-        }
-
-        .scanner-logo {
+        .navbar-brand-icon {
             width: 32px;
-            height: 40px;
-            position: relative;
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            border: 2px solid var(--pokemon-yellow);
-            overflow: hidden;
-            box-shadow: 0 0 10px rgba(255, 203, 5, 0.2);
-        }
-
-        .scanner-logo::before {
-            content: '';
-            position: absolute;
-            top: 4px;
-            left: 4px;
-            right: 4px;
-            bottom: 4px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 2px;
-        }
-
-        .scanner-logo::after {
-            content: '';
-            position: absolute;
-            width: 120%;
-            height: 2px;
-            background: var(--pokemon-red);
-            box-shadow: 0 0 8px var(--pokemon-red);
-            top: 0;
-            left: -10%;
-            animation: scan-vertical 2s linear infinite;
-        }
-
-        @keyframes scan-vertical {
-            0% {
-                top: 0;
-                opacity: 0;
-            }
-
-            10% {
-                opacity: 1;
-            }
-
-            90% {
-                opacity: 1;
-            }
-
-            100% {
-                top: 100%;
-                opacity: 0;
-            }
-        }
-
-
-
-        .nav-link {
-            color: rgba(255, 255, 255, 0.8) !important;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            padding: 0.5rem 1rem !important;
-            border-radius: 10px;
-            margin: 0 0.25rem;
-        }
-
-        .nav-link:hover {
-            color: var(--pokemon-yellow) !important;
-            background: rgba(255, 203, 5, 0.1);
-        }
-
-        .nav-link.active {
-            color: var(--pokemon-yellow) !important;
-            background: rgba(255, 203, 5, 0.15);
-        }
-
-        /* Glass Card */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .glass-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
-        }
-
-        /* Buttons */
-        .btn-pokemon {
-            background: linear-gradient(135deg, var(--pokemon-yellow) 0%, #f39c12 100%);
-            border: none;
-            color: #000;
-            font-weight: 600;
-            padding: 12px 30px;
-            border-radius: 50px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(255, 203, 5, 0.3);
-        }
-
-        .btn-pokemon:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 25px rgba(255, 203, 5, 0.5);
-            color: #000;
-        }
-
-        .btn-pokemon:disabled {
-            opacity: 0.6;
-            transform: none;
-        }
-
-        .btn-danger-pokemon {
-            background: linear-gradient(135deg, var(--pokemon-red) 0%, #ff4444 100%);
-            border: none;
-            color: #fff;
-        }
-
-        .btn-danger-pokemon:hover {
-            color: #fff;
-            box-shadow: 0 6px 25px rgba(204, 0, 0, 0.5);
-        }
-
-        /* Main Container */
-        .main-container {
-            padding-top: 130px;
-            padding-bottom: 80px;
-            flex: 1;
-        }
-
-        /* Page Titles */
-        .page-title {
-            font-weight: 800;
-            font-size: 2.5rem;
-            background: linear-gradient(135deg, var(--pokemon-yellow) 0%, #fff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-        }
-
-        .page-subtitle {
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 1.1rem;
-        }
-
-        /* Loading Spinner */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
+            height: 32px;
+            background: linear-gradient(135deg, #ef4444, #e11d48);
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 9999;
-            display: none;
-            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+            flex-shrink: 0;
         }
 
-        .loading-overlay.active {
+        .nav-link-custom {
             display: flex;
-        }
-
-        .pokeball-loader {
-            width: 80px;
-            height: 80px;
-            position: relative;
-            animation: bounce 0.6s infinite alternate;
-        }
-
-        @keyframes bounce {
-            from {
-                transform: translateY(0) rotate(0deg);
-            }
-
-            to {
-                transform: translateY(-20px) rotate(20deg);
-            }
-        }
-
-        .pokeball-loader::before {
-            content: '';
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: linear-gradient(to bottom, var(--pokemon-red) 45%, #000 45%, #000 55%, #fff 55%);
-            box-shadow: 0 0 30px rgba(255, 203, 5, 0.5);
-        }
-
-        .pokeball-loader::after {
-            content: '';
-            position: absolute;
-            width: 24px;
-            height: 24px;
-            background: #fff;
-            border: 4px solid #000;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                box-shadow: 0 0 0 0 rgba(255, 203, 5, 0.7);
-            }
-
-            50% {
-                box-shadow: 0 0 0 10px rgba(255, 203, 5, 0);
-            }
-        }
-
-        /* Toast Notifications */
-        .toast-container {
-            position: fixed;
-            top: 100px;
-            right: 20px;
-            z-index: 9998;
-        }
-
-        .toast {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-        }
-
-        .toast-header {
-            background: transparent;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            color: #fff;
-        }
-
-        .toast-body {
-            color: rgba(255, 255, 255, 0.9);
-        }
-
-        /* Footer */
-        .app-footer {
-            background: rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1.5rem 0;
-            margin-top: auto;
-        }
-
-        .app-footer p {
-            margin: 0;
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 0.875rem;
-        }
-
-        .app-footer a {
-            color: var(--pokemon-yellow);
-            text-decoration: none;
-            transition: color 0.3s;
-        }
-
-        .app-footer a:hover {
-            color: var(--pokemon-yellow-light);
-        }
-
-        .footer-version {
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.3);
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        /* Page Transitions */
-        .fade-in {
-            animation: fadeIn 0.4s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Mobile Hamburger */
-        .navbar-toggler {
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 0.5rem;
-        }
-
-        .navbar-toggler:focus {
-            box-shadow: 0 0 0 3px rgba(255, 203, 5, 0.3);
-        }
-
-        .navbar-toggler-icon {
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 203, 5, 0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-        }
-
-        /* Type Badges */
-        .type-badge {
-            display: inline-flex;
             align-items: center;
-            gap: 4px;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #9ca3af;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .nav-link-custom:hover {
+            background-color: rgba(255, 255, 255, 0.06);
             color: #fff;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
         }
 
-        .type-fire {
-            background: var(--type-fire);
+        .nav-link-custom.active {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #fff;
         }
 
-        .type-water {
-            background: var(--type-water);
+        /* Dropdown */
+        .nav-dropdown-menu {
+            background-color: rgba(17, 24, 39, 0.97);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 0.75rem;
+            padding: 0.375rem;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            min-width: 220px;
         }
 
-        .type-grass,
-        .type-erba {
-            background: var(--type-grass);
+        .nav-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.625rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #d1d5db;
+            text-decoration: none;
+            transition: all 0.15s;
         }
 
-        .type-electric,
-        .type-elettro {
-            background: var(--type-electric);
+        .nav-dropdown-item:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+            color: #fff;
         }
 
-        .type-psychic,
-        .type-psico {
-            background: var(--type-psychic);
+        .nav-dropdown-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
 
-        .type-fighting,
-        .type-lotta {
-            background: var(--type-fighting);
+        .dropdown-chevron {
+            transition: transform 0.2s;
         }
 
-        .type-dark,
-        .type-buio {
-            background: var(--type-dark);
+        .dropdown-chevron.rotated {
+            transform: rotate(180deg);
         }
 
-        .type-steel,
-        .type-acciaio {
-            background: var(--type-steel);
+        .nav-user-avatar {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #ef4444, #e11d48);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
         }
 
-        .type-fairy {
-            background: var(--type-fairy);
-        }
-
-        .type-dragon,
-        .type-drago {
-            background: var(--type-dragon);
-        }
-
-        .type-normal,
-        .type-normale {
-            background: var(--type-normal);
-        }
-
-        .type-colorless,
-        .type-incolore {
-            background: var(--type-colorless);
-        }
-
-        .type-fuoco {
-            background: var(--type-fire);
-        }
-
-        .type-acqua {
-            background: var(--type-water);
+        /* Mobile Bottom Nav */
+        @media (max-width: 767.98px) {
+            body {
+                padding-bottom: 72px; /* Spazio per la bottom nav */
+            }
+            .mobile-bottom-nav {
+                background-color: rgba(17, 24, 39, 0.95);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                z-index: 1040;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+            .mobile-nav-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+                color: #9ca3af;
+                text-decoration: none;
+                font-size: 0.65rem;
+                font-weight: 500;
+                flex: 1;
+                padding: 8px 0;
+                transition: color 0.2s;
+            }
+            .mobile-nav-item.active {
+                color: #fff;
+            }
+            .mobile-nav-item svg {
+                stroke-width: 2;
+                transition: transform 0.2s, stroke 0.2s;
+            }
+            .mobile-nav-item.active svg {
+                stroke: #60a5fa; /* Colore accento */
+            }
         }
     </style>
-
-    @stack('styles')
+    @yield('custom_style')
 </head>
 
-<body>
-    <!-- Demo Warning Banner -->
-    <div class="demo-banner">
-        <div class="container banner-content">
-            <i class="bi bi-exclamation-triangle-fill"></i>
-            <span>ATTENZIONE: Ogni giorno a mezzanotte viene eseguita la pulizia del DB e dello storage (Ambiente
-                Demo).</span>
-        </div>
-    </div>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg fixed-top">
-        <div class="container">
-            <a class="navbar-brand" href="{{ route('cards.upload') }}">
-                <span class="scanner-logo"></span>
-                Card Scanner
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    @auth
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('cards.upload') ? 'active' : '' }}"
-                                href="{{ route('cards.upload') }}">
-                                <i class="bi bi-camera-fill me-1"></i> Scansiona
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('cards.index') ? 'active' : '' }}"
-                                href="{{ route('cards.index') }}">
-                                <i class="bi bi-collection-fill me-1"></i> Collezione
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('collection.*') ? 'active' : '' }}"
-                                href="{{ route('collection.value') }}">
-                                <i class="bi bi-currency-dollar me-1"></i> Valore
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('matching.*') ? 'active' : '' }}"
-                                href="{{ route('matching.index') }}">
-                                <i class="bi bi-link-45deg me-1"></i> Matching
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('market-data.*') ? 'active' : '' }}"
-                                href="{{ route('market-data.index') }}">
-                                <i class="bi bi-cloud-upload me-1"></i> Market Data
-                            </a>
-                        </li>
-                    @endauth
-                </ul>
+<body class="min-vh-100 d-flex flex-column">
+    @include('partials._card–modal')
+    @include('partials._manage-collection-modal')
 
-                <ul class="navbar-nav">
-                    @guest
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('login') ? 'active' : '' }}"
-                                href="{{ route('login') }}">
-                                <i class="bi bi-box-arrow-in-right me-1"></i> Accedi
+    {{-- ─── Navbar ─────────────────────────────────────────────────────── --}}
+    <nav id="main-navbar" class="navbar sticky-top border-bottom">
+        <div class="container" style="max-width: 1280px;">
+            <div class="d-flex w-100 align-items-center justify-content-between" style="height: 64px;">
+
+                {{-- Logo / Brand --}}
+                <a href="{{ route('dashboard') }}"
+                    class="d-flex align-items-center gap-2 text-decoration-none text-white fw-bold"
+                    style="font-size: 1.1rem; letter-spacing: -0.01em; transition: opacity 0.2s;"
+                    onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                    <div class="navbar-brand-icon">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white"
+                            stroke-width="2.5">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="2" y1="12" x2="22" y2="12" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                    </div>
+                    PokeStash
+                </a>
+
+                {{-- Search Bar --}}
+                <form action="{{ route('cards.search') }}" method="GET" class="d-none d-md-flex mx-4 position-relative" style="flex-grow: 1; max-width: 800px;" id="nav-search-form">
+                    <div class="input-group input-group-sm position-relative">
+                        <span class="input-group-text border-0" style="background-color: rgba(255, 255, 255, 0.05); color: #9ca3af; border-radius: 0.5rem 0 0 0.5rem;">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </span>
+                        <input type="text" id="nav-search-input" name="q" class="form-control border-0 text-white shadow-none" style="background-color: rgba(255, 255, 255, 0.05); border-radius: 0 0.5rem 0.5rem 0;" placeholder="{{ __('Cerca carte...') }}" value="{{ request('q') }}" autocomplete="off">
+                        
+                        <!-- Autocomplete Dropdown -->
+                        <div id="nav-search-dropdown" class="position-absolute w-100 bg-dark rounded-3 shadow-lg d-none" style="top: 100%; left: 0; z-index: 1050; max-height: 400px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); margin-top: 8px;">
+                            <div id="nav-search-results" class="list-group list-group-flush rounded-3"></div>
+                            <div id="nav-search-loading" class="p-3 text-center text-secondary d-none">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <small>{{ __('Caricamento...') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                {{-- Navigation Links --}}
+                <div class="d-none d-md-flex align-items-center gap-1">
+
+                    {{-- Dashboard --}}
+                    <a href="{{ route('dashboard') }}"
+                        class="nav-link-custom {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" />
+                        </svg>
+                        {{ __('Dashboard') }}
+                    </a>
+
+                    {{-- Collezioni Dropdown --}}
+                    <div class="position-relative" id="nav-collezioni-dropdown">
+                        <button type="button" id="nav-collezioni-btn"
+                            class="nav-link-custom border-0 bg-transparent {{ request()->routeIs('collezioni.*') ? 'active' : '' }}"
+                            onclick="toggleDropdown()">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            {{ __('Collezioni') }}
+                            <svg class="dropdown-chevron" id="dropdown-chevron" width="12" height="12"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        {{-- Dropdown Menu --}}
+                        <div id="dropdown-menu" class="nav-dropdown-menu position-absolute end-0 mt-2"
+                            style="display: none; top: 100%;">
+                            <a href="{{ route('collezioni.mie') }}" class="nav-dropdown-item">
+                                <div class="nav-dropdown-icon" style="background-color: rgba(99,102,241,0.1);">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
+                                        stroke="#818cf8" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                    </svg>
+                                </div>
+                                {{ __('Le mie collezioni') }}
                             </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="btn btn-pokemon btn-sm ms-2" href="{{ route('register') }}">
-                                <i class="bi bi-person-plus me-1"></i> Registrati
+
+                            <a href="{{ route('collezioni.disponibili') }}" class="nav-dropdown-item">
+                                <div class="nav-dropdown-icon" style="background-color: rgba(16,185,129,0.1);">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
+                                        stroke="#34d399" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </div>
+                                {{ __('Collezioni disponibili') }}
                             </a>
-                        </li>
-                    @else
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown"
-                                role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                @if(Auth::user()->avatar)
-                                    <img src="{{ Auth::user()->avatar_url }}" alt="Avatar" class="rounded-circle me-2"
-                                        style="width: 28px; height: 28px; object-fit: cover;">
-                                @else
-                                    <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center me-2"
-                                        style="width: 28px; height: 28px;">
-                                        <i class="bi bi-person-fill text-dark small"></i>
+                        </div>
+                    </div>
+
+                    {{-- User Dropdown --}}
+                    <div class="position-relative" id="nav-user-dropdown">
+                        <button type="button" id="nav-user-btn"
+                            class="nav-link-custom border-0 bg-transparent {{ request()->routeIs('profile.*', 'settings.*') ? 'active' : '' }}"
+                            onclick="toggleUserDropdown()">
+                            <div class="nav-user-avatar">
+                                {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+                            </div>
+                            <span class="d-none d-sm-inline">{{ Auth::user()->name }}</span>
+                            <svg class="dropdown-chevron" id="user-dropdown-chevron" width="12" height="12"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        {{-- User Dropdown Menu --}}
+                        <div id="user-dropdown-menu" class="nav-dropdown-menu position-absolute end-0 mt-2"
+                            style="display: none; top: 100%;">
+
+                            {{-- Header utente --}}
+                            <div class="px-3 py-2 mb-1">
+                                <p class="mb-0 text-white fw-semibold" style="font-size:0.875rem;">{{ Auth::user()->name }}</p>
+                                <p class="mb-0" style="font-size:0.75rem; color:#6b7280;">{{ __('Gestisci il tuo account') }}</p>
+                            </div>
+
+                            <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 0.25rem 0;"></div>
+
+                            {{-- Profilo --}}
+                            <a href="{{ route('profile.edit') }}" class="nav-dropdown-item">
+                                <div class="nav-dropdown-icon" style="background-color: rgba(99,102,241,0.1);">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
+                                        stroke="#818cf8" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                </div>
+                                {{ __('Profilo') }}
+                            </a>
+
+                            {{-- Impostazioni --}}
+                            <a href="{{ route('settings.index') }}" class="nav-dropdown-item">
+                                <div class="nav-dropdown-icon" style="background-color: rgba(245,158,11,0.1);">
+                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
+                                        stroke="#f59e0b" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 008.5 4.6 1.65 1.65 0 0010 3.09V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 8.5a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                                    </svg>
+                                </div>
+                                {{ __('Impostazioni') }}
+                            </a>
+
+                            <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 0.25rem 0;"></div>
+
+                            {{-- Logout --}}
+                            <form method="POST" action="{{ route('logout') }}" class="m-0">
+                                @csrf
+                                <button type="submit" class="nav-dropdown-item w-100 border-0 bg-transparent text-start" style="cursor:pointer;">
+                                    <div class="nav-dropdown-icon" style="background-color: rgba(239,68,68,0.1);">
+                                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
+                                            stroke="#ef4444" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                        </svg>
                                     </div>
-                                @endif
-                                {{ Auth::user()->display_name }}
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="userDropdown">
-                                <li>
-                                    <a class="dropdown-item" href="{{ route('profile.show') }}">
-                                        <i class="bi bi-person me-2"></i>Il Mio Profilo
-                                    </a>
-                                </li>
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <li>
-                                    <form action="{{ route('logout') }}" method="POST" class="d-inline">
-                                        @csrf
-                                        <button type="submit" class="dropdown-item text-danger">
-                                            <i class="bi bi-box-arrow-right me-2"></i>Esci
-                                        </button>
-                                    </form>
-                                </li>
-                            </ul>
-                        </li>
-                    @endguest
-                </ul>
+                                    {{ __('Esci') }}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
     </nav>
 
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="text-center">
-            <div class="pokeball-loader"></div>
-            <p class="mt-4 text-white fw-medium">Analizzando la carta...</p>
-        </div>
-    </div>
-
-    <!-- Toast Container -->
-    <div class="toast-container"></div>
-
-    <!-- Main Content -->
-    <main class="main-container fade-in">
-        <div class="container">
-            @yield('content')
-        </div>
+    {{-- ─── Main Content ──────────────────────────────────────────────── --}}
+    <main class="flex-grow-1">
+        @yield('content')
     </main>
 
-    <!-- Footer -->
-    <footer class="app-footer">
-        <div class="container">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
-                <p>
-                    <i class="bi bi-stars me-1"></i>
-                    <strong>Card Scanner</strong>
-                </p>
-                <p class="footer-version mt-2 mt-md-0">
-                    v1.0.0 &bull; Made with <i class="bi bi-heart-fill text-danger"></i> for collectors
-                </p>
-            </div>
-        </div>
-    </footer>
+    <x-footer />
 
-    <!-- Bootstrap 5 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Global utility functions
-        function showLoading() {
-            document.getElementById('loadingOverlay').classList.add('active');
+        // ── Collezioni Dropdown ──
+        function toggleDropdown() {
+            const menu = document.getElementById('dropdown-menu');
+            const chevron = document.getElementById('dropdown-chevron');
+            const isHidden = menu.style.display === 'none' || menu.style.display === '';
+            menu.style.display = isHidden ? 'block' : 'none';
+            chevron.classList.toggle('rotated', isHidden);
+
+            // Chiudi l'altro dropdown
+            closeUserDropdown();
         }
 
-        function hideLoading() {
-            document.getElementById('loadingOverlay').classList.remove('active');
+        // ── User Dropdown ──
+        function toggleUserDropdown() {
+            const menu = document.getElementById('user-dropdown-menu');
+            const chevron = document.getElementById('user-dropdown-chevron');
+            const isHidden = menu.style.display === 'none' || menu.style.display === '';
+            menu.style.display = isHidden ? 'block' : 'none';
+            chevron.classList.toggle('rotated', isHidden);
+
+            // Chiudi l'altro dropdown
+            closeCollezioniDropdown();
         }
 
-        function showToast(message, type = 'success') {
-            const container = document.querySelector('.toast-container');
-            const toastId = 'toast-' + Date.now();
-
-            const iconClass = type === 'success' ? 'bi-check-circle-fill text-success' :
-                type === 'warning' ? 'bi-exclamation-triangle-fill text-warning' :
-                    type === 'info' ? 'bi-info-circle-fill text-info' :
-                        'bi-exclamation-circle-fill text-danger';
-            const title = type === 'success' ? 'Successo' :
-                type === 'warning' ? 'Attenzione' :
-                    type === 'info' ? 'Info' : 'Errore';
-
-            const toastHtml = `
-                <div id="${toastId}" class="toast" role="alert">
-                    <div class="toast-header">
-                        <i class="bi ${iconClass} me-2"></i>
-                        <strong class="me-auto">${title}</strong>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
-                    </div>
-                    <div class="toast-body">${message}</div>
-                </div>
-            `;
-
-            container.insertAdjacentHTML('beforeend', toastHtml);
-
-            const toastEl = document.getElementById(toastId);
-            const toast = new bootstrap.Toast(toastEl, {
-                delay: 5000
-            });
-            toast.show();
-
-            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+        function closeUserDropdown() {
+            const menu = document.getElementById('user-dropdown-menu');
+            const chevron = document.getElementById('user-dropdown-chevron');
+            if (menu) {
+                menu.style.display = 'none';
+                chevron.classList.remove('rotated');
+            }
         }
 
-        // Get type class from type name
-        function getTypeClass(type) {
-            if (!type) return 'type-colorless';
-            const typeMap = {
-                'fuoco': 'type-fuoco',
-                'fire': 'type-fire',
-                'acqua': 'type-acqua',
-                'water': 'type-water',
-                'erba': 'type-erba',
-                'grass': 'type-grass',
-                'elettro': 'type-elettro',
-                'electric': 'type-electric',
-                'psico': 'type-psico',
-                'psychic': 'type-psychic',
-                'lotta': 'type-lotta',
-                'fighting': 'type-fighting',
-                'buio': 'type-buio',
-                'dark': 'type-dark',
-                'acciaio': 'type-acciaio',
-                'steel': 'type-steel',
-                'drago': 'type-drago',
-                'dragon': 'type-dragon',
-                'normale': 'type-normale',
-                'normal': 'type-normal',
-                'incolore': 'type-incolore',
-                'colorless': 'type-colorless',
-                'fairy': 'type-fairy'
-            };
-            return typeMap[type.toLowerCase()] || 'type-colorless';
+        function closeCollezioniDropdown() {
+            const menu = document.getElementById('dropdown-menu');
+            const chevron = document.getElementById('dropdown-chevron');
+            if (menu) {
+                menu.style.display = 'none';
+                chevron.classList.remove('rotated');
+            }
         }
+
+        document.addEventListener('click', function(e) {
+            const collezioniDropdown = document.getElementById('nav-collezioni-dropdown');
+            const userDropdown = document.getElementById('nav-user-dropdown');
+
+            if (collezioniDropdown && !collezioniDropdown.contains(e.target)) {
+                closeCollezioniDropdown();
+            }
+            if (userDropdown && !userDropdown.contains(e.target)) {
+                closeUserDropdown();
+            }
+        });
     </script>
 
-    @stack('scripts')
+    <script>
+        window.__trans = {
+            loading: @json(__('Caricamento...')),
+            sending: @json(__('Invio...')),
+            added: @json(__('Aggiunta!')),
+            error: @json(__('Errore')),
+            add: @json(__('Aggiungi')),
+            remove: @json(__('Rimuovi')),
+            no_abilities: @json(__('Nessuna abilità')),
+            no_price: @json(__('Nessun prezzo disponibile')),
+            no_copies: @json(__('Nessuna copia in collezione.')),
+            confirm_remove_copy: @json(__('Vuoi rimuovere questa copia?')),
+            confirm_remove_card: @json(__('Vuoi rimuovere completamente questa carta dalla tua collezione?')),
+            confirm_remove_mass: @json(__('Vuoi rimuovere :count carte dalla tua collezione?')),
+            save_error: @json(__('Errore durante il salvataggio.')),
+            add_error: @json(__('Errore durante l\'aggiunta')),
+            pokemon_added: @json(__(':name #:number aggiunto'))
+        };
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('nav-search-input');
+            const searchDropdown = document.getElementById('nav-search-dropdown');
+            const searchResults = document.getElementById('nav-search-results');
+            const searchLoading = document.getElementById('nav-search-loading');
+            let debounceTimer;
+
+            if (!searchInput) return;
+
+            searchInput.addEventListener('input', function(e) {
+                const query = e.target.value.trim();
+                
+                clearTimeout(debounceTimer);
+                
+                if (query.length < 2) {
+                    searchDropdown.classList.add('d-none');
+                    return;
+                }
+
+                debounceTimer = setTimeout(() => {
+                    searchDropdown.classList.remove('d-none');
+                    searchResults.innerHTML = '';
+                    searchLoading.classList.remove('d-none');
+
+                    fetch(`{{ route('cards.autocomplete') }}?q=${encodeURIComponent(query)}`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        searchLoading.classList.add('d-none');
+                        searchResults.innerHTML = '';
+                        
+                        if (data.length === 0) {
+                            searchResults.innerHTML = `<div class="p-3 text-center text-secondary small">{{ __('Nessun risultato trovato') }}</div>`;
+                            return;
+                        }
+
+                        data.forEach(card => {
+                            const rarityStyle = card.rarity.toLowerCase().includes('ultra') || card.rarity.toLowerCase().includes('secret') 
+                                ? 'color:#ffb3b1;' : (card.rarity.toLowerCase().includes('rare') ? 'color:#ffd795;' : 'color:#a0b4cc;');
+                            
+                            const setImg = card.set_symbol 
+                                ? `<img src="${card.set_symbol}" alt="" style="height:12px; margin-right:4px; filter: drop-shadow(0px 1px 1px rgba(0,0,0,0.5));">`
+                                : '';
+                                
+                            let flagSvg = '';
+                            if (card.language === 'it') flagSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2" width="12" height="9" style="border-radius:1px; flex-shrink:0;"><path fill="#009246" d="M0 0h1v2H0z"/><path fill="#fff" d="M1 0h1v2H1z"/><path fill="#ce2b37" d="M2 0h1v2H2z"/></svg>`;
+                            else if (card.language === 'en') flagSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" width="12" height="9" style="border-radius:1px; flex-shrink:0;"><clipPath id="s"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#s)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#t)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>`;
+                            else if (card.language === 'jp') flagSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="12" height="9" style="border-radius:1px; flex-shrink:0;"><rect width="900" height="600" fill="#fff"/><circle cx="450" cy="300" r="180" fill="#bc002d"/></svg>`;
+
+                            const a = document.createElement('a');
+                            a.href = `{{ route('cards.search') }}?q=${encodeURIComponent(card.name + ' ' + card.dexId)}`; // Navigate to card specifically
+                            // If they just click, they will search for this exact card. Or we can open the modal. For now, doing a specific search is fine.
+                            a.className = 'list-group-item list-group-item-action bg-transparent text-white border-0 border-bottom d-flex align-items-center gap-3 py-2';
+                            a.style.borderColor = 'rgba(255,255,255,0.05) !important';
+                            
+                            // Let's open the modal directly! It's much cooler.
+                            a.onclick = (ev) => {
+                                ev.preventDefault();
+                                searchDropdown.classList.add('d-none');
+                                openModal({ id: card.id, name: card.name, image: card.image ? card.image.replace('/low.png', '') : null });
+                            };
+
+                            a.innerHTML = `
+                                <div style="width: 35px; height: 48px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; flex-shrink: 0;" class="d-flex align-items-center justify-content-center">
+                                    ${card.image ? `<img src="${card.image}" style="width:100%; height:100%; object-fit:contain;" loading="lazy" onerror="this.style.display='none'">` : '<span style="font-size:10px; color:#666;">{{ __("No img") }}</span>'}
+                                </div>
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        ${flagSvg}
+                                        <div class="fw-bold text-truncate" style="font-size: 0.85rem;">${card.name}</div>
+                                        <div class="ms-auto font-monospace text-secondary" style="font-size:0.7rem;">#${card.dexId}</div>
+                                    </div>
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div class="text-secondary text-truncate d-flex align-items-center" style="font-size: 0.7rem;">
+                                            ${setImg} ${card.set_name || '{{ __("Sconosciuto") }}'}
+                                        </div>
+                                        <div style="font-size: 0.7rem; font-weight: 600; ${rarityStyle}">
+                                            ${card.rarity}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            searchResults.appendChild(a);
+                        });
+                        
+                        // Add "See all results" link
+                        const seeAll = document.createElement('a');
+                        seeAll.href = `{{ route('cards.search') }}?q=${encodeURIComponent(query)}`;
+                        seeAll.className = 'list-group-item list-group-item-action bg-transparent text-center text-primary border-0 py-2 py-2 fw-semibold';
+                        seeAll.style.fontSize = '0.8rem';
+                        seeAll.innerHTML = `{{ __('Vedi tutti i risultati') }} &rarr;`;
+                        searchResults.appendChild(seeAll);
+                    })
+                    .catch(err => {
+                        searchLoading.classList.add('d-none');
+                        searchResults.innerHTML = `<div class="p-3 text-center text-danger small">{{ __('Errore di connessione') }}</div>`;
+                    });
+                }, 300);
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !searchDropdown.contains(e.target)) {
+                    searchDropdown.classList.add('d-none');
+                }
+            });
+            
+            // Show dropdown when clicking input if there's a value
+            searchInput.addEventListener('focus', function(e) {
+                if (e.target.value.trim().length >= 2 && searchResults.innerHTML !== '') {
+                    searchDropdown.classList.remove('d-none');
+                }
+            });
+        });
+    </script>
+    <!-- Global Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3 mt-5" id="global-toast-container" style="z-index: 1080;"></div>
+
+    {{-- ─── Mobile Bottom Navigation Bar (Visualizzata solo su sm e inferiori) ─── --}}
+    <nav class="mobile-bottom-nav d-flex d-md-none fixed-bottom w-100">
+        <a href="{{ route('dashboard') }}" class="mobile-nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" />
+            </svg>
+            <span>{{ __('Home') }}</span>
+        </a>
+        <a href="{{ route('cards.search') }}" class="mobile-nav-item {{ request()->routeIs('cards.search') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span>{{ __('Cerca') }}</span>
+        </a>
+        <a href="{{ route('collezioni.mie') }}" class="mobile-nav-item {{ request()->routeIs('collezioni.mie') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+            <span>{{ __('Mie') }}</span>
+        </a>
+        <a href="{{ route('collezioni.disponibili') }}" class="mobile-nav-item {{ request()->routeIs('collezioni.disponibili') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <span>{{ __('Set') }}</span>
+        </a>
+        <a href="{{ route('profile.edit') }}" class="mobile-nav-item {{ request()->routeIs('profile.*', 'settings.*') ? 'active' : '' }}">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span>{{ __('Profilo') }}</span>
+        </a>
+    </nav>
+
+    <script>
+        window.showToast = function(message, type = 'success') {
+            const container = document.getElementById('global-toast-container');
+            if (!container) return;
+
+            const bgClass = type === 'success' ? 'bg-success' : (type === 'danger' ? 'bg-danger' : 'bg-primary');
+            const icon = type === 'success' 
+                ? '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>'
+                : '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>';
+
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast align-items-center text-white ${bgClass} border-0 shadow-lg`;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body d-flex align-items-center gap-2 fw-medium" style="font-size: 0.95rem;">
+                        ${icon}
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+            
+            container.appendChild(toastEl);
+            const toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+            toast.show();
+            
+            toastEl.addEventListener('hidden.bs.toast', () => {
+                toastEl.remove();
+            });
+        };
+    </script>
 </body>
 
 </html>

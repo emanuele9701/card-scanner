@@ -35,13 +35,4 @@ return [
         ],
     ],
 
-    'google_drive' => [
-        'enabled' => env('GOOGLE_DRIVE_ENABLED', false),
-    ],
-
-    'gemini' => [
-        'api_key' => env('GEMINI_API_KEY', ''),
-        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent'),
-    ],
-
 ];

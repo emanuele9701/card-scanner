@@ -3,82 +3,92 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
-use Inertia\Inertia;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
     /**
-     * Show registration form
+     * Registra un nuovo utente e restituisce un token API.
      */
-    public function showRegister()
+    public function register(Request $request): JsonResponse
     {
-        return Inertia::render('Auth/Register');
-    }
-
-    /**
-     * Handle registration
-     */
-    public function register(Request $request)
-    {
-        $request->validate([
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', Password::min(8), 'confirmed'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
         $user = User::create([
-            'name' => explode('@', $request->email)[0], // Use email prefix as default name
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
         ]);
 
-        Auth::login($user);
+        $token = $user->createToken('api-token')->plainTextToken;
 
-        return redirect()->route('cards.upload')->with('success', 'Registrazione completata! Benvenuto!');
+        return response()->json([
+            'success' => true,
+            'message' => 'Registrazione avvenuta con successo.',
+            'data' => [
+                'user' => $user,
+                'token' => $token,
+            ],
+        ], 201);
     }
 
     /**
-     * Show the login form.
+     * Login e creazione token API.
      */
-    public function showLogin()
+    public function login(Request $request): JsonResponse
     {
-        return Inertia::render('Auth/Login');
-    }
-
-    /**
-     * Handle login
-     */
-    public function login(Request $request)
-    {
-        $credentials = $request->validate([
+        $request->validate([
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
-            $request->session()->regenerate();
+        $user = User::where('email', $request->email)->first();
 
-            return redirect()->intended(route('cards.upload'))->with('success', 'Bentornato!');
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['Credenziali non valide.'],
+            ]);
         }
 
-        return back()->withErrors([
-            'email' => 'Credenziali non valide.',
-        ])->onlyInput('email');
+        $token = $user->createToken('api-token')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => $user,
+                'token' => $token,
+            ],
+        ]);
     }
 
     /**
-     * Handle logout
+     * Logout — revoca il token corrente.
      */
-    public function logout(Request $request)
+    public function logout(Request $request): JsonResponse
     {
-        Auth::logout();
+        $request->user()->currentAccessToken()->delete();
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        return response()->json([
+            'success' => true,
+            'message' => 'Logout effettuato.',
+        ]);
+    }
 
-        return redirect()->route('login')->with('success', 'Logout effettuato!');
+    /**
+     * Restituisce l'utente autenticato.
+     */
+    public function me(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $request->user(),
+        ]);
     }
 }

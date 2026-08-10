@@ -3,42 +3,21 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\UserSetting;
 
-class User extends Authenticatable
+#[Fillable(['name', 'email', 'password', 'fcm_token'])]
+#[Hidden(['password', 'remember_token'])]
+class User extends Authenticatable // implements MustVerifyEmail
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'first_name',
-        'last_name',
-        'birth_date',
-        'phone',
-        'avatar',
-    ];
-
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
+    /** @use HasFactory<UserFactory> */
+    use HasFactory, Notifiable, HasApiTokens;
 
     /**
      * Get the attributes that should be cast.
@@ -50,61 +29,59 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'birth_date' => 'date',
         ];
     }
 
     /**
-     * Get the user's full name
+     * Collezione di carte dell'utente.
      */
-    public function getFullNameAttribute(): string
+    public function collection()
     {
-        if ($this->first_name || $this->last_name) {
-            return trim("{$this->first_name} {$this->last_name}");
-        }
-        return $this->name;
+        return $this->hasMany(UserCardCollection::class, 'user_id', 'id');
     }
 
     /**
-     * Get the user's display name
+     * Impostazioni dell'utente.
      */
-    public function getDisplayNameAttribute(): string
+    public function settings()
     {
-        return $this->first_name ?? $this->name;
+        return $this->hasMany(UserSetting::class, 'user_id', 'id');
+    }
+
+    public function cardWatchlists()
+    {
+        return $this->hasMany(UserCardWatchlist::class, 'user_id', 'id');
+    }
+
+    public function setWatchlists()
+    {
+        return $this->hasMany(UserSetWatchlist::class, 'user_id', 'id');
     }
 
     /**
-     * Get the user's avatar URL
+     * Restituisce il valore di una specifica impostazione.
      */
-    public function getAvatarUrlAttribute(): ?string
+    public function getSetting(string $key, $default = null)
     {
-        if ($this->avatar) {
-            return asset('storage/' . $this->avatar);
-        }
-        return null;
+        return $this->settings()->where('key', $key)->value('value') ?? $default;
     }
 
     /**
-     * Get user's Pokemon cards
+     * Salva un'impostazione dell'utente.
      */
-    public function pokemonCards(): HasMany
+    public function setSetting(string $key, string $value)
     {
-        return $this->hasMany(PokemonCard::class);
+        return $this->settings()->updateOrCreate(
+            ['user_id' => $this->id, 'key' => $key],
+            ['value' => $value]
+        );
     }
 
     /**
-     * The games that belong to the user.
+     * Lingua preferita dell'utente.
      */
-    public function games()
+    public function getLanguageAttribute(): string
     {
-        return $this->belongsToMany(Game::class, 'game_user');
-    }
-
-    /**
-     * The card sets that belong to the user.
-     */
-    public function cardSets()
-    {
-        return $this->belongsToMany(CardSet::class, 'card_set_user');
+        return $this->getSetting('language', config('app.locale'));
     }
 }

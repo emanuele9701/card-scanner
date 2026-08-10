@@ -2,336 +2,218 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\UpdateCardRequest;
-use App\Http\Requests\BulkDestroyRequest;
-use App\Http\Requests\AssignSetRequest;
-use App\Models\CardSet;
-use App\Models\MarketPrice;
-use App\Models\PokemonCard;
-use App\Services\GoogleDriveService;
-use Exception;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Http\Controllers\Controller;
+use App\Models\TCGCard;
+use App\Models\TCGSet;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
-use Inertia\Inertia;
+use Illuminate\Support\Facades\Cache;
 
 class CardController extends Controller
 {
-    use AuthorizesRequests;
-
     /**
-     * Get all scanned cards with server-side pagination
+     * Ricerca globale carte con supporto per:
+     *  - nome carta (anche con spazi, es. "Mr. Mime")
+     *  - abbreviazione set + dexId (es. "MEG 001")
+     *  - nome + dexId (es. "Bulbasaur 001")
+     *  - abbreviazione + nome + dexId (es. "MEG Bulbasaur 001")
+     *  - qualsiasi combinazione parziale
      */
-    public function index(Request $request)
-    {
-        $perPage = $request->input('per_page', 25);
-        $search = $request->input('search', '');
-        $game = $request->input('game', '');
-        $set = $request->input('set', '');
-        $withoutSet = $request->input('without_set', false);
-        $withoutRarity = $request->input('without_rarity', false);
-        $onlyDuplicates = $request->input('only_duplicates', false);
-        $rarityVariant = $request->input('rarity_variant', '');
-        $sortColumn = $request->input('sort_column', '');
-        $sortDirection = in_array(strtolower($request->input('sort_direction', 'asc')), ['asc', 'desc'])
-            ? strtolower($request->input('sort_direction', 'asc'))
-            : 'asc';
+    public function search(Request $request) {
+        $q = trim($request->query('q', ''));
+        
+        if (empty($q)) {
+            $cards = TCGCard::with('set')->paginate(15);
+            return $this->respondSearch($request, $cards, $q);
+        }
 
-        $query = PokemonCard::with('cardSet')
-            ->withSum('inventory', 'quantity')
-            ->where('user_id', auth()->id())
-            ->where('status', PokemonCard::STATUS_COMPLETED);
+        $parsed = $this->parseSearchQuery($q);
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('card_name', 'like', '%' . $search . '%')
-                    ->orWhere('set_number', 'like', '%' . $search . '%');
+        $query = TCGCard::with('set');
+
+        // Filtro per abbreviazione set (join su indice)
+        if ($parsed['abbreviation']) {
+            $query->whereHas('set', function ($sq) use ($parsed) {
+                $sq->where('abbreviation_official', $parsed['abbreviation']);
             });
         }
 
-        if ($game) {
-            $query->where('game', $game);
-        }
-
-        if ($set) {
-            $query->whereHas('cardSet', function ($q) use ($set) {
-                $q->where('name', $set);
+        // Filtro per dexId (match esatto, con/senza zeri iniziali)
+        if ($parsed['dexId'] !== null) {
+            $dexId = $parsed['dexId'];
+            $query->where(function ($q) use ($dexId) {
+                $q->where('dexId', $dexId)
+                  ->orWhere('dexId', ltrim($dexId, '0'))
+                  ->orWhere('dexId', str_pad(ltrim($dexId, '0'), 3, '0', STR_PAD_LEFT));
             });
         }
 
-        if ($withoutSet) {
-            $query->whereNull('card_set_id');
+        // Filtro per nome carta (LIKE)
+        if ($parsed['name']) {
+            $query->where('name', 'like', '%' . $parsed['name'] . '%');
         }
 
-        if ($withoutRarity) {
-            $query->where(function ($q) {
-                $q->whereNull('rarity')->orWhere('rarity', '');
-            });
+        // Se non abbiamo parsato nulla di strutturato, fallback a ricerca generica
+        if (!$parsed['abbreviation'] && $parsed['dexId'] === null && !$parsed['name']) {
+            $query->where('name', 'like', "%{$q}%");
         }
 
-        if ($onlyDuplicates) {
-            $query->whereIn('id', function ($subquery) {
-                $subquery->select('pokemon_card_id')
-                    ->from('card_inventory')
-                    ->where('user_id', auth()->id())
-                    ->groupBy('pokemon_card_id')
-                    ->havingRaw('SUM(quantity) > 1');
-            });
-        }
+        $cards = $query->paginate(15);
 
-        if ($rarityVariant) {
-            $query->whereHas('inventory', function ($q) use ($rarityVariant) {
-                $q->where('rarity_variant', $rarityVariant);
-            });
-        }
-
-        // Apply sorting — whitelist columns to prevent injection
-        $allowedSortColumns = ['card_name', 'set_number', 'rarity', 'hp', 'type', 'created_at'];
-        if ($sortColumn === 'set_number') {
-            $query->orderByRaw("CAST(SUBSTRING_INDEX(set_number, '/', 1) AS UNSIGNED) " . $sortDirection)
-                ->orderBy('set_number', $sortDirection);
-        } elseif ($sortColumn && in_array($sortColumn, $allowedSortColumns)) {
-            $query->orderBy($sortColumn, $sortDirection);
-        } else {
-            $query->orderBy('card_name');
-        }
-
-        $cards = $query->paginate($perPage);
-
-        $availableGames = PokemonCard::where('user_id', auth()->id())
-            ->whereNotNull('game')
-            ->distinct()
-            ->pluck('game')
-            ->sort()
-            ->values();
-
-        $availableSets = CardSet::whereHas('pokemonCards', function ($q) {
-            $q->where('user_id', auth()->id());
-        })
-            ->pluck('name')
-            ->sort()
-            ->values();
-
-        $availableVariants = \App\Models\CardInventory::where('user_id', auth()->id())
-            ->distinct()
-            ->pluck('rarity_variant')
-            ->sort()
-            ->values();
-
-        return Inertia::render('Cards/Index', [
-            'cards' => $cards,
-            'availableGames' => $availableGames,
-            'availableSets' => $availableSets,
-            'availableVariants' => $availableVariants,
-            'filters' => [
-                'search' => $search,
-                'game' => $game,
-                'set' => $set,
-                'without_set' => $withoutSet,
-                'without_rarity' => $withoutRarity,
-                'only_duplicates' => $onlyDuplicates,
-                'rarity_variant' => $rarityVariant,
-                'sort_column' => $sortColumn,
-                'sort_direction' => $sortDirection,
-            ]
-        ]);
+        return $this->respondSearch($request, $cards, $q);
     }
 
     /**
-     * Get single card data for modal display
+     * Parsa la query di ricerca in componenti: abbreviazione, nome, dexId.
+     *
+     * Logica:
+     * 1. L'ultimo token, se numerico → dexId
+     * 2. Il primo token (dei rimanenti), se è un'abbreviazione nota → abbreviazione set
+     * 3. Tutto ciò che resta → nome della carta (supporta spazi)
      */
-    public function show(PokemonCard $card)
+    private function parseSearchQuery(string $q): array
     {
-        $this->authorize('view', $card);
-        $card->load(['cardSet', 'inventory', 'marketCard']);
-        $marketCard = $card->getRelation('marketCard');
-        $inventary = $card->getRelation('inventory')->toArray();
+        $result = [
+            'abbreviation' => null,
+            'name' => null,
+            'dexId' => null,
+        ];
 
-        $marketCard->load(['prices'], function ($query) {
-            $query->orderBy('import_date', 'desc');
+        $tokens = preg_split('/\s+/', trim($q));
+        if (empty($tokens)) {
+            return $result;
+        }
+
+        // 1. Ultimo token numerico? → dexId
+        $lastToken = end($tokens);
+        if (preg_match('/^\d+$/', $lastToken)) {
+            $result['dexId'] = $lastToken;
+            array_pop($tokens);
+        }
+
+        if (empty($tokens)) {
+            return $result;
+        }
+
+        // 2. Primo token = abbreviazione nota?
+        $firstToken = strtoupper($tokens[0]);
+        $knownAbbreviations = $this->getKnownAbbreviations();
+        
+        if (isset($knownAbbreviations[$firstToken])) {
+            $result['abbreviation'] = $firstToken;
+            array_shift($tokens);
+        }
+
+        // 3. Tutto il resto → nome carta
+        if (!empty($tokens)) {
+            $result['name'] = implode(' ', $tokens);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Restituisce un set di abbreviazioni note, cachate per 24h.
+     * La chiave è l'abbreviazione uppercase, il valore è true.
+     * Formato: ['MEG' => true, 'SV' => true, ...]
+     */
+    private function getKnownAbbreviations(): array
+    {
+        return Cache::remember('tcg_set_abbreviations', 60 * 60 * 24, function () {
+            return TCGSet::whereNotNull('abbreviation_official')
+                ->where('abbreviation_official', '!=', '')
+                ->pluck('abbreviation_official')
+                ->unique()
+                ->mapWithKeys(fn ($abbr) => [strtoupper($abbr) => true])
+                ->toArray();
         });
+    }
 
-        $valoreComplessivo = 0;
+    /**
+     * Risponde alla ricerca in formato JSON (AJAX) o con la vista.
+     */
+    private function respondSearch(Request $request, $cards, string $q)
+    {
+        if ($request->ajax()) {
+            return response()->json([
+                'html' => view('collezioni.partials.cards-grid', compact('cards'))->render(),
+                'current_page' => $cards->currentPage(),
+                'last_page' => $cards->lastPage(),
+            ]);
+        }
 
-        $prices = $marketCard->getRelation('prices');
-        $out = [];
-        array_map(function ($item) use ($prices, &$out, &$valoreComplessivo) {
+        return view('search.results', compact('cards', 'q'));
+    }
 
-            $cardPrices = [];
-            foreach ($prices as $price) {
-                if ($price->printing === $item['rarity_variant']) {
-                    $cardPrices = [
-                        'provider_name' => $price->provider->name ?? 'Unknown',
-                        'market_price' => $price->market_price,
-                        'import_date' => $price->import_date->toDateString(),
-                        'unit' => MarketPrice::UNITS_DIVISA[$price->unit_divisa] ?? $price->unit_divisa,
-                    ];
-                    $out[] = array_merge($item, $cardPrices);
-                    $valoreComplessivo += $item['quantity'] * $price->market_price;
-                }
-            }
-        }, $inventary);
+    public function autocomplete(Request $request)
+    {
+        $q = trim($request->query('q', ''));
+        if (empty($q)) {
+            return response()->json([]);
+        }
 
+        $parsed = $this->parseSearchQuery($q);
+        $query = TCGCard::with('set');
 
-        return response()->json([
-            'success' => true,
-            'card' => [
+        if ($parsed['abbreviation']) {
+            $query->whereHas('set', function ($sq) use ($parsed) {
+                $sq->where('abbreviation_official', $parsed['abbreviation']);
+            });
+        }
+
+        if ($parsed['dexId'] !== null) {
+            $dexId = $parsed['dexId'];
+            $query->where(function ($q) use ($dexId) {
+                $q->where('dexId', $dexId)
+                  ->orWhere('dexId', ltrim($dexId, '0'))
+                  ->orWhere('dexId', str_pad(ltrim($dexId, '0'), 3, '0', STR_PAD_LEFT));
+            });
+        }
+
+        if ($parsed['name']) {
+            $query->where('name', 'like', '%' . $parsed['name'] . '%');
+        }
+
+        if (!$parsed['abbreviation'] && $parsed['dexId'] === null && !$parsed['name']) {
+            $query->where('name', 'like', "%{$q}%");
+        }
+
+        $cards = $query->limit(8)->get(['id', 'name', 'url_image', 'language', 'set_id', 'dexId', 'rarity']);
+        
+        return response()->json($cards->map(function($card) {
+            return [
                 'id' => $card->id,
-                'card_name' => $card->card_name,
-                'hp' => $card->hp,
-                'type' => $card->type,
-                'evolution_stage' => $card->evolution_stage,
-                'weakness' => $card->weakness,
-                'resistance' => $card->resistance,
-                'retreat_cost' => $card->retreat_cost,
-                'set_number' => $card->set_number,
-                'rarity' => $card->rarity,
-                'illustrator' => $card->illustrator,
-                'flavor_text' => $card->flavor_text,
-                'condition' => $card->condition,
-                'acquisition_price' => $card->acquisition_price,
-                'image_url' => $card->image_url,
-                'card_set_id' => $card->card_set_id,
-                'card_set' => $card->cardSet ? ['name' => $card->cardSet->name] : null,
-                'estimated_value' => $card->formatted_estimated_value,
-                'inventory' => $out,
-                'total_quantity' => $card->getTotalQuantity(),
-                'total_value' => $valoreComplessivo,
-            ]
-        ]);
+                'name' => $card->name,
+                'image' => $card->url_image ? $card->url_image . '/low.png' : null,
+                'language' => strtolower($card->language ?? ''),
+                'set_name' => optional($card->set)->name,
+                'set_symbol' => optional($card->set)->symbol ? optional($card->set)->symbol . '/low.png' : null,
+                'rarity' => $card->rarity ?: 'Common',
+                'dexId' => str_pad($card->dexId, 3, '0', STR_PAD_LEFT)
+            ];
+        }));
     }
 
-    /**
-     * Update a card
-     */
-    public function update(UpdateCardRequest $request, PokemonCard $card)
-    {
-        $this->authorize('update', $card);
-
-        $data = $request->only([
-            'card_name',
-            'hp',
-            'type',
-            'evolution_stage',
-            'rarity',
-            'set_number',
-            'illustrator',
-            'card_set_id',
-            'retreat_cost',
-            'weakness',
-            'resistance',
-            'game'
-        ]);
-
-        if ($request->has('game')) {
-            $gameModel = \App\Models\Game::firstOrCreate(['name' => $request->game]);
-            $data['game_id'] = $gameModel->id;
-        }
-
-        $card->update($data);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Carta aggiornata con successo!',
-            'data' => $card->load('cardSet')
-        ]);
-    }
-
-    /**
-     * Delete a card
-     */
-    public function destroy(PokemonCard $card)
-    {
-        $this->authorize('delete', $card);
-
-        if ($card->driveFile && $card->driveFile->isUploaded()) {
-            $driveService = app(GoogleDriveService::class);
-            $driveService->deleteFile($card->driveFile->drive_id);
-        } elseif ($card->storage_path && Storage::disk('public')->exists($card->storage_path)) {
-            Storage::disk('public')->delete($card->storage_path);
-        }
-
-        $card->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Carta eliminata con successo!'
-        ]);
-    }
-
-    /**
-     * Delete multiple cards at once
-     */
-    public function bulkDestroy(BulkDestroyRequest $request)
-    {
-
-        $cards = PokemonCard::with('driveFile')
-            ->where('user_id', auth()->id())
-            ->whereIn('id', $request->card_ids)
-            ->get();
-
-        $count = $cards->count();
-        $driveService = app(GoogleDriveService::class);
-
-        foreach ($cards as $card) {
-            if ($card->driveFile && $card->driveFile->isUploaded()) {
-                try {
-                    $driveService->deleteFile($card->driveFile->drive_id);
-                } catch (Exception $e) {
-                    Log::error("Failed to delete file from Drive for card #{$card->id}: " . $e->getMessage());
+    public function show(\App\Models\TCGCard $card) {
+        $userId = \Illuminate\Support\Facades\Auth::id();
+        $card->load([
+            'abilities', 
+            'prices', 
+            'priceHistory',
+            'collectors' => function($q) use ($userId) {
+                if ($userId) {
+                    $q->where('user_id', $userId);
                 }
-            } elseif ($card->storage_path && Storage::disk('public')->exists($card->storage_path)) {
-                Storage::disk('public')->delete($card->storage_path);
             }
-            $card->delete();
+        ]);
+        
+        $card->is_watchlisted = false;
+        if ($userId) {
+            $card->is_watchlisted = \Illuminate\Support\Facades\DB::table('user_card_watchlists')
+                ->where('user_id', $userId)
+                ->where('card_id', $card->id)
+                ->exists();
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => "{$count} carte eliminate con successo!"
-        ]);
-    }
-
-    /**
-     * Assign set to one or more cards
-     */
-    public function assignSet(AssignSetRequest $request)
-    {
-
-        PokemonCard::where('user_id', auth()->id())
-            ->whereIn('id', $request->card_ids)
-            ->update(['card_set_id' => $request->card_set_id]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Set assegnato con successo!'
-        ]);
-    }
-
-    /**
-     * Get all card sets for dropdown
-     */
-    public function getCardSets()
-    {
-        $sets = CardSet::orderBy('name')->get(['id', 'name', 'abbreviation']);
-
-        return response()->json([
-            'success' => true,
-            'data' => $sets
-        ]);
-    }
-
-    /**
-     * Get all available games for dropdown
-     */
-    public function getAvailableGames()
-    {
-        $games = \App\Models\Game::orderBy('name')->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $games
-        ]);
+        
+        return response()->json($card);
     }
 }

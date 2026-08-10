@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Card Scanner'),
+    'name' => env('APP_NAME', 'Laravel'),
 
     /*
     |--------------------------------------------------------------------------
@@ -54,8 +54,6 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
-    'force_https' => (bool) env('FORCE_HTTPS', false),
-
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
@@ -67,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('TIMEZONE', 'UTC'),
 
     /*
     |--------------------------------------------------------------------------
@@ -80,9 +78,9 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    'locale' => env('APP_LOCALE', 'it'),
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'it'),
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 

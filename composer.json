@@ -9,28 +9,28 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
-        "google/apiclient": "^2.19",
-        "inertiajs/inertia-laravel": "^2.0",
-        "intervention/image": "^3.11",
+        "php": "^8.3",
+        "imangazaliev/didom": "^2.0",
         "kriswallsmith/buzz": "^1.3",
-        "laravel/framework": "^12.0",
+        "laravel/framework": "^13.0",
         "laravel/sanctum": "^4.3",
-        "laravel/tinker": "^2.10.1",
+        "laravel/tinker": "^3.0",
         "nyholm/psr7": "^1.8",
+        "phpoffice/phpspreadsheet": "*",
+        "predis/predis": "^3.5",
+        "spatie/laravel-medialibrary": "^11.21",
         "symfony/cache": "^7.4",
-        "tcgdex/sdk": "^2.2",
-        "tightenco/ziggy": "^2.6",
-        "yaza/laravel-google-drive-storage": "^4.1"
+        "tcgdex/sdk": "^2.3"
     },
     "require-dev": {
+        "edneymatias/antigravity-laravel-kit": "^1.3",
         "fakerphp/faker": "^1.23",
-        "laravel/pail": "^1.2.2",
-        "laravel/pint": "^1.24",
-        "laravel/sail": "^1.41",
+        "laravel/breeze": "^2.4",
+        "laravel/pail": "^1.2.5",
+        "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^11.5.3"
+        "phpunit/phpunit": "^12.5.12"
     },
     "autoload": {
         "psr-4": {
@@ -50,12 +50,12 @@
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
             "@php artisan migrate --force",
-            "npm install",
+            "npm install --ignore-scripts",
             "npm run build"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"npm run dev\" --names='server,queue,vite'"
         ],
         "test": [
             "@php artisan config:clear --ansi",
